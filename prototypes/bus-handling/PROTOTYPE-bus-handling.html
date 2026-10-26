@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PROTOTYPE · Bus handling</title>
+<!--
+  THROWAWAY PROTOTYPE for wayfinder ticket 007 "Prototype arcade-plus bus handling".
+  Question: what should driving the bus feel like (acceleration, braking, steering, body roll),
+  on flat Dhaka streets vs Bandarban hairpins? Not production code: no tests, no structure.
+  Run: double-click this file (needs internet for the Three.js and Rapier CDN imports).
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#a9cde0;font:13px/1.35 system-ui,sans-serif;color:#111}
+  canvas{display:block;touch-action:none}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:5;white-space:nowrap}
+  #hud{position:fixed;top:30px;left:8px;background:rgba(255,255,255,.9);padding:8px 10px;border-radius:8px;width:220px;font-variant-numeric:tabular-nums}
+  #hud .big{font-size:28px;font-weight:700}
+  .bar{height:6px;background:#ddd;border-radius:3px;overflow:hidden;margin:2px 0 6px}
+  .bar>i{display:block;height:100%;background:#2a9d4b;transition:width .1s}
+  #panel{position:fixed;top:30px;right:8px;width:280px;max-height:calc(100% - 40px);overflow:auto;background:rgba(255,255,255,.93);padding:8px 10px;border-radius:8px}
+  #panel.closed #body{display:none}
+  #panel label{display:block;margin:6px 0 0}
+  #panel input[type=range]{width:100%}
+  #panel .row{display:flex;justify-content:space-between;gap:6px}
+  button{margin:2px 2px 2px 0;padding:4px 8px;border:1px solid #888;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+  button.on{background:#222;color:#fff}
+  #help{font-size:12px;color:#444;margin-top:8px}
+  #toast{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:700;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center}
+  #loading{position:fixed;inset:0;display:grid;place-items:center;font-size:18px}
+  #touch{display:none}
+  body.touch #touch{display:block}
+  #steerZone{position:fixed;left:0;bottom:0;width:45%;height:45%;background:rgba(0,0,0,.06)}
+  #steerZone span{position:absolute;bottom:10px;left:10px;color:#333;font-size:12px}
+  .pedal{position:fixed;bottom:16px;width:84px;height:110px;border-radius:12px;border:2px solid #333;background:rgba(255,255,255,.7);font-weight:700;display:grid;place-items:center;user-select:none}
+  #gas{right:16px;height:130px}
+  #door{right:16px;bottom:160px;height:56px}
+  #brk{right:112px}
+  .pedal.down{background:#333;color:#fff}
+  @media (max-width:700px){#hud{width:170px;font-size:12px}#hud .big{font-size:22px}#panel{width:230px}}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: bus handling (throwaway)</div>
+<div id="loading">Loading Three.js + Rapier…</div>
+<div id="hud"></div>
+<div id="panel" class="closed">
+  <div class="row"><b>Tuning</b><button id="toggle">Show ▾</button></div>
+  <div id="body">
+    <div id="presets"></div>
+    <div id="sliders"></div>
+    <div class="row"><button id="copy">Copy values</button><button id="resetBtn">Reset bus (R)</button></div>
+    <div id="help">
+      <b>Drive:</b> W/↑ gas · S/↓ brake, then reverse · A/D or ←/→ steer<br>
+      <b>Places:</b> 1 Dhaka street · 2 Bandarban hairpins · R reset<br>
+      <b>View:</b> V toggles chase / cockpit<br>
+      <b>Presets:</b> Q Heavy · E Arcade-plus · T Snappy<br>
+      Gamepad: left stick steer, RT gas, LT brake. Touch: drag in the bottom-left area to steer.<br>
+      Stop in a yellow zone, open the doors (F or DOOR) to serve a Stop, close them to drive on.
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="touch">
+  <div id="steerZone"><span>drag ◀ ▶ to steer</span></div>
+  <div id="brk" class="pedal">BRAKE</div>
+  <div id="gas" class="pedal">GAS</div>
+  <div id="door" class="pedal">DOOR</div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/+esm';
+
+await RAPIER.init();
+document.getElementById('loading').remove();
+
+// ---------- tuning parameters ----------
+const DEFS = [
+  ['engine',      'Engine force per rear wheel (N)', 2000, 20000, 100],
+  ['topSpeed',    'Top speed (km/h)',                 30,   120,   1],
+  ['brake',       'Brake deceleration (m/s²)',        1,    9,     0.1],
+  ['maxSteer',    'Max steer angle (°)',              15,   45,    1],
+  ['steerRate',   'Steering speed (°/s)',             20,   200,   1],
+  ['steerSens',   'Steer fade with speed (lower = less steer when fast)', 10, 150, 1],
+  ['stiffness',   'Suspension stiffness',             5,    60,    0.5],
+  ['compression', 'Damping, compression',             0.5,  8,     0.1],
+  ['relaxation',  'Damping, rebound',                 0.5,  8,     0.1],
+  ['grip',        'Tyre grip (friction slip)',        0.5,  4,     0.05],
+  ['comY',        'Centre of mass height (m, + = higher, more roll)', -1.2, 0.6, 0.05, true],
+  ['antiRoll',    'Anti-roll assist',                 0,    15,    0.5],
+  ['angDamp',     'Angular damping (stability)',      0,    4,     0.1],
+];
+const PRESETS = {
+  'Heavy':       {engine:5000,  topSpeed:70, brake:3.5, maxSteer:38, steerRate:45,  steerSens:40, stiffness:15, compression:1.8, relaxation:2.4, grip:1.0, comY:0.2,  antiRoll:0, angDamp:0.4},
+  'Arcade-plus': {engine:9000,  topSpeed:80, brake:5.0, maxSteer:38, steerRate:80,  steerSens:50, stiffness:22, compression:2.7, relaxation:3.2, grip:1.6, comY:-0.4, antiRoll:3, angDamp:1.0},
+  'Snappy':      {engine:14000, topSpeed:90, brake:7.0, maxSteer:40, steerRate:150, steerSens:80, stiffness:35, compression:4.0, relaxation:4.5, grip:2.5, comY:-0.8, antiRoll:8, angDamp:2.0},
+};
+const P = {...PRESETS['Arcade-plus']};
+let presetName = 'Arcade-plus';
+
+// ---------- renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9cde0);
+scene.fog = new THREE.Fog(0xa9cde0, 150, 900);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.2, 2000);
+scene.add(new THREE.HemisphereLight(0xdfefff, 0x6b7d4a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-200, 300, 120); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const mat = c => new THREE.MeshLambertMaterial({color:c, flatShading:true});
+
+// ---------- physics world ----------
+const world = new RAPIER.World({x:0, y:-9.81, z:0});
+const DT = 1/60; world.timestep = DT;
+const fixed = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+world.createCollider(RAPIER.ColliderDesc.cuboid(3000, 0.1, 3000).setTranslation(0, -0.1, 0).setFriction(1), fixed);
+const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), mat(0x7f9a55));
+groundMesh.rotation.x = -Math.PI/2; scene.add(groundMesh);
+
+function box(w, h, d, color, x, y, z, collide = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z); scene.add(m);
+  if (collide) world.createCollider(RAPIER.ColliderDesc.cuboid(w/2, h/2, d/2).setTranslation(x, y, z), fixed);
+  return m;
+}
+
+// ---------- Dhaka-style street: 4 lanes, median, left-hand traffic (drive at z<0) ----------
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+box(780, 0.02, 14, 0x3d3d40, 330, 0.01, 0, false);
+box(780, 0.15, 2, 0xb9b4a8, 330, 0.075, -8, false);
+box(780, 0.15, 2, 0xb9b4a8, 330, 0.075, 8, false);
+box(780, 0.5, 0.6, 0xd9c84a, 330, 0.25, 0);                       // median (has a collider)
+for (let x = -55; x < 715; x += 9) { box(3, 0.02, 0.15, 0xffffff, x, 0.03, -3.5, false); box(3, 0.02, 0.15, 0xffffff, x, 0.03, 3.5, false); }
+const palette = [0xd8cbb5, 0xc9a27e, 0xe6e1d3, 0x9fb3c8, 0xd98c6c, 0xbfbfbf, 0xe8d28e, 0x8fae9b];
+for (const side of [-1, 1]) {
+  for (let x = -60; x < 720;) {
+    const w = 10 + rnd()*12, d = 12 + rnd()*14, h = 6 + rnd()*30;
+    box(w, h, d, palette[Math.floor(rnd()*palette.length)], x + w/2, h/2, side*(9.5 + d/2 + rnd()*3));
+    x += w + 1 + rnd()*4;
+  }
+}
+const STOPS = [{name:'Farmgate', x:150}, {name:'Bijoy Sarani', x:350}, {name:'Jahangir Gate', x:550}];
+for (const s of STOPS) {
+  box(16, 0.03, 3.4, 0xf2c200, s.x, 0.035, -5.3, false);
+  box(6, 0.15, 1.6, 0x2e6e9e, s.x, 2.6, -8.3, false);
+  box(0.15, 2.6, 0.15, 0x555555, s.x - 2.8, 1.3, -8.3, false); box(0.15, 2.6, 0.15, 0x555555, s.x + 2.8, 1.3, -8.3, false);
+  s.served = false;
+}
+
+// ---------- Bandarban-style climb: narrow road, switchback hairpins, low walls ----------
+function hillPath() {
+  const pts = []; let x = 780, y = 0.03, z = 0, h = 0; const step = 2;
+  const push = () => pts.push(new THREE.Vector3(x, y, z));
+  const straight = (len, g) => { for (let s = 0; s < len; s += step) { x += Math.cos(h)*step; z += Math.sin(h)*step; y += g*step; push(); } };
+  const arc = (ang, r, g) => { const len = Math.abs(ang)*r, n = Math.ceil(len/step), dh = ang/n, ds = len/n;
+    for (let i = 0; i < n; i++) { h += dh; x += Math.cos(h)*ds; z += Math.sin(h)*ds; y += g*ds; push(); } };
+  push();
+  straight(60, 0); straight(40, 0.04); arc(0.4, 60, 0.06); arc(-0.4, 60, 0.06); straight(80, 0.08);
+  arc(-Math.PI, 13, 0.03); straight(110, 0.08);
+  arc(Math.PI, 13, 0.03);  straight(110, 0.08);
+  arc(-Math.PI, 13, 0.03); straight(60, 0.07); arc(0.6, 40, 0.06); arc(-0.9, 30, 0.06); straight(80, 0.05);
+  arc(Math.PI/2, 25, 0.04); straight(100, 0.02);
+  return pts;
+}
+const HILL = hillPath();
+{
+  const W = 6.5, WALL = 0.9;
+  const road = [], wall = [], skirt = [], idxRoad = [], idxWall = [];
+  const L = [], R = [];
+  for (let i = 0; i < HILL.length; i++) {
+    const a = HILL[Math.max(0, i-1)], b = HILL[Math.min(HILL.length-1, i+1)];
+    const t = new THREE.Vector3(b.x - a.x, 0, b.z - a.z).normalize();
+    const right = new THREE.Vector3(-t.z, 0, t.x);
+    L.push(HILL[i].clone().addScaledVector(right, -W/2)); R.push(HILL[i].clone().addScaledVector(right, W/2));
+  }
+  // physics trimesh: road surface + both walls
+  const v = [], ix = [];
+  for (let i = 0; i < HILL.length; i++) v.push(L[i].x, L[i].y, L[i].z, R[i].x, R[i].y, R[i].z, L[i].x, L[i].y+WALL, L[i].z, R[i].x, R[i].y+WALL, R[i].z);
+  for (let i = 0; i < HILL.length - 1; i++) {
+    const a = i*4, b = (i+1)*4;
+    ix.push(a, a+1, b,  a+1, b+1, b);              // road
+    ix.push(a, b, b+2,  a, b+2, a+2);              // left wall
+    ix.push(a+1, a+3, b+3,  a+1, b+3, b+1);        // right wall
+  }
+  world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(v), new Uint32Array(ix)).setFriction(1), fixed);
+  const geo = (verts, tris) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); g.setIndex(tris); g.computeVertexNormals(); return g; };
+  const roadIdx = [], wallIdx = [];
+  for (let i = 0; i < HILL.length - 1; i++) { const a = i*4, b = (i+1)*4; roadIdx.push(a, a+1, b, a+1, b+1, b); wallIdx.push(a, b, b+2, a, b+2, a+2, a+1, a+3, b+3, a+1, b+3, b+1); }
+  scene.add(new THREE.Mesh(geo(v, roadIdx), mat(0x4a4a4c)));
+  const wm = mat(0xe8e8e8); wm.side = THREE.DoubleSide; scene.add(new THREE.Mesh(geo(v, wallIdx), wm));
+  // visual earth embankment down to the ground
+  const sv = [], si = [];
+  for (let i = 0; i < HILL.length; i++) sv.push(L[i].x, L[i].y, L[i].z, L[i].x, 0, L[i].z, R[i].x, R[i].y, R[i].z, R[i].x, 0, R[i].z);
+  for (let i = 0; i < HILL.length - 1; i++) { const a = i*4, b = (i+1)*4; si.push(a, a+1, b+1, a, b+1, b, a+2, b+2, b+3, a+2, b+3, a+3); }
+  const em = mat(0x8a6a45); em.side = THREE.DoubleSide; scene.add(new THREE.Mesh(geo(sv, si), em));
+  for (let i = 0; i < HILL.length; i += 5) box(0.3, 0.02, 0.15, 0xffffff, HILL[i].x, HILL[i].y + 0.02, HILL[i].z, false);
+}
+
+// ---------- the bus ----------
+const MASS = 12000;
+const WHEELS = [[3.3,-1.0,-1.05],[3.3,-1.0,1.05],[-2.7,-1.0,-1.05],[-2.7,-1.0,1.05]]; // front L/R, rear L/R; +x forward, +z right
+const REST = 0.45, RADIUS = 0.52;
+const busMesh = new THREE.Group(); scene.add(busMesh);
+{
+  const b = new THREE.Mesh(new THREE.BoxGeometry(11, 2.8, 2.5), mat(0xc0392b)); busMesh.add(b);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(11.02, 0.5, 2.52), mat(0x1e8449)); stripe.position.y = -0.7; busMesh.add(stripe);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.9, 2.54), mat(0x22313f)); win.position.set(-0.4, 0.5, 0); busMesh.add(win);
+  const ws = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 2.2), mat(0x22313f)); ws.position.set(5.5, 0.4, 0); busMesh.add(ws);
+}
+const wheelMeshes = WHEELS.map(([x, y, z]) => {
+  const pivot = new THREE.Group(); pivot.position.set(x, y, z);
+  const w = new THREE.Mesh(new THREE.CylinderGeometry(RADIUS, RADIUS, 0.35, 14), mat(0x1a1a1a)); w.rotation.x = Math.PI/2;
+  const spin = new THREE.Group(); spin.add(w); pivot.add(spin); busMesh.add(pivot); return {pivot, spin};
+});
+
+let body = null, vc = null;
+function spawn(pos, yaw, keepVel = false) {
+  let lin = {x:0,y:0,z:0}, ang = {x:0,y:0,z:0}, rot;
+  if (body && keepVel) { lin = body.linvel(); ang = body.angvel(); rot = body.rotation(); pos = body.translation(); }
+  if (vc) world.removeVehicleController(vc);
+  if (body) world.removeRigidBody(body);
+  if (!rot) { const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yaw); rot = {x:q.x, y:q.y, z:q.z, w:q.w}; }
+  body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation(rot).setLinvel(lin.x, lin.y, lin.z).setAngvel(ang).setCanSleep(false));
+  world.createCollider(RAPIER.ColliderDesc.cuboid(5.5, 1.4, 1.25).setFriction(0.5)
+    .setMassProperties(MASS, {x:0, y:P.comY, z:0}, {x:MASS*1.17, y:MASS*10.6, z:MASS*10.7}, {x:0,y:0,z:0,w:1}), body);
+  vc = world.createVehicleController(body);
+  for (const [x, y, z] of WHEELS) vc.addWheel({x, y, z}, {x:0, y:-1, z:0}, {x:0, y:0, z:1}, REST, RADIUS);
+  steer = 0; prevVel.set(0,0,0); settle = keepVel ? 0 : 60;
+  window.__dbg = {body, vc, P};
+}
+let spawnPoint = {pos:{x:-40, y:2.2, z:-3.5}, yaw:0};
+function goTo(where) {
+  spawnPoint = where === 'hill' ? {pos:{x:HILL[0].x - 10, y:2.2, z:HILL[0].z}, yaw:0} : {pos:{x:-40, y:2.2, z:-3.5}, yaw:0};
+  if (where === 'city') STOPS.forEach(s => s.served = false);
+  spawn(spawnPoint.pos, spawnPoint.yaw); runStats();
+  toast(where === 'hill' ? 'Bandarban-style hairpins' : 'Dhaka-style street');
+}
+
+// ---------- input ----------
+const keys = new Set();
+addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (e.code === 'KeyR') spawn(spawnPoint.pos, spawnPoint.yaw);
+  if (e.code === 'Digit1') goTo('city');
+  if (e.code === 'Digit2') goTo('hill');
+  if (e.code === 'KeyF') toggleDoors();
+  if (e.code === 'KeyV') camMode = camMode === 'chase' ? 'cockpit' : 'chase';
+  if (e.code === 'KeyQ') applyPreset('Heavy');
+  if (e.code === 'KeyE') applyPreset('Arcade-plus');
+  if (e.code === 'KeyT') applyPreset('Snappy');
+});
+addEventListener('keyup', e => keys.delete(e.code));
+const touch = {steer:0, gas:0, brake:0};
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
+{
+  const zone = document.getElementById('steerZone'); let sx = null;
+  zone.addEventListener('pointerdown', e => { sx = e.clientX; zone.setPointerCapture(e.pointerId); });
+  zone.addEventListener('pointermove', e => { if (sx !== null) touch.steer = Math.max(-1, Math.min(1, (sx - e.clientX)/70)); });
+  const end = () => { sx = null; touch.steer = 0; };
+  zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+  for (const [id, k] of [['gas','gas'], ['brk','brake']]) {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', e => { touch[k] = 1; el.classList.add('down'); el.setPointerCapture(e.pointerId); });
+    const up = () => { touch[k] = 0; el.classList.remove('down'); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  }
+}
+function readInput() {
+  let gas = (keys.has('KeyW') || keys.has('ArrowUp')) ? 1 : 0;
+  let brk = (keys.has('KeyS') || keys.has('ArrowDown')) ? 1 : 0;
+  let st = ((keys.has('KeyA') || keys.has('ArrowLeft')) ? 1 : 0) - ((keys.has('KeyD') || keys.has('ArrowRight')) ? 1 : 0);
+  const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null;
+  if (gp) {
+    const ax = gp.axes[0] || 0; if (Math.abs(ax) > 0.12) st = -ax;
+    gas = Math.max(gas, gp.buttons[7]?.value || 0); brk = Math.max(brk, gp.buttons[6]?.value || 0);
+  }
+  gas = Math.max(gas, touch.gas); brk = Math.max(brk, touch.brake); if (touch.steer) st = touch.steer;
+  return {gas, brk, st};
+}
+
+// ---------- simulation step ----------
+let steer = 0, camMode = 'chase', settle = 0, doorsOpen = false;
+function toggleDoors() {
+  if (!doorsOpen && Math.abs(vc.currentVehicleSpeed()) > 0.5) { toast('Stop first'); return; }
+  doorsOpen = !doorsOpen; document.getElementById('door').classList.toggle('down', doorsOpen); toast(doorsOpen ? 'Doors open' : 'Doors closed');
+}
+document.getElementById('door').addEventListener('pointerdown', toggleDoors);
+const prevVel = new THREE.Vector3(), aLatS = {v:0}, aLongS = {v:0};
+let stats; function runStats() { stats = {jerky:0, wasJerky:false, comfortLoss:0, served:0}; }
+runStats();
+const q = new THREE.Quaternion(), fwd = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3();
+let live = {kmh:0, gear:'N', aLat:0, aLong:0, roll:0, steerDeg:0, comfortNow:1};
+
+function step() {
+  const inp = readInput();
+  const r = body.rotation(); q.set(r.x, r.y, r.z, r.w);
+  fwd.set(1,0,0).applyQuaternion(q); right.set(0,0,1).applyQuaternion(q); up.set(0,1,0).applyQuaternion(q);
+  const v = vc.currentVehicleSpeed(), kmh = v * 3.6;
+
+  // drive / brake / reverse
+  let eng = 0, brk = 0;
+  if (inp.gas > 0) { if (v < -0.5) brk = inp.gas; else eng = P.engine * inp.gas * Math.max(0, 1 - kmh / P.topSpeed); }
+  if (inp.brk > 0) { if (v > 0.5) brk = Math.max(brk, inp.brk); else eng = -P.engine * 0.4 * inp.brk * Math.max(0, 1 + kmh / 15); }
+  if (!inp.gas && !inp.brk && Math.abs(v) < 0.3) brk = 0.3; // hold still when idle
+  const brakeImpulse = MASS * P.brake * DT / 4 * brk;
+  if (doorsOpen) { eng = 0; brk = 1; }
+  live.gear = eng < 0 ? 'R' : (Math.abs(v) < 0.3 && !inp.gas ? 'N' : 'D');
+
+  // steering with rate limit and speed fade
+  const limit = P.maxSteer / (1 + Math.abs(kmh) / P.steerSens);
+  const target = inp.st * limit;
+  const rate = (inp.st === 0 ? 1.5 : 1) * P.steerRate * DT;
+  steer += Math.max(-rate, Math.min(rate, target - steer));
+  live.steerDeg = steer;
+
+  for (let i = 0; i < 4; i++) {
+    vc.setWheelSuspensionStiffness(i, P.stiffness);
+    vc.setWheelSuspensionCompression(i, P.compression);
+    vc.setWheelSuspensionRelaxation(i, P.relaxation);
+    vc.setWheelFrictionSlip(i, P.grip);
+    vc.setWheelMaxSuspensionForce(i, 1e6);
+    vc.setWheelMaxSuspensionTravel(i, 0.4);
+    vc.setWheelBrake(i, brakeImpulse);
+    vc.setWheelEngineForce(i, i >= 2 ? eng : 0);
+    vc.setWheelSteering(i, i < 2 ? THREE.MathUtils.degToRad(steer) : 0);
+  }
+  body.setAngularDamping(P.angDamp);
+
+  // rolling + air resistance, anti-roll assist
+  body.resetForces(true); body.resetTorques(true);
+  if (Math.abs(v) > 0.05) {
+    const drag = 0.015 * MASS * 9.81 * Math.sign(v) * Math.min(1, Math.abs(v)) + 3.15 * v * Math.abs(v);
+    body.addForce({x:-fwd.x*drag, y:-fwd.y*drag, z:-fwd.z*drag}, true);
+  }
+  const roll = Math.asin(THREE.MathUtils.clamp(right.y, -1, 1));
+  const tq = P.antiRoll * roll * MASS * 20;
+  body.addTorque({x:fwd.x*tq, y:fwd.y*tq, z:fwd.z*tq}, true);
+  live.roll = THREE.MathUtils.radToDeg(roll);
+
+  vc.updateVehicle(DT);
+  world.step();
+
+  // passenger comfort: accelerations in the bus frame
+  const lv = body.linvel(); const vel = new THREE.Vector3(lv.x, lv.y, lv.z);
+  const acc = vel.clone().sub(prevVel).divideScalar(DT); prevVel.copy(vel);
+  aLatS.v += (acc.dot(right) - aLatS.v) * 0.15; aLongS.v += (acc.dot(fwd) - aLongS.v) * 0.15;
+  live.aLat = aLatS.v; live.aLong = aLongS.v; live.kmh = kmh;
+  const lat = Math.abs(aLatS.v), lon = Math.abs(aLongS.v);
+  live.comfortNow = Math.max(0, 1 - Math.max(lat / 3, lon / 3.5));
+  if (settle > 0) { settle--; aLatS.v = aLongS.v = 0; return; } // ignore the spawn drop
+  const jerky = lat > 1.5 || lon > 1.8;
+  if (jerky && !stats.wasJerky) stats.jerky++;
+  stats.wasJerky = jerky;
+  stats.comfortLoss += (Math.max(0, lat - 1.5) + Math.max(0, lon - 1.8)) * DT;
+
+  // stops
+  const p = body.translation();
+  for (const s of STOPS) if (!s.served && Math.abs(p.x - s.x) < 8 && p.z < -2.5 && p.z > -8 && Math.abs(kmh) < 2 && doorsOpen) { s.served = true; stats.served++; toast('Stop served: ' + s.name); }
+  if (p.y < -10) spawn(spawnPoint.pos, spawnPoint.yaw);
+}
+
+// ---------- UI ----------
+const hud = document.getElementById('hud');
+function renderHud() {
+  const pct = n => Math.round(n * 100);
+  hud.innerHTML = `<div class="big">${Math.abs(live.kmh).toFixed(0)} km/h <small>${live.gear}</small></div>
+    Preset: <b>${presetName}</b>${isCustom() ? ' (edited)' : ''}<br>
+    Steer: ${live.steerDeg.toFixed(1)}° · Roll: ${live.roll.toFixed(1)}°<br>
+    Lateral: ${live.aLat.toFixed(2)} m/s² · Long: ${live.aLong.toFixed(2)} m/s²<br>
+    Passenger comfort now
+    <div class="bar"><i style="width:${pct(live.comfortNow)}%;background:${live.comfortNow < 0.5 ? '#c0392b' : '#2a9d4b'}"></i></div>
+    Jerky moments: <b>${stats.jerky}</b> · Comfort loss: ${stats.comfortLoss.toFixed(1)}<br>
+    Stops served: ${stats.served}/${STOPS.length} · Doors: <b>${doorsOpen ? 'OPEN' : 'closed'}</b> · View: ${camMode}`;
+}
+const isCustom = () => DEFS.some(([k]) => P[k] !== PRESETS[presetName][k]);
+const sliders = document.getElementById('sliders'), presetsEl = document.getElementById('presets');
+const inputs = {};
+for (const [k, label, min, max, stepv, rebuild] of DEFS) {
+  const wrap = document.createElement('label');
+  wrap.innerHTML = `<div class="row"><span>${label}</span><b id="v_${k}"></b></div>`;
+  const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = stepv;
+  inp.addEventListener('input', () => { P[k] = parseFloat(inp.value); syncSliders(); if (rebuild) spawn(null, 0, true); });
+  inp.addEventListener('keydown', e => e.stopPropagation());
+  wrap.appendChild(inp); sliders.appendChild(wrap); inputs[k] = inp;
+}
+function syncSliders() { for (const [k] of DEFS) { inputs[k].value = P[k]; document.getElementById('v_' + k).textContent = P[k]; }
+  presetsEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent === presetName)); }
+for (const name of Object.keys(PRESETS)) {
+  const b = document.createElement('button'); b.textContent = name; b.onclick = () => applyPreset(name); presetsEl.appendChild(b);
+}
+function applyPreset(name) { presetName = name; Object.assign(P, PRESETS[name]); syncSliders(); spawn(null, 0, true); toast('Preset: ' + name); }
+document.getElementById('toggle').onclick = () => { const p = document.getElementById('panel'); p.classList.toggle('closed'); document.getElementById('toggle').textContent = p.classList.contains('closed') ? 'Show ▾' : 'Hide ▴'; };
+document.getElementById('copy').onclick = () => { navigator.clipboard?.writeText(JSON.stringify({preset:presetName, ...P})); toast('Values copied'); };
+document.getElementById('resetBtn').onclick = () => spawn(spawnPoint.pos, spawnPoint.yaw);
+let toastT; function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 1400); }
+
+window.__stepN = n => { for (let i = 0; i < n; i++) step(); return {...live, pos: body.translation(), stats}; };
+
+// ---------- loop ----------
+syncSliders();
+spawn(spawnPoint.pos, spawnPoint.yaw);
+let last = performance.now(), acc = 0, hudT = 0;
+const camPos = new THREE.Vector3(-60, 10, -3.5), look = new THREE.Vector3();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; acc += dt;
+  while (acc >= DT) { step(); acc -= DT; }
+  const t = body.translation(), r = body.rotation();
+  busMesh.position.set(t.x, t.y, t.z); busMesh.quaternion.set(r.x, r.y, r.z, r.w);
+  for (let i = 0; i < 4; i++) {
+    const sl = vc.wheelSuspensionLength(i) ?? REST;
+    wheelMeshes[i].pivot.position.y = WHEELS[i][1] - sl;
+    wheelMeshes[i].pivot.rotation.y = vc.wheelSteering(i) || 0;
+    wheelMeshes[i].spin.rotation.z = -(vc.wheelRotation(i) || 0);
+  }
+  q.set(r.x, r.y, r.z, r.w); fwd.set(1,0,0).applyQuaternion(q); up.set(0,1,0).applyQuaternion(q);
+  const flatF = new THREE.Vector3(fwd.x, 0, fwd.z).normalize();
+  if (camMode === 'chase') {
+    const want = new THREE.Vector3(t.x, t.y, t.z).addScaledVector(flatF, -17).add(new THREE.Vector3(0, 6.5, 0));
+    camPos.lerp(want, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
+    look.set(t.x, t.y + 1.5, t.z).addScaledVector(flatF, 6); camera.lookAt(look);
+  } else {
+    camera.position.set(t.x, t.y, t.z).addScaledVector(fwd, 5.1).addScaledVector(up, 0.9);
+    camera.up.copy(up); look.set(t.x, t.y, t.z).addScaledVector(fwd, 40).addScaledVector(up, 0.5); camera.lookAt(look); camera.up.set(0,1,0);
+    camPos.copy(camera.position);
+  }
+  renderer.render(scene, camera);
+  if ((hudT += dt) > 0.1) { hudT = 0; renderHud(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+toast('Dhaka-style street · press 2 for hairpins');
+</script>
+</body>
+</html>

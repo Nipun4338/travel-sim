@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROTOTYPE · HUD and menus</title>
+<!--
+  THROWAWAY PROTOTYPE for wayfinder ticket 018 "Prototype the HUD, menus and mode select".
+  Question: what should the HUD and menus look like on desktop and on a landscape phone?
+  Three radically different directions (A Glass, B Bus art, C Instrument) over the same screens and mock data.
+  Switch with the bottom bar or URL params: ?v=A|B|C&screen=bus&frame=phone
+  Run: double-click this file. No game logic; everything is static mock data.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&family=Baloo+Da+2:wght@500;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#20252b;font:14px/1.35 system-ui,sans-serif;color:#111;overflow:hidden}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:50;font-size:12px}
+  #tabs{position:fixed;top:24px;left:0;right:0;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;z-index:40;padding:4px}
+  #ctrl{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:12px;background:#fff;padding:6px 10px;border-radius:10px;z-index:40;box-shadow:0 4px 16px rgba(0,0,0,.4);flex-wrap:wrap;justify-content:center}
+  #ctrl b{font-size:12px;margin-right:4px}
+  .tb{padding:4px 9px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer;font:13px system-ui}
+  .tb.on{background:#222;color:#fff}
+  #wrap{position:absolute;inset:60px 0 96px 0;display:grid;place-items:center}
+  #stage{position:relative;overflow:hidden;width:100%;height:100%}
+  #stage.phone{position:absolute;left:50%;top:50%;width:812px;height:375px;border-radius:28px;outline:10px solid #0c0c0c;transform-origin:center}
+  .bg{position:absolute;inset:0;background:linear-gradient(#9fc6de 0 45%,#c9d5c0 45% 47%,#4a4a4c 47% 100%)}
+  .bg::before{content:"";position:absolute;left:0;right:0;top:20%;height:27%;background:repeating-linear-gradient(90deg,#cbbfa8 0 60px,#b5a58a 60px 110px,#d8d1c2 110px 150px,#9aa7b5 150px 200px);clip-path:polygon(0 30%,8% 10%,15% 35%,24% 0,33% 25%,45% 5%,55% 30%,66% 8%,78% 28%,88% 3%,100% 20%,100% 100%,0 100%)}
+  .bg::after{content:"";position:absolute;left:46%;bottom:0;width:8%;height:53%;background:linear-gradient(90deg,transparent 45%,#e8d24a 45% 55%,transparent 55%)}
+  .bg.sky{background:linear-gradient(#7fb0d6,#cfe3ef 60%,#5f7f4a 60%)}
+  .bg.sky::before{top:52%;height:10%;background:#476a36;clip-path:polygon(0 60%,10% 20%,20% 50%,32% 0,45% 40%,60% 10%,75% 50%,88% 15%,100% 40%,100% 100%,0 100%)}
+  .bg.sky::after{display:none}
+  .scr{position:absolute;inset:0}
+  .w{position:absolute}
+  .touch{display:none}
+  #stage.phone .touch{display:block}
+  .bn{display:none}
+  .stars{letter-spacing:2px}
+  .lock{opacity:.45}
+
+  /* ================= A: GLASS ================= */
+  .vA .w,.vA .panel{background:rgba(255,255,255,.72);backdrop-filter:blur(8px);border-radius:14px;padding:8px 12px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+  .vA .num{font-size:40px;font-weight:700}
+  .vA label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}
+  .vA .bus .speed{left:16px;bottom:16px}
+  .vA .bus .next{left:50%;top:14px;transform:translateX(-50%);text-align:center}
+  .vA .bus .taka{right:16px;top:14px;font-size:22px;font-weight:700}
+  .vA .bus .pax{right:16px;top:70px}
+  .vA .bus .comfort{right:16px;top:126px;width:170px}
+  .vA .bus .doors{left:16px;top:14px}
+  .vA .bus .junction{left:16px;top:66px}
+  .vA .bus .mini{left:16px;top:118px;width:150px}
+  .vA .bus .pause{right:16px;bottom:16px}
+  .vA .fl .speed{left:16px;top:50%;transform:translateY(-50%)}
+  .vA .fl .alt{right:16px;top:50%;transform:translateY(-50%);text-align:right}
+  .vA .fl .hdg{left:50%;top:14px;transform:translateX(-50%)}
+  .vA .fl .rings{left:16px;top:14px}
+  .vA .fl .taka{right:16px;top:14px;font-size:20px;font-weight:700}
+  .vA .fl .thr{left:16px;bottom:16px;width:150px}
+  .vA .fl .stall{left:50%;top:70px;transform:translateX(-50%);background:#c0392b;color:#fff}
+  .vA .fl .glide{right:16px;bottom:16px}
+  .vA .menu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:16px;padding:20px}
+  .vA .panel h2{margin:.2em 0}
+  .vA .card{width:230px;cursor:pointer}
+  .vA .btn{display:inline-block;background:#1e6fd9;color:#fff;border-radius:10px;padding:8px 14px;margin:4px 4px 0 0;font-weight:600}
+  .vA .btn.alt{background:#fff;color:#1e6fd9;border:1px solid #1e6fd9}
+  .vA .chip{display:inline-block;border:1px solid #999;border-radius:999px;padding:3px 10px;margin:2px;font-size:12px}
+  .vA .chip.on{background:#1e6fd9;color:#fff;border-color:#1e6fd9}
+  .vA .bar{height:7px;background:#ddd;border-radius:4px;overflow:hidden}.vA .bar i{display:block;height:100%;background:#2a9d4b}
+
+  /* ================= B: BUS ART (Dhaka bus / rickshaw art, bilingual) ================= */
+  .vB{font-family:"Baloo Da 2","Noto Sans Bengali",system-ui,sans-serif}
+  .vB .bn{display:inline;font-family:"Noto Sans Bengali",sans-serif;opacity:.85;margin-right:6px}
+  .vB .dash{position:absolute;left:0;right:0;bottom:0;height:96px;background:#7b1e3a;border-top:6px solid transparent;border-image:repeating-linear-gradient(90deg,#f7c600 0 14px,#16a085 14px 28px,#e74c3c 28px 42px,#2e86c1 42px 56px) 6;display:flex;gap:6px;padding:8px;color:#fff}
+  .vB .dash .w{position:static;flex:1;background:rgba(0,0,0,.25);border:2px solid #f7c600;border-radius:10px;padding:4px 8px;font-size:13px}
+  .vB .num{font-size:34px;font-weight:800;color:#f7c600;line-height:1}
+  .vB label{display:block;font-size:11px;color:#ffe9a8}
+  .vB .bus .mini,.vB .bus .pause{display:none}
+  .vB .float{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#16a085;color:#fff;border:3px solid #f7c600;border-radius:16px;padding:4px 16px;font-size:18px;font-weight:800}
+  .vB .fl .stall{background:#e74c3c !important}
+  .vB .menu{position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,#f7c600 0 6%,transparent 7%),radial-gradient(circle at 85% 30%,#e74c3c 0 5%,transparent 6%),linear-gradient(135deg,#7b1e3a,#2e1a47);display:flex;align-items:center;justify-content:center;gap:16px;padding:20px;color:#fff}
+  .vB .panel{background:rgba(0,0,0,.35);border:3px solid #f7c600;border-radius:18px;padding:10px 14px}
+  .vB .card{width:230px;cursor:pointer;background:#16a085}
+  .vB .card:nth-child(2){background:#2e86c1}
+  .vB .panel h2{margin:.1em 0;color:#f7c600}
+  .vB .btn{display:inline-block;background:#f7c600;color:#7b1e3a;border-radius:12px;padding:6px 14px;margin:4px 4px 0 0;font-weight:800}
+  .vB .btn.alt{background:transparent;color:#f7c600;border:2px solid #f7c600}
+  .vB .chip{display:inline-block;border:2px solid #ffe9a8;border-radius:10px;padding:1px 9px;margin:2px;font-size:12px}
+  .vB .chip.on{background:#e74c3c;border-color:#f7c600}
+  .vB .bar{height:8px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden}.vB .bar i{display:block;height:100%;background:#f7c600}
+
+  /* ================= C: INSTRUMENT (dark cluster, everything bottom-centre) ================= */
+  .vC{font-family:"JetBrains Mono",ui-monospace,monospace}
+  .vC .cluster{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:grid;grid-template-columns:repeat(4,auto);gap:4px 18px;background:rgba(8,12,16,.82);color:#9cf0b0;border:1px solid #2b3a44;border-radius:12px;padding:10px 16px}
+  .vC .cluster .w{position:static;font-size:12px}
+  .vC .num{font-size:30px;color:#e8fff0}
+  .vC label{display:block;font-size:10px;color:#6c8a96;text-transform:uppercase}
+  .vC .warn{color:#ffb347}
+  .vC .side{position:absolute;right:10px;top:10px;background:rgba(8,12,16,.82);color:#9cf0b0;border:1px solid #2b3a44;border-radius:10px;padding:8px 10px;font-size:12px;width:180px}
+  .vC .fl .stall{color:#ff5a4f}
+  .vC .menu{position:absolute;inset:0;background:#0b1015;color:#9cf0b0;display:flex;align-items:center;justify-content:center;gap:16px;padding:20px}
+  .vC .panel{border:1px solid #2b3a44;border-radius:8px;padding:10px 14px;background:#0f161c}
+  .vC .card{width:230px;cursor:pointer}
+  .vC .panel h2{margin:.1em 0;color:#e8fff0;font-size:18px}
+  .vC .btn{display:inline-block;border:1px solid #9cf0b0;color:#0b1015;background:#9cf0b0;border-radius:4px;padding:4px 12px;margin:4px 4px 0 0}
+  .vC .btn.alt{background:transparent;color:#9cf0b0}
+  .vC .chip{display:inline-block;border:1px solid #2b3a44;border-radius:4px;padding:1px 8px;margin:2px;font-size:12px}
+  .vC .chip.on{border-color:#9cf0b0;color:#e8fff0}
+  .vC .bar{height:6px;background:#1d2a33}.vC .bar i{display:block;height:100%;background:#9cf0b0}
+
+  /* touch overlay, all variants */
+  .touch .steer{position:absolute;left:0;bottom:0;width:42%;height:48%;border:2px dashed rgba(255,255,255,.6);border-radius:0 20px 0 0;color:#fff;font-size:11px;padding:6px}
+  .touch .pd{position:absolute;bottom:14px;width:64px;height:78px;border-radius:12px;border:2px solid #fff;background:rgba(0,0,0,.35);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+  .touch .gas{right:14px;height:92px}.touch .brk{right:86px}.touch .door{right:14px;bottom:114px;height:46px}
+  .touch .thr{right:20px;bottom:14px;width:34px;height:120px;border:2px solid #fff;border-radius:10px;background:linear-gradient(transparent 40%,rgba(255,255,255,.5) 40%)}
+  .vB .touch .pd,.vB .touch .steer{bottom:100px}.vB .touch .door{bottom:200px}
+  .vC .touch .pd{bottom:110px}.vC .touch .door{bottom:210px}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: HUD and menus (throwaway, mock data)</div>
+<div id="tabs"></div>
+<div id="wrap"><div id="stage"></div></div>
+<div id="ctrl"></div>
+
+<script>
+const Q = new URLSearchParams(location.search);
+const st = {v: Q.get('v') || 'A', screen: Q.get('screen') || 'bus', frame: Q.get('frame') || 'desktop'};
+const SCREENS = [['mode','Mode select'],['setup','Run setup'],['bus','Bus HUD'],['flight','Flight HUD'],['results','Results'],['settings','Settings'],['credits','Licences']];
+const L = (en, bn) => `<span class="bn">${bn}</span>${en}`;
+const T = '৳';
+
+const comfortBar = p => `<div class="bar"><i style="width:${p}%"></i></div>`;
+const miniMap = `<svg viewBox="0 0 140 70" width="100%"><polyline points="5,60 30,50 55,40 70,25 95,20 120,10 135,5" fill="none" stroke="#888" stroke-width="3"/>
+  ${[[5,60],[30,50],[55,40],[70,25]].map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="4" fill="${i<3?'#2a9d4b':'#e67e22'}"/>`).join('')}<circle cx="62" cy="33" r="5" fill="#c0392b"/></svg>`;
+
+function busWidgets() {
+  return {
+    speed:   `<div class="w speed"><label>${L('Speed','গতি')}</label><span class="num">34</span> km/h · D</div>`,
+    next:    `<div class="w next"><label>${L('Next Stop','পরবর্তী স্টপ')}</label><b>Mohakhali</b> · 0.8 km<br>due 08:42 · <span class="warn" style="color:#c0392b">+0:12 late</span></div>`,
+    taka:    `<div class="w taka"><label>${L('Taka earned','আয়')}</label>${T} 1,240</div>`,
+    pax:     `<div class="w pax"><label>${L('Passengers','যাত্রী')}</label>38 / 70 · 12 standing</div>`,
+    comfort: `<div class="w comfort"><label>${L('Comfort','আরাম')}</label>${comfortBar(72)}Jerky moments: 2</div>`,
+    doors:   `<div class="w doors"><label>${L('Doors','দরজা')}</label>Closed</div>`,
+    junction:`<div class="w junction"><label>${L('Junction','মোড়')}</label><span class="warn">STOP · 0:08</span></div>`,
+    mini:    `<div class="w mini"><label>Route</label>${miniMap}</div>`,
+    pause:   `<div class="w pause">❚❚</div>`,
+  };
+}
+function flightWidgets() {
+  return {
+    speed: `<div class="w speed"><label>${L('Airspeed','গতি')}</label><span class="num">168</span> km/h</div>`,
+    alt:   `<div class="w alt"><label>${L('Altitude','উচ্চতা')}</label><span class="num">212</span> m<br>VS −2.1 m/s · AGL 205</div>`,
+    hdg:   `<div class="w hdg"><label>${L('Heading','দিক')}</label>320° NW ·· 330 · 340 ··</div>`,
+    rings: `<div class="w rings"><label>${L('Rings','রিং')}</label>2 / 5 · par 1:40 · 0:58</div>`,
+    taka:  `<div class="w taka"><label>${L('Taka earned','আয়')}</label>${T} 860</div>`,
+    thr:   `<div class="w thr"><label>${L('Throttle','থ্রটল')}</label>${comfortBar(35)}</div>`,
+    stall: `<div class="w stall">STALL</div>`,
+    glide: `<div class="w glide"><label>${L('Glide path','অবতরণ পথ')}</label>▲ slightly high · RWY 32 2.4 km</div>`,
+  };
+}
+const touchBus = `<div class="touch"><div class="steer">drag ◀ ▶ to steer</div><div class="pd brk">BRAKE</div><div class="pd gas">GAS</div><div class="pd door">DOOR</div></div>`;
+const touchFl  = `<div class="touch"><div class="steer">virtual stick</div><div class="thr"></div><div class="pd brk" style="right:66px">BRK</div></div>`;
+
+function hud(kind) {
+  const W = kind === 'bus' ? busWidgets() : flightWidgets();
+  const bg = `<div class="bg ${kind==='flight'?'sky':''}"></div>`, touch = kind === 'bus' ? touchBus : touchFl, cls = kind === 'bus' ? 'bus' : 'fl';
+  if (st.v === 'A') return `${bg}<div class="scr ${cls}">${Object.values(W).join('')}${touch}</div>`;
+  if (st.v === 'B') {
+    const order = kind === 'bus' ? ['speed','next','pax','comfort','doors','taka'] : ['speed','alt','hdg','rings','thr','taka'];
+    const float = kind === 'bus' ? `<div class="float">${L('Mohakhali in 0.8 km','মহাখালী ০.৮ কিমি')} · +0:12</div>` : `<div class="float" style="background:#e74c3c">STALL · স্টল</div>`;
+    return `${bg}<div class="scr ${cls}">${float}<div class="dash">${order.map(k=>W[k]).join('')}</div>${touch}</div>`;
+  }
+  const order = kind === 'bus' ? ['speed','next','taka','doors','pax','comfort','junction','pause'] : ['speed','alt','hdg','rings','thr','taka','stall','glide'];
+  const side = kind === 'bus' ? `<div class="side"><label>Route</label>${miniMap}</div>` : '';
+  return `${bg}<div class="scr ${cls}">${side}<div class="cluster">${order.map(k=>W[k]).join('')}</div>${touch}</div>`;
+}
+
+function menu(screen) {
+  const p = (h, body, w='auto') => `<div class="panel" style="width:${w}">${h?`<h2>${h}</h2>`:''}${body}</div>`;
+  if (screen === 'mode') return `<div class="menu">
+    ${p(L('Bus Mode','বাস'), `<p>Drive real Routes. Serve Stops on time.</p><span class="chip on">Dhaka</span><span class="chip">Bandarban</span><br><span class="btn">Play</span>`, '240px')}
+    ${p(L('Flight Mode','বিমান'), `<p>Free flight and Challenges.</p><span class="chip on">Dhaka</span><span class="chip">Bandarban</span><br><span class="btn">Fly</span>`, '240px')}
+    ${p('', `<b>${L('Career','ক্যারিয়ার')}</b><br>${T} 18,450 · 112 km<br>1,204 passengers<br>9 landings · 14/25 landmarks<br><span class="btn alt">Liveries</span><span class="btn alt">Settings</span>`, '200px')}</div>`;
+  if (screen === 'setup') return `<div class="menu">
+    ${p(L('Dhaka Route · Farmgate → Airport','ঢাকা রুট'), `
+      <div>Leg 1 · Farmgate → Mohakhali · 4.6 km <span class="stars">★★☆</span> ${T} 1,520</div>
+      <div><b>Leg 2 · Mohakhali → Kuril · 6.5 km</b> · not played</div>
+      <div class="lock">Leg 3 · Kuril → Airport · 🔒 finish Leg 2</div>
+      <div class="lock">Full Route · 14 km · 🔒 finish all Legs</div>`, '330px')}
+    ${p(L('Conditions','আবহাওয়া'), `
+      <div>Time <span class="chip">Morning</span><span class="chip">Midday</span><span class="chip">Golden</span><span class="chip on">Night</span></div>
+      <div>Weather <span class="chip">Random</span><span class="chip">Clear</span><span class="chip on">Rain</span></div>
+      <div style="margin-top:6px">Taka bonus <b>×1.32</b> (rain ×1.2, night ×1.1)</div>
+      <span class="btn">Start Leg 2</span><span class="btn alt">Download Dhaka for offline · 58 MB</span>`, '330px')}</div>`;
+  if (screen === 'results') return `<div class="menu">
+    ${p(L('Leg complete · Mohakhali → Kuril','লেগ সম্পন্ন'), `
+      <div>Fares (41 passengers) ${T} 1,230</div><div>On-time bonus ${T} 300</div><div>Weather bonus ×1.32 ${T} 505</div>
+      <div style="color:#c0392b">Jerky moments (3) −${T} 120 · Junction −${T} 50</div><hr><b>Taka earned ${T} 1,865</b>`, '300px')}
+    ${p('', `<div>Punctuality <span class="stars">★★★</span></div><div>Comfort <span class="stars">★★☆</span></div><div>Safety <span class="stars">★★★</span></div>
+      <div style="margin-top:6px">New best! · Leg 3 unlocked</div><span class="btn">Next Leg</span><span class="btn alt">Retry</span><span class="btn alt">Menu</span>`, '240px')}</div>`;
+  if (screen === 'settings') return `<div class="menu">
+    ${p(L('Settings','সেটিংস'), `
+      <div>Quality <span class="chip on">Auto (Medium)</span><span class="chip">Low</span><span class="chip">Medium</span><span class="chip">High</span></div>
+      <div>Invert pitch <span class="chip">On</span><span class="chip on">Off</span></div>
+      <div>Controls: keyboard · gamepad · touch (auto)</div>
+      <div>Language <span class="chip on">English</span><span class="chip">বাংলা</span><span class="chip">Both</span></div>`, '320px')}
+    ${p(L('Storage and saves','স্টোরেজ'), `
+      <div>Dhaka · 58 MB <span class="btn alt">Delete</span></div><div>Bandarban · 44 MB <span class="btn alt">Delete</span></div>
+      <div style="font-size:12px;margin:4px 0">Your phone may clear offline Regions when storage is low.</div>
+      <span class="btn">Export save code</span><span class="btn alt">Import</span>`, '300px')}</div>`;
+  return `<div class="menu">${p(L('Licences and credits','লাইসেন্স'), `
+      <div>Map data © OpenStreetMap contributors, ODbL · openstreetmap.org/copyright</div>
+      <div>produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved</div>
+      <div>Building heights: Google Open Buildings 2.5D, CC BY 4.0</div>
+      <div>Vehicle models: Cessna 172 by TonyWony (CC BY) · Jeep Willys by skudgee (CC BY) · …</div>`, '520px')}</div>`;
+}
+
+function render() {
+  document.body.className = 'v' + st.v;
+  const stage = document.getElementById('stage');
+  stage.className = st.frame === 'phone' ? 'phone' : '';
+  stage.innerHTML = (st.screen === 'bus' || st.screen === 'flight') ? hud(st.screen) : menu(st.screen);
+  if (st.frame === 'phone') { const s = Math.min((innerWidth - 40) / 812, (innerHeight - 180) / 375, 1.4); stage.style.transform = `translate(-50%,-50%) scale(${s})`; } else stage.style.transform = '';
+  document.getElementById('tabs').innerHTML = SCREENS.map(([k, n]) => `<button class="tb ${st.screen===k?'on':''}" onclick="set('screen','${k}')">${n}</button>`).join('');
+  document.getElementById('ctrl').innerHTML =
+    `<span><b>Direction</b>${[['A','A · Glass'],['B','B · Bus art'],['C','C · Instrument']].map(([k,n])=>`<button class="tb ${st.v===k?'on':''}" onclick="set('v','${k}')">${n}</button>`).join(' ')}</span>
+     <span><b>Frame</b>${[['desktop','Desktop'],['phone','Phone (landscape)']].map(([k,n])=>`<button class="tb ${st.frame===k?'on':''}" onclick="set('frame','${k}')">${n}</button>`).join(' ')}</span>`;
+  history.replaceState(null, '', `?v=${st.v}&screen=${st.screen}&frame=${st.frame}`);
+}
+function set(k, v) { st[k] = v; render(); }
+addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>

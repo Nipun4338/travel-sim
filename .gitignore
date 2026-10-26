@@ -1,0 +1,13 @@
+# dependencies and build output
+node_modules/
+dist/
+
+# baked Region files are build output and stay out of git (see SPEC.md §16)
+regions-out/
+
+# local Claude settings
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db

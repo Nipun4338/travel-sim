@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PROTOTYPE · Flight model</title>
+<!--
+  THROWAWAY PROTOTYPE for wayfinder ticket 008 "Prototype arcade-plus flight model".
+  Question: what should flying feel like (take-off speed, stall, roll/pitch response, landing assistance, camera)?
+  A hand-written kinematic arcade model, not a physics engine. Not production code.
+  Run: double-click this file (needs internet for the Three.js CDN import).
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#b7d3e6;font:13px/1.35 system-ui,sans-serif;color:#111}
+  canvas{display:block;touch-action:none}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:5;white-space:nowrap}
+  #hud{position:fixed;top:30px;left:8px;background:rgba(255,255,255,.9);padding:8px 10px;border-radius:8px;width:230px;font-variant-numeric:tabular-nums}
+  #hud .big{font-size:24px;font-weight:700}
+  #hud .warn{color:#fff;background:#c0392b;padding:1px 6px;border-radius:4px;font-weight:700}
+  .bar{height:6px;background:#ddd;border-radius:3px;overflow:hidden;margin:2px 0 6px}
+  .bar>i{display:block;height:100%;background:#2e86c1}
+  #panel{position:fixed;top:30px;right:8px;width:280px;max-height:calc(100% - 40px);overflow:auto;background:rgba(255,255,255,.93);padding:8px 10px;border-radius:8px}
+  #panel.closed #body{display:none}
+  #panel label{display:block;margin:6px 0 0}
+  #panel input[type=range]{width:100%}
+  #panel .row{display:flex;justify-content:space-between;gap:6px;align-items:center}
+  button{margin:2px 2px 2px 0;padding:4px 8px;border:1px solid #888;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+  button.on{background:#222;color:#fff}
+  #help{font-size:12px;color:#444;margin-top:8px}
+  #toast{position:fixed;top:36%;left:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:700;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center}
+  #touch{display:none}
+  body.touch #touch{display:block}
+  #stickZone{position:fixed;left:0;bottom:0;width:45%;height:50%;background:rgba(0,0,0,.05)}
+  #stickZone span{position:absolute;bottom:10px;left:10px;color:#333;font-size:12px}
+  #thrWrap{position:fixed;right:20px;bottom:20px;height:170px;width:50px}
+  #thr{position:absolute;width:170px;left:-60px;top:75px;transform:rotate(-90deg)}
+  #brkBtn{position:fixed;right:84px;bottom:20px;width:70px;height:70px;border-radius:12px;border:2px solid #333;background:rgba(255,255,255,.7);font-weight:700;display:grid;place-items:center;user-select:none}
+  @media (max-width:700px){#hud{width:180px;font-size:12px}#hud .big{font-size:20px}#panel{width:230px}}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: flight model (throwaway)</div>
+<div id="hud"></div>
+<div id="panel" class="closed">
+  <div class="row"><b>Tuning</b><button id="toggle">Show ▾</button></div>
+  <div id="body">
+    <div id="presets"></div>
+    <label class="row"><span>Invert pitch (↑/W = nose up)</span><input type="checkbox" id="invert"></label>
+    <div id="sliders"></div>
+    <div class="row"><button id="copy">Copy values</button><button id="resetBtn">Reset (R)</button></div>
+    <div id="help">
+      <b>Fly:</b> W/S or ↑/↓ pitch (W = nose down, like a stick) · A/D or ←/→ roll · Q/E rudder<br>
+      <b>Throttle:</b> Shift up · Z down · B wheel brakes<br>
+      <b>Places:</b> 1 runway start · 2 final approach (follow the rings) · 3 over the hills · R reset<br>
+      <b>View:</b> V chase / cockpit · <b>Presets:</b> 7 Gentle · 8 Arcade-plus · 9 Sim-lite<br>
+      Gamepad: left stick, RT/LT throttle, LB/RB rudder, A brakes. Touch: virtual stick bottom-left, throttle slider right.
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="touch">
+  <div id="stickZone"><span>drag = stick</span></div>
+  <div id="brkBtn">BRAKE</div>
+  <div id="thrWrap"><input id="thr" type="range" min="0" max="1" step="0.01" value="0"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+// ---------- tuning parameters ----------
+const DEFS = [
+  ['maxAccel',   'Thrust (m/s² at full throttle)',             2,   15,  0.1],
+  ['maxSpeed',   'Max speed (km/h)',                           150, 500, 5],
+  ['stall',      'Stall speed (km/h)',                         60,  200, 1],
+  ['stallMode',  'Stall: 0 none · 1 soft · 2 hard',            0,   2,   1],
+  ['pitchRate',  'Pitch rate (°/s)',                           10,  120, 1],
+  ['rollRate',   'Roll rate (°/s)',                            30,  240, 1],
+  ['yawRate',    'Rudder yaw rate (°/s)',                      5,   60,  1],
+  ['response',   'Control response (higher = snappier)',       1,   15,  0.5],
+  ['autoLevel',  'Auto-level wings when stick is centred',     0,   3,   0.1],
+  ['coord',      'Bank turns the plane (coordination)',        0,   1.5, 0.05],
+  ['gravity',    'Climbs slow you / dives speed you up',       0,   1,   0.05],
+  ['crashVS',    'Max touchdown sink rate (m/s)',              1,   10,  0.5],
+  ['landAssist', 'Landing assist: auto-flare (0 off, 1 on)',   0,   1,   1],
+];
+const PRESETS = {
+  'Gentle':      {maxAccel:4.5, maxSpeed:300, stall:90,  stallMode:0, pitchRate:45, rollRate:90,  yawRate:20, response:4, autoLevel:1.5, coord:1.0, gravity:0.3, crashVS:6, landAssist:1},
+  'Arcade-plus': {maxAccel:4, maxSpeed:330, stall:100, stallMode:1, pitchRate:50, rollRate:110, yawRate:20, response:5, autoLevel:0.6, coord:1.0, gravity:0.6, crashVS:4, landAssist:0},
+  'Sim-lite':    {maxAccel:3, maxSpeed:280, stall:110, stallMode:2, pitchRate:40, rollRate:90,  yawRate:15, response:3, autoLevel:0,   coord:0.8, gravity:1.0, crashVS:3, landAssist:0},
+};
+const P = {...PRESETS['Arcade-plus']};
+let presetName = 'Arcade-plus';
+
+// ---------- scene ----------
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xb7d3e6);
+scene.fog = new THREE.Fog(0xb7d3e6, 2000, 14000);
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.5, 30000);
+scene.add(new THREE.HemisphereLight(0xe6f2ff, 0x5f6f3e, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(-3000, 5000, 2000); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const mat = c => new THREE.MeshLambertMaterial({color:c, flatShading:true});
+
+// ---------- terrain: flat airport + city to the west, hills and a river valley to the east ----------
+const hash = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf*xf*(3-2*xf), v = zf*zf*(3-2*zf);
+  const a = hash(xi, zi), b = hash(xi+1, zi), c = hash(xi, zi+1), d = hash(xi+1, zi+1);
+  return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v;
+}
+const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x-e0)/(e1-e0))); return t*t*(3-2*t); };
+const riverX = z => 5200 + 900*Math.sin(z/2500);
+function H(x, z) {
+  const mask = smooth(2500, 5000, Math.hypot(x, z)) * smooth(-1500, 1500, x);
+  if (mask <= 0) return 0;
+  let h = 520*vnoise(x/3000+7, z/3000+3) + 160*vnoise(x/900, z/900) + 45*vnoise(x/280, z/280);
+  h *= smooth(150, 1000, Math.abs(x - riverX(z)));
+  return h * mask;
+}
+{
+  const SIZE = 30000, SEG = 300;
+  const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI/2);
+  const pos = g.attributes.position, col = new Float32Array(pos.count*3), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + 3000, z = pos.getZ(i); pos.setX(i, x);
+    const h = H(x, z); pos.setY(i, h);
+    if (h < 2) c.setHex(0x7f9a55); else if (h < 250) c.setHex(0x4f7a3a); else if (h < 450) c.setHex(0x3c5f2e); else c.setHex(0x7a6a55);
+    col.set([c.r, c.g, c.b], i*3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true, flatShading:true})));
+  // river
+  const rv = [];
+  for (let z = -15000; z <= 15000; z += 200) rv.push(new THREE.Vector3(riverX(z), 3, z));
+  const rg = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rv), 300, 60, 4, false);
+  rg.scale(1, 0.05, 1);
+  scene.add(new THREE.Mesh(rg, mat(0x3f7fa8)));
+}
+// runway 14-ish: along z, 3200 x 45 m, take-off towards -z
+const RW = {len:3200, wid:45};
+{
+  const r = new THREE.Mesh(new THREE.BoxGeometry(RW.wid, 0.2, RW.len), mat(0x3a3a3c)); r.position.y = 0.1; scene.add(r);
+  for (let z = -RW.len/2 + 60; z < RW.len/2 - 60; z += 60) { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 0.22, 30), mat(0xffffff)); m.position.set(0, 0.11, z); scene.add(m); }
+  for (const s of [-1, 1]) for (let i = -6; i <= 6; i++) { if (!i) continue; const m = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.22, 40), mat(0xffffff)); m.position.set(i*3, 0.11, s*(RW.len/2 - 30)); scene.add(m); }
+  const t = new THREE.Mesh(new THREE.BoxGeometry(250, 18, 80), mat(0xd9d4c7)); t.position.set(260, 9, 0); scene.add(t);
+  const tw = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 45, 8), mat(0xe8e8e8)); tw.position.set(180, 22, 300); scene.add(tw);
+}
+// city boxes west of the airport for scale
+{
+  const N = 700, im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat(0xcfc6b4), N), m4 = new THREE.Matrix4();
+  let s = 3; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < N; i++) {
+    const x = -3800 + rnd()*3300, z = -3500 + rnd()*7000, w = 20 + rnd()*40, h = 8 + rnd()*50 * (rnd() < 0.1 ? 3 : 1);
+    m4.compose(new THREE.Vector3(x, h/2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, w)); im.setMatrixAt(i, m4);
+  }
+  scene.add(im);
+}
+// approach rings on a 3° glide path to the runway's south end (landing towards -z)
+const RINGS = [800, 1600, 2400, 3200, 4000].map(d => {
+  const y = Math.max(12, d * Math.tan(3 * Math.PI/180)), z = RW.len/2 + d;
+  const m = new THREE.Mesh(new THREE.TorusGeometry(30, 1.5, 8, 32), mat(0xf39c12)); m.position.set(0, y, z); scene.add(m);
+  return {m, y, z, hit:false};
+});
+
+// ---------- the plane (forward = -z, up = +y, right = +x) ----------
+const plane = new THREE.Group(); scene.add(plane);
+{
+  const add = (g, c, x, y, z) => { const m = new THREE.Mesh(g, mat(c)); m.position.set(x, y, z); plane.add(m); return m; };
+  add(new THREE.BoxGeometry(1.3, 1.4, 8), 0xf2f2f2, 0, 0, 0);
+  add(new THREE.BoxGeometry(11, 0.15, 1.6), 0xc0392b, 0, 0.75, -0.6);
+  add(new THREE.BoxGeometry(3.6, 0.12, 1.0), 0xc0392b, 0, 0.2, 3.6);
+  add(new THREE.BoxGeometry(0.12, 1.5, 1.1), 0xc0392b, 0, 0.9, 3.7);
+  add(new THREE.BoxGeometry(1.2, 0.5, 1.2), 0x22313f, 0, 0.75, -1.4);
+}
+const prop = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.15, 0.08), mat(0x222222)); prop.position.set(0, 0, -4.05); plane.add(prop);
+const GEAR = 1.4;
+
+// ---------- state ----------
+const S = {pos:new THREE.Vector3(), q:new THREE.Quaternion(), speed:0, sink:0, throttle:0, onGround:true, crashed:0,
+           rates:{p:0, r:0, y:0}, vel:new THREE.Vector3(), lastLanding:'—', ringsHit:0, stallWarn:false, wingDrop:1};
+let spawnKind = 'runway';
+function spawn(kind = spawnKind) {
+  spawnKind = kind; S.rates = {p:0, r:0, y:0}; S.sink = 0; S.crashed = 0; RINGS.forEach(r => { r.hit = false; r.m.material.color.setHex(0xf39c12); }); S.ringsHit = 0;
+  if (kind === 'runway') { S.pos.set(0, GEAR, RW.len/2 - 80); S.q.setFromEuler(new THREE.Euler(0, 0, 0)); S.speed = 0; S.throttle = 0; S.onGround = true; }
+  if (kind === 'approach') { const d = 3000; S.pos.set(0, d*Math.tan(3*Math.PI/180) + 20, RW.len/2 + d); S.q.setFromEuler(new THREE.Euler(-3*Math.PI/180, 0, 0, 'YXZ')); S.speed = 150/3.6; S.throttle = 0.12; S.onGround = false; }
+  if (kind === 'hills') { const z = 4000; S.pos.set(riverX(z), 650, z); S.q.setFromEuler(new THREE.Euler(0, 0, 0)); S.speed = 200/3.6; S.throttle = 0.6; S.onGround = false; }
+  thrEl.value = S.throttle;
+  toast({runway:'Runway start: full throttle, rotate', approach:'Final approach: fly through the rings and land', hills:'Over the hills: follow the river valley'}[kind]);
+}
+
+// ---------- input ----------
+const keys = new Set();
+const thrEl = document.getElementById('thr');
+addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (e.code === 'KeyR') spawn();
+  if (e.code === 'Digit1') spawn('runway');
+  if (e.code === 'Digit2') spawn('approach');
+  if (e.code === 'Digit3') spawn('hills');
+  if (e.code === 'KeyV') camMode = camMode === 'chase' ? 'cockpit' : 'chase';
+  if (e.code === 'Digit7') applyPreset('Gentle');
+  if (e.code === 'Digit8') applyPreset('Arcade-plus');
+  if (e.code === 'Digit9') applyPreset('Sim-lite');
+});
+addEventListener('keyup', e => keys.delete(e.code));
+const touch = {pitch:0, roll:0, brake:0, thrTouched:false};
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
+{
+  const zone = document.getElementById('stickZone'); let o = null;
+  zone.addEventListener('pointerdown', e => { o = {x:e.clientX, y:e.clientY}; zone.setPointerCapture(e.pointerId); });
+  zone.addEventListener('pointermove', e => { if (!o) return; touch.roll = Math.max(-1, Math.min(1, (e.clientX - o.x)/70)); touch.pitch = Math.max(-1, Math.min(1, (e.clientY - o.y)/70)); });
+  const end = () => { o = null; touch.roll = touch.pitch = 0; };
+  zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+  thrEl.addEventListener('input', () => { S.throttle = parseFloat(thrEl.value); });
+  const b = document.getElementById('brkBtn');
+  b.addEventListener('pointerdown', () => touch.brake = 1); b.addEventListener('pointerup', () => touch.brake = 0); b.addEventListener('pointercancel', () => touch.brake = 0);
+}
+const invertEl = document.getElementById('invert');
+function readInput() {
+  const k = c => keys.has(c) ? 1 : 0;
+  // pitch: + = nose up. Default stick convention: W/↑ = nose down.
+  let pitch = (k('KeyS') || k('ArrowDown')) - (k('KeyW') || k('ArrowUp'));
+  let roll = (k('KeyD') || k('ArrowRight')) - (k('KeyA') || k('ArrowLeft'));   // + = roll right
+  let yaw = k('KeyE') - k('KeyQ');                                            // + = yaw right
+  let thr = k('ShiftLeft') || k('ShiftRight') ? 1 : 0; if (k('KeyZ')) thr = -1;
+  let brake = k('KeyB');
+  const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(Boolean) : null;
+  if (gp) {
+    const dz = v => Math.abs(v) > 0.1 ? v : 0;
+    if (dz(gp.axes[0])) roll = gp.axes[0]; if (dz(gp.axes[1])) pitch = gp.axes[1];
+    const up = gp.buttons[7]?.value || 0, down = gp.buttons[6]?.value || 0; if (up || down) thr = up - down;
+    yaw = (gp.buttons[5]?.pressed ? 1 : 0) - (gp.buttons[4]?.pressed ? 1 : 0) || yaw;
+    brake = brake || (gp.buttons[0]?.pressed ? 1 : 0);
+  }
+  if (touch.roll || touch.pitch) { roll = touch.roll; pitch = touch.pitch; }
+  brake = brake || touch.brake;
+  if (invertEl.checked) pitch = -pitch;
+  return {pitch, roll, yaw, thr, brake};
+}
+
+// ---------- flight model ----------
+const DT = 1/60, D2R = Math.PI/180;
+const fwd = new THREE.Vector3(), up = new THREE.Vector3(), right = new THREE.Vector3();
+const AX = new THREE.Vector3(1,0,0), AY = new THREE.Vector3(0,1,0), AZ = new THREE.Vector3(0,0,1), tmpQ = new THREE.Quaternion();
+let live = {};
+const onRunway = p => Math.abs(p.x) < RW.wid/2 + 6 && Math.abs(p.z) < RW.len/2 + 20;
+
+function step() {
+  if (S.crashed > 0) { if (--S.crashed === 0) spawn(); return; }
+  const inp = readInput();
+  if (inp.thr) { S.throttle = Math.min(1, Math.max(0, S.throttle + inp.thr * 0.5 * DT)); thrEl.value = S.throttle; }
+  fwd.set(0,0,-1).applyQuaternion(S.q); up.set(0,1,0).applyQuaternion(S.q); right.set(1,0,0).applyQuaternion(S.q);
+  const pitchDeg = Math.asin(THREE.MathUtils.clamp(fwd.y, -1, 1)) / D2R;
+  const bankDeg = Math.asin(THREE.MathUtils.clamp(-right.y, -1, 1)) / D2R * (up.y < 0 ? -1 : 1); // + = right wing down
+  const sStall = P.stall / 3.6, s = S.speed;
+
+  // lift: 1 = flying, 0 = fully stalled
+  let lift = 1;
+  if (P.stallMode === 1) lift = THREE.MathUtils.clamp((s - sStall*0.75) / (sStall*0.25), 0, 1);
+  if (P.stallMode === 2) lift = s < sStall ? Math.max(0, (s - sStall*0.9) / (sStall*0.1)) : 1;
+  if (P.stallMode === 0 && !S.onGround) S.speed = Math.max(S.speed, sStall * 0.9);
+  S.stallWarn = !S.onGround && P.stallMode > 0 && s < sStall * 1.1;
+
+  // control rates (deg/s), less authority when slow
+  const auth = THREE.MathUtils.clamp(s / sStall, 0.25, 1);
+  let tp = inp.pitch * P.pitchRate * auth, tr = -inp.roll * P.rollRate * auth, ty = -inp.yaw * P.yawRate;
+  if (!S.onGround) {
+    if (!inp.roll) tr += P.autoLevel * bankDeg;
+    tp -= (1 - lift) * 35;                                   // stalled: nose drops
+    if (P.stallMode === 2 && lift < 0.5) tr += S.wingDrop * 45; // hard stall: a wing drops
+  } else {
+    tr = 0; ty = -(inp.yaw || inp.roll) * 25 * Math.min(1, s / 5);   // nosewheel steering
+    if (s < sStall * 1.1) tp = Math.min(tp, 0);
+  }
+  const k = 1 - Math.exp(-P.response * DT);
+  S.rates.p += (tp - S.rates.p) * k; S.rates.r += (tr - S.rates.r) * k; S.rates.y += (ty - S.rates.y) * k;
+  S.q.multiply(tmpQ.setFromAxisAngle(AX, S.rates.p * D2R * DT));
+  S.q.multiply(tmpQ.setFromAxisAngle(AZ, S.rates.r * D2R * DT));
+  S.q.multiply(tmpQ.setFromAxisAngle(AY, S.rates.y * D2R * DT));
+  if (!S.onGround) {   // banked flight turns the plane
+    const yawW = -P.coord * 9.81 * Math.tan(THREE.MathUtils.clamp(bankDeg * D2R, -1.3, 1.3)) / Math.max(s, 15) * DT;
+    S.q.premultiply(tmpQ.setFromAxisAngle(AY, yawW));
+  }
+  S.q.normalize();
+  if (Math.random() < 0.01) S.wingDrop = Math.random() < 0.5 ? -1 : 1;
+
+  // speed
+  fwd.set(0,0,-1).applyQuaternion(S.q);
+  const drag = P.maxAccel / Math.pow(P.maxSpeed / 3.6, 2);
+  let a = P.maxAccel * S.throttle - drag * s * s - 9.81 * fwd.y * P.gravity;
+  if (S.onGround) a -= 0.25 + inp.brake * 3.5;
+  S.speed = Math.max(0, S.speed + a * DT);
+
+  // velocity: along the nose, plus sink when lift is lost
+  S.sink += ((1 - lift) * 22 - S.sink) * (1 - Math.exp(-1.5 * DT));
+  S.vel.copy(fwd).multiplyScalar(S.speed); S.vel.y -= S.onGround ? 0 : S.sink;
+  const ground = H(S.pos.x, S.pos.z), agl = S.pos.y - GEAR - ground;
+  if (P.landAssist && !S.onGround && onRunway(S.pos) && agl < 12 && S.vel.y < -1) S.vel.y = Math.max(S.vel.y, -0.8 - agl * 0.12);
+  S.pos.addScaledVector(S.vel, DT);
+
+  if (S.onGround) {
+    // stay on the ground: wings level, nose not below level, until rotated above stall speed
+    const e = new THREE.Euler().setFromQuaternion(S.q, 'YXZ');
+    e.z = 0; e.x = THREE.MathUtils.clamp(e.x, 0, s >= sStall * 1.1 ? 15*D2R : 0);
+    S.q.setFromEuler(e);
+    S.pos.y = H(S.pos.x, S.pos.z) + GEAR;
+    if (e.x > 3*D2R && s >= sStall * 1.1) { S.onGround = false; S.sink = 0; toast('Airborne'); }
+    if (!onRunway(S.pos) && s > 15 && H(S.pos.x, S.pos.z) > 1) crash('Ran off into rough ground');
+  } else {
+    const g2 = H(S.pos.x, S.pos.z), a2 = S.pos.y - GEAR - g2;
+    if (a2 <= 0) {
+      const vs = S.vel.y, level = Math.abs(bankDeg) < 15 && pitchDeg > -6;
+      const flat = Math.abs(H(S.pos.x + 20, S.pos.z) - g2) < 2 && Math.abs(H(S.pos.x, S.pos.z + 20) - g2) < 2;
+      if (level && vs > -P.crashVS && (onRunway(S.pos) || (flat && S.speed < 160/3.6))) {
+        const off = Math.abs(S.pos.x);
+        const grade = vs > -1 ? 'Butter' : vs > -2 ? 'Good' : 'Firm';
+        S.lastLanding = `${grade}: ${(-vs).toFixed(1)} m/s sink, ${onRunway(S.pos) ? off.toFixed(1) + ' m off centreline' : 'off-field'}`;
+        S.onGround = true; S.pos.y = g2 + GEAR; S.sink = 0; toast('Landed: ' + grade);
+      } else crash(vs <= -P.crashVS ? `Crashed: ${(-vs).toFixed(1)} m/s sink` : !level ? 'Crashed: not level' : 'Crashed into terrain');
+    }
+  }
+  for (const r of RINGS) if (!r.hit && Math.abs(S.pos.z - r.z) < 4 && Math.hypot(S.pos.x, S.pos.y - r.y) < 30) { r.hit = true; S.ringsHit++; r.m.material.color.setHex(0x27ae60); }
+  live = {kmh:S.speed*3.6, alt:S.pos.y, agl:Math.max(0, S.pos.y - GEAR - H(S.pos.x, S.pos.z)), vs:S.vel.y, pitch:pitchDeg, bank:bankDeg,
+          hdg:(Math.atan2(fwd.x, -fwd.z)/D2R + 360) % 360, lift};
+}
+function crash(msg) { S.crashed = 90; S.lastLanding = msg; toast(msg); }
+
+// ---------- UI ----------
+const hud = document.getElementById('hud');
+function renderHud() {
+  if (!live.kmh && live.kmh !== 0) return;
+  hud.innerHTML = `<div class="big">${live.kmh.toFixed(0)} km/h ${S.stallWarn ? '<span class="warn">STALL</span>' : ''}</div>
+    Alt ${live.alt.toFixed(0)} m · Above ground ${live.agl.toFixed(0)} m<br>
+    Vertical speed: ${live.vs.toFixed(1)} m/s<br>
+    Pitch ${live.pitch.toFixed(0)}° · Bank ${live.bank.toFixed(0)}° · Heading ${live.hdg.toFixed(0)}°<br>
+    Throttle <div class="bar"><i style="width:${Math.round(S.throttle*100)}%"></i></div>
+    State: <b>${S.crashed ? 'CRASHED' : S.onGround ? 'On ground' : 'Flying'}</b> · Rings ${S.ringsHit}/${RINGS.length}<br>
+    Last: ${S.lastLanding}<br>
+    Preset: <b>${presetName}</b>${isCustom() ? ' (edited)' : ''} · View: ${camMode}`;
+}
+const isCustom = () => DEFS.some(([k]) => P[k] !== PRESETS[presetName][k]);
+const sliders = document.getElementById('sliders'), presetsEl = document.getElementById('presets'), inputs = {};
+for (const [k, label, min, max, st] of DEFS) {
+  const wrap = document.createElement('label');
+  wrap.innerHTML = `<div class="row"><span>${label}</span><b id="v_${k}"></b></div>`;
+  const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = st;
+  inp.addEventListener('input', () => { P[k] = parseFloat(inp.value); syncSliders(); });
+  inp.addEventListener('keydown', e => e.stopPropagation());
+  wrap.appendChild(inp); sliders.appendChild(wrap); inputs[k] = inp;
+}
+function syncSliders() { for (const [k] of DEFS) { inputs[k].value = P[k]; document.getElementById('v_' + k).textContent = P[k]; }
+  presetsEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent === presetName)); }
+for (const name of Object.keys(PRESETS)) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => applyPreset(name); presetsEl.appendChild(b); }
+function applyPreset(name) { presetName = name; Object.assign(P, PRESETS[name]); syncSliders(); toast('Preset: ' + name); }
+document.getElementById('toggle').onclick = () => { const p = document.getElementById('panel'); p.classList.toggle('closed'); document.getElementById('toggle').textContent = p.classList.contains('closed') ? 'Show ▾' : 'Hide ▴'; };
+document.getElementById('copy').onclick = () => { navigator.clipboard?.writeText(JSON.stringify({preset:presetName, invertPitch:invertEl.checked, ...P})); toast('Values copied'); };
+document.getElementById('resetBtn').onclick = () => spawn();
+let toastT; function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => t.style.opacity = 0, 1600); }
+window.__stepN = (n, inp) => { for (let i = 0; i < n; i++) step(); return {...live, onGround:S.onGround, crashed:S.crashed, last:S.lastLanding, rings:S.ringsHit, throttle:S.throttle}; };
+window.__S = S;
+
+// ---------- loop ----------
+let camMode = 'chase';
+syncSliders(); spawn('runway');
+let last = performance.now(), acc = 0, hudT = 0;
+const camPos = new THREE.Vector3(0, 10, RW.len/2), look = new THREE.Vector3();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; acc += dt;
+  while (acc >= DT) { step(); acc -= DT; }
+  plane.position.copy(S.pos); plane.quaternion.copy(S.q);
+  prop.rotation.z += S.throttle * 1.2 + 0.05;
+  fwd.set(0,0,-1).applyQuaternion(S.q); up.set(0,1,0).applyQuaternion(S.q);
+  if (camMode === 'chase') {
+    const want = S.pos.clone().addScaledVector(fwd, -24).addScaledVector(up, 6);
+    if (S.crashed) want.set(S.pos.x + 30, S.pos.y + 25, S.pos.z + 30);
+    camPos.lerp(want, 1 - Math.exp(-dt * 5)); camera.position.copy(camPos);
+    camera.up.lerp(up, 1 - Math.exp(-dt * 2)).normalize();
+    look.copy(S.pos).addScaledVector(fwd, 30); camera.lookAt(look);
+  } else {
+    camera.position.copy(S.pos).addScaledVector(up, 0.9).addScaledVector(fwd, -1.0);
+    camera.up.copy(up); look.copy(S.pos).addScaledVector(fwd, 100).addScaledVector(up, 0.9); camera.lookAt(look);
+    camPos.copy(camera.position);
+  }
+  renderer.render(scene, camera);
+  if ((hudT += dt) > 0.1) { hudT = 0; renderHud(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
