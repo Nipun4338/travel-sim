@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Document, NodeIO } from '@gltf-transform/core';
+import { Document, Logger, NodeIO } from '@gltf-transform/core';
 import { EXTMeshoptCompression, KHRMeshQuantization } from '@gltf-transform/extensions';
 import { quantize, reorder, weld } from '@gltf-transform/functions';
 import { MeshoptEncoder } from 'meshoptimizer';
@@ -20,7 +20,7 @@ async function getIO(): Promise<NodeIO> {
 
 /** One GLB per chunk LOD; each layer becomes a named node so the game can pick collider layers. */
 export async function encodeChunk(layers: Map<ChunkLayer, { pos: number[]; col: number[]; uv?: number[] }>): Promise<Uint8Array> {
-  const doc = new Document();
+  const doc = new Document().setLogger(new Logger(Logger.Verbosity.WARN));
   const buffer = doc.createBuffer();
   const scene = doc.createScene();
   const material = doc.createMaterial('flat').setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(1).setMetallicFactor(0);

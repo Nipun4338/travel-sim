@@ -10,7 +10,7 @@ Milestones for building v1 from [SPEC.md](../SPEC.md). Each one ends with someth
 | M3 | **Bus gameplay** | Legs, Timetable, doors, passengers, Jerky Moments, Fines, Taka earned and the results screen all work on Dhaka Leg 1 | §6 |
 | M4 | **AI traffic** | lane-following traffic, junction phases and per-tier caps | §7 |
 | M5 | **Bandarban bake + Route** | the hill Route with graded hairpins, hand-placed Stops, oncoming jeeps | §4, §5 |
-| M6 | **Flight Mode** | kinematic flight model, both Flight Zones, 5 Challenges, landing grade, free-flight checklist | §8 |
+| M6 | **Flight Mode** | kinematic flight model, both Flight Zones, 5 Challenges, landing grade, free-flight checklist. Open with `?play=flight&world=dhaka\|bandarban` (`&challenge=1..3`) until M8's mode select | §8 |
 | M7 | **Time of day and weather** | 4 times, rain and hill fog with the gameplay effects and per-tier techniques | §9 |
 | M8 | **UI** | the bus-art look with the corner layout, all 7 screens, bilingual text | §13 |
 | M9 | **Progression, saves and audio** | IndexedDB saves, export code, Liveries, career stats; the sound list and Helper call-outs | §14, §15 |

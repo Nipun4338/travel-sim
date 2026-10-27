@@ -35,6 +35,8 @@ export async function overpass(query: string, cacheFile: string): Promise<OsmDat
         return data;
       } catch (e) {
         console.log(`    failed: ${(e as Error).message}`);
+        // Overpass rate-limits busy clients; back off before the next try.
+        await new Promise(r => setTimeout(r, 20_000 * attempt));
       }
     }
   }
@@ -58,8 +60,37 @@ export async function copernicusWindow(bbox: [number, number, number, number], c
     return { ...meta, data: new Float32Array(readFileSync(cacheFile + '.f32').buffer.slice(0)) };
   }
   const [s, w, n, e] = bbox;
-  const lat = Math.floor(s), lon = Math.floor(w);
-  if (Math.floor(n) !== lat || Math.floor(e) !== lon) throw new Error('bbox spans more than one DEM tile');
+  // A bbox across 1° tile edges is read tile by tile and stitched (same pixel size below 50° N).
+  const parts: DemWindow[] = [];
+  for (let lat = Math.floor(s); lat <= Math.floor(n); lat++) for (let lon = Math.floor(w); lon <= Math.floor(e); lon++) {
+    parts.push(await tileWindow(lat, lon, [Math.max(s, lat), Math.max(w, lon), Math.min(n, lat + 1), Math.min(e, lon + 1)]));
+  }
+  const out = parts.length === 1 ? parts[0] : stitch(parts);
+  mkdirSync(dirname(cacheFile), { recursive: true });
+  const { data, ...meta } = out;
+  writeFileSync(cacheFile, JSON.stringify(meta));
+  writeFileSync(cacheFile + '.f32', Buffer.from(data.buffer));
+  return out;
+}
+
+function stitch(parts: DemWindow[]): DemWindow {
+  const { resLon, resLat } = parts[0];
+  const west = Math.min(...parts.map(p => p.west)), north = Math.max(...parts.map(p => p.north));
+  const width = Math.round((Math.max(...parts.map(p => p.west + p.width * resLon)) - west) / resLon);
+  const height = Math.round((north - Math.min(...parts.map(p => p.north - p.height * resLat))) / resLat);
+  const data = new Float32Array(width * height);
+  for (const p of parts) {
+    const ox = Math.round((p.west - west) / resLon), oy = Math.round((north - p.north) / resLat);
+    for (let y = 0; y < p.height; y++) for (let x = 0; x < p.width; x++) {
+      const tx = ox + x, ty = oy + y;
+      if (tx < width && ty < height) data[ty * width + tx] = p.data[y * p.width + x];
+    }
+  }
+  return { width, height, west, north, resLon, resLat, data };
+}
+
+async function tileWindow(lat: number, lon: number, bbox: [number, number, number, number]): Promise<DemWindow> {
+  const [s, w, n, e] = bbox;
   const name = `Copernicus_DSM_COG_10_N${String(lat).padStart(2, '0')}_00_E${String(lon).padStart(3, '0')}_00_DEM`;
   const url = `https://copernicus-dem-30m.s3.amazonaws.com/${name}/${name}.tif`;
   console.log(`  dem: ${name}`);
@@ -71,13 +102,8 @@ export async function copernicusWindow(bbox: [number, number, number, number], c
   const y0 = Math.floor((n - oy) / ry), y1 = Math.ceil((s - oy) / ry);
   const rasters = await img.readRasters({ window: [x0, y0, x1, y1] });
   const band = rasters[0] as unknown as ArrayLike<number>;
-  const out: DemWindow = {
+  return {
     width: x1 - x0, height: y1 - y0, west: ox + x0 * rx, north: oy + y0 * ry, resLon: rx, resLat: -ry,
     data: Float32Array.from(band),
   };
-  mkdirSync(dirname(cacheFile), { recursive: true });
-  const { data, ...meta } = out;
-  writeFileSync(cacheFile, JSON.stringify(meta));
-  writeFileSync(cacheFile + '.f32', Buffer.from(data.buffer));
-  return out;
 }

@@ -24,7 +24,7 @@ const SIGNS = [0xd62828, 0x2a9d4b, 0x1f5fbf, 0xf2c200, 0xf07f13, 0xc2187a, 0xf4f
 const AWNINGS = [0x2e6e9e, 0x2a8a4b, 0xb0302f, 0xd9a21b, 0x6a4c9c].map(color);
 const ALL = [0, 1, 2];
 
-function pickWall(id: number): THREE.Color {
+export function pickWall(id: number): THREE.Color {
   const total = WALLS.reduce((s, [, w]) => s + w, 0);
   let r = hash01(id + 7) * total;
   for (const [hex, w] of WALLS) { if ((r -= w) < 0) return color(hex); }

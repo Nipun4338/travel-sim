@@ -12,8 +12,11 @@ export class ChunkGeometry {
   /** key "cx_cz" -> per-LOD layer buffers */
   readonly chunks = new Map<string, ChunkBufs[]>();
 
+  /** `offset` shifts the chunk grid, e.g. so a zone's chunks start at its west/north edge. */
+  constructor(private size = CHUNK_SIZE, private offset = 0) {}
+
   chunkOf(x: number, z: number): [number, number] {
-    return [Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)];
+    return [Math.floor((x + this.offset) / this.size), Math.floor((z + this.offset) / this.size)];
   }
 
   private buf(cx: number, cz: number, lod: number, layer: ChunkLayer): LayerBuf {

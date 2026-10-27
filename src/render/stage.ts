@@ -6,9 +6,12 @@ export interface Stage {
   camera: THREE.PerspectiveCamera;
 }
 
-/** Renderer, scene and midday lighting. Time of day and weather arrive in M7. */
-export function createStage(): Stage {
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+/**
+ * Renderer, scene and midday lighting. Time of day and weather arrive in M7. Flight Mode sees tens
+ * of kilometres, so it asks for a logarithmic depth buffer and a far camera.
+ */
+export function createStage(opts: { far?: number; logDepth?: boolean } = {}): Stage {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: opts.logDepth ?? false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   document.body.prepend(renderer.domElement);
@@ -21,7 +24,7 @@ export function createStage(): Stage {
   sun.position.set(-200, 900, 150);
   scene.add(sun);
 
-  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 2000);
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, opts.far ?? 2000);
   addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();

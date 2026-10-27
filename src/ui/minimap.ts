@@ -1,14 +1,16 @@
-// Round corner map, heading-up: nearby roads, the Route, its Stops and the bus. M toggles it.
+// Round corner map, heading-up: nearby roads, the Route (or a Ring course), its points and the
+// vehicle. M toggles it. Bus Mode feeds it the Route and lanes; Flight Mode a wider view of the zone.
 import type { LaneData, RouteData } from '../shared/region';
 import { t } from '../i18n/i18n';
 
-const CELL = 100;
-const VIEW_M = 260;       // metres from the bus to the map's edge
+const BUS_VIEW_M = 260;   // metres from the bus to the map's edge
 const BUS_AT = 0.62;      // bus sits below centre so more of the road ahead shows
 const STORE_KEY = 'travel-sim.minimap';
 
 // x0 z0 x1 z1, half-width in metres, flyover?
-type Seg = [number, number, number, number, number, boolean];
+export type MapSeg = [number, number, number, number, number, boolean];
+type Seg = MapSeg;
+export interface MapPoint { x: number; z: number; name: string; done?: boolean; }
 
 export class Minimap {
   private root = document.createElement('div');
@@ -16,7 +18,9 @@ export class Minimap {
   private ctx = this.canvas.getContext('2d')!;
   private roads = new Map<string, Seg[]>();
   private routeSegs = new Map<string, Seg[]>();
-  private stops: { x: number; z: number; name: string }[] = [];
+  private stops: MapPoint[] = [];
+  private viewM = BUS_VIEW_M;
+  private cell = 100;
   private sizePx = 0;
   private visible = true;
 
@@ -29,19 +33,28 @@ export class Minimap {
   }
 
   setRegion(route: RouteData, lanes: LaneData): void {
+    const roads: Seg[] = [];
+    for (const w of lanes.ways) {
+      for (let i = 1; i < w.points.length; i++) roads.push([w.points[i - 1][0], w.points[i - 1][2], w.points[i][0], w.points[i][2], w.width / 2, w.elevated]);
+    }
+    this.setLayers(roads, route.points.map(p => [p[0], p[2]]), route.stops.map(s => ({ x: s.x, z: s.z, name: s.name })), BUS_VIEW_M);
+  }
+
+  /** Roads, a path drawn in blue, and points (the next one in amber); `viewM` is the map's radius. */
+  setLayers(roads: Seg[], path: Array<[number, number]>, points: MapPoint[], viewM: number): void {
+    this.viewM = viewM;
+    this.cell = Math.max(100, Math.round(viewM / 3));
     this.roads.clear();
     this.routeSegs.clear();
-    for (const w of lanes.ways) {
-      for (let i = 1; i < w.points.length; i++) {
-        this.add(this.roads, [w.points[i - 1][0], w.points[i - 1][2], w.points[i][0], w.points[i][2], w.width / 2, w.elevated]);
-      }
-    }
-    for (let i = 1; i < route.points.length; i++) {
-      this.add(this.routeSegs, [route.points[i - 1][0], route.points[i - 1][2], route.points[i][0], route.points[i][2], 0, false]);
-    }
-    this.stops = route.stops.map(s => ({ x: s.x, z: s.z, name: s.name }));
+    this.nearCache.clear();
+    roads.forEach(s => this.add(this.roads, s));
+    for (let i = 1; i < path.length; i++) this.add(this.routeSegs, [path[i - 1][0], path[i - 1][1], path[i][0], path[i][1], 0, false]);
+    this.stops = points;
     this.root.hidden = !this.visible;
   }
+
+  /** Marks points done (e.g. landmarks found) without rebuilding the map. */
+  setDone(names: Set<string>): void { this.stops.forEach(p => { p.done = names.has(p.name); }); }
 
   toggle(): boolean {
     this.visible = !this.visible;
@@ -52,8 +65,10 @@ export class Minimap {
 
   private add(grid: Map<string, Seg[]>, s: Seg): void {
     const seen = new Set<string>();
-    for (const [x, z] of [[s[0], s[1]], [s[2], s[3]]]) {
-      const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    const len = Math.hypot(s[2] - s[0], s[3] - s[1]), steps = Math.max(1, Math.ceil(len / this.cell));
+    for (let k = 0; k <= steps; k++) {
+      const x = s[0] + ((s[2] - s[0]) * k) / steps, z = s[1] + ((s[3] - s[1]) * k) / steps;
+      const key = `${Math.floor(x / this.cell)},${Math.floor(z / this.cell)}`;
       if (seen.has(key)) continue;
       seen.add(key);
       if (!grid.has(key)) grid.set(key, []);
@@ -61,11 +76,18 @@ export class Minimap {
     }
   }
 
+  // Segments near the vehicle, cached per grid cell (a city zone has thousands within the map).
+  private nearCache = new Map<Map<string, Seg[]>, { key: string; segs: Seg[] }>();
+
   private near(grid: Map<string, Seg[]>, x: number, z: number): Seg[] {
+    const r = Math.ceil(this.viewM / this.cell) + 1, cx = Math.floor(x / this.cell), cz = Math.floor(z / this.cell);
+    const key = `${cx},${cz},${grid.size}`, hit = this.nearCache.get(grid);
+    if (hit?.key === key) return hit.segs;
     const out = new Set<Seg>();
-    const r = Math.ceil(VIEW_M / CELL) + 1, cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) for (const s of grid.get(`${cx + i},${cz + j}`) ?? []) out.add(s);
-    return [...out];
+    const segs = [...out];
+    this.nearCache.set(grid, { key, segs });
+    return segs;
   }
 
   /** fx, fz: the bus's forward direction on the ground (+x east, +z south). */
@@ -79,7 +101,7 @@ export class Minimap {
     }
     const n = Math.hypot(fx, fz) || 1;
     fx /= n; fz /= n;
-    const size = this.sizePx, scale = size / 2 / VIEW_M, cx = size / 2, cy = size * BUS_AT;
+    const size = this.sizePx, scale = size / 2 / this.viewM, cx = size / 2, cy = size * BUS_AT;
     // Heading-up: forward maps to screen up, the bus's right to screen right.
     const sx = (wx: number, wz: number) => cx + ((wx - x) * -fz + (wz - z) * fx) * scale;
     const sy = (wx: number, wz: number) => cy - ((wx - x) * fx + (wz - z) * fz) * scale;
@@ -95,14 +117,25 @@ export class Minimap {
     c.lineCap = 'round';
 
     const roads = this.near(this.roads, x, z);
+    // One path per style and (rounded) width: thousands of single strokes are far too slow.
+    const batches = new Map<string, Seg[]>();
+    for (const s of roads) {
+      const w = Math.max(1.5 * dpr, Math.round(s[4] * 2 * scale * 2) / 2);
+      const k = `${s[5] ? 1 : 0}|${w}`;
+      if (!batches.has(k)) batches.set(k, []);
+      batches.get(k)!.push(s);
+    }
     for (const flyover of [false, true]) {
       c.strokeStyle = flyover ? 'rgba(200, 200, 210, 0.55)' : 'rgba(225, 222, 210, 0.9)';
-      for (const s of roads) {
-        if (s[5] !== flyover) continue;
-        c.lineWidth = Math.max(1.5 * dpr, s[4] * 2 * scale);
+      for (const [k, segs] of batches) {
+        const [fl, w] = k.split('|');
+        if ((fl === '1') !== flyover) continue;
+        c.lineWidth = +w;
         c.beginPath();
-        c.moveTo(sx(s[0], s[1]), sy(s[0], s[1]));
-        c.lineTo(sx(s[2], s[3]), sy(s[2], s[3]));
+        for (const s of segs) {
+          c.moveTo(sx(s[0], s[1]), sy(s[0], s[1]));
+          c.lineTo(sx(s[2], s[3]), sy(s[2], s[3]));
+        }
         c.stroke();
       }
     }
@@ -125,7 +158,7 @@ export class Minimap {
       const k = d > rim ? rim / d : 1;
       c.beginPath();
       c.arc(size / 2 + dx * k, size / 2 + dy * k, (next ? 6 : 4) * dpr, 0, Math.PI * 2);
-      c.fillStyle = next ? '#ffb020' : '#ffffff';
+      c.fillStyle = next ? '#ffb020' : st.done ? '#7fa08a' : '#ffffff';
       c.fill();
       c.lineWidth = 1.5 * dpr;
       c.strokeStyle = '#1b1b1b';

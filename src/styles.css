@@ -66,3 +66,16 @@ canvas { display: block; touch-action: none; }
 .minimap[hidden] { display: none; }
 .minimap canvas { width: 100%; height: 100%; }
 @media (pointer: coarse) { .minimap { top: 12px; bottom: auto; right: auto; left: 12px; width: 120px; height: 120px; } }
+
+/* Flight Mode: STALL in the strip, speed and height beside the view in the chase camera, touch stick and throttle. */
+.hud-strip .stall { color: #fff; background: #c0392b; padding: 0 6px; border-radius: 4px; font-weight: 700; }
+.flight-read { position: fixed; top: 50%; transform: translateY(-50%); color: #fff; background: rgba(0,0,0,.35); padding: 6px 10px; border-radius: 10px; font-size: 13px; pointer-events: none; font-variant-numeric: tabular-nums; }
+.flight-read[hidden] { display: none; }
+.flight-read b { font-size: 22px; }
+.flight-read.left { left: 12px; }
+.flight-read.right { right: 12px; text-align: right; }
+.flight-touch .stick-zone { position: fixed; left: 0; bottom: 0; width: 45%; height: 50%; background: rgba(0,0,0,.05); }
+.flight-touch .stick-zone span { position: absolute; left: 10px; bottom: 10px; color: #333; font-size: 12px; }
+.flight-touch .thr-wrap { position: fixed; right: 20px; bottom: 20px; width: 50px; height: 170px; }
+.flight-touch .thr { position: absolute; width: 170px; left: -60px; top: 75px; transform: rotate(-90deg); }
+.flight-touch .brake { right: 84px; bottom: 20px; width: 70px; height: 70px; }

@@ -16,3 +16,4 @@ Thumbs.db
 data/raw/
 # baked Region output
 public/regions/
+public/zones/

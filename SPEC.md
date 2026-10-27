@@ -77,7 +77,10 @@ A **custom TypeScript bake script** runs at build time and writes, per Region:
 - **Elevated roads** are baked from OSM bridge ways as decks on pillars, stacked by `layer` because OSM has no height tags: the Elevated Expressway (`layer=3`), MRT Line 6 (`bridge=viaduct`, `layer=6`), and the Mohakhali and Kuril flyovers (`layer=1`). The Dhaka–Ashulia Elevated Expressway is baked *as under construction* (pillars and partial deck). The bus drives at ground level under all of them.
 - **Detail:**
   - Bus Mode: full detail within **~250 m** of the Route, with a low-detail backdrop beyond.
-  - Flight Mode: the whole Flight Zone at low and medium detail, reusing the corridor detail where it overlaps.
+  - Flight Mode: the whole Flight Zone at low and medium detail, baked separately (`npm run bake:flight -- <zone>`, output in `public/zones/`). It does not reuse the corridor chunks: the two use different origins and chunk grids.
+    - **Terrain** is a 40 m height field, shared by the game for ground contact, drawn as 2 km chunks at 40 m (near) and 100 m (mid), over a whole-zone 400 m backdrop that sits just below them.
+    - **Buildings** are read from the Geofabrik extract (`data/raw/osm/bangladesh-latest.osm.pbf`, ~356 MB; Overpass can't serve them all) and baked as boxes (each OSM footprint's smallest enclosing rectangle) drawn instanced and thinned with distance, largest first. The Dhaka zone holds ~900k OSM buildings, too many to bake as meshes. Heights come from tags, else from local building density. The plane crashes on contact with them.
+    - Runways come from OSM and are flattened into the ground; roads, water and green space colour the terrain.
 - **Style:** flat-shaded low-poly, vertex colours plus a small shared texture atlas, no real-time shadows.
 - **Batching:** chunk meshes must be merged and lamps instanced. The unbatched prototype Dhaka scene hit ~250 draw calls.
 
@@ -237,6 +240,8 @@ A HORN key and touch button, with no Fine.
 
 **Free flight:** unscored, with a **landmark checklist**: flying near a landmark ticks it off, and the count shows in career stats.
 
+**Relaxed mode (default)** applies to Flight Mode too: Challenges never fail and pay no Taka or stars; a crash puts you back at the start after a moment. The end card shows Rings, time against par and, for landings, the grade with its sink rate, centreline offset and touchdown distance. `?mode=scored` adds Taka, stars and the fail conditions above.
+
 ## 9. Time of day and weather
 [023](docs/wayfinder/tickets/023-define-day-night-and-weather.md), [024](docs/wayfinder/tickets/024-prototype-fog-and-rain.md)
 
@@ -296,7 +301,7 @@ Check each model's separable parts (wheels, doors, control surfaces) in Sketchfa
 | Bus | W/↑ gas · S/↓ brake/reverse · A/D steer · F doors · H horn · L headlights · K high beam · Q/E indicators · X hazards · V camera · Tab details · ` language · mouse-drag to look around in the cab | left stick steer, RT gas, LT brake | drag-to-steer area bottom-left (~45% × 45%, 70 px = full lock); GAS and BRAKE bottom-right; DOOR and HORN above GAS; ◀ 💡 ▶ (indicators, headlights) top-right |
 | Plane | W/S pitch (**W = nose down**, invert option) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · V camera | left stick, RT/LT throttle, LB/RB rudder, A brakes | floating virtual stick bottom-left (70 px = full deflection; drag down = nose up); vertical throttle slider and BRAKE bottom-right; no touch rudder |
 
-Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh drives on the left), with a dashboard, analog speedometer, tell-tale lamps, a steering wheel that turns with the steering, live side mirrors and an amber next-Stop display; V switches to the chase camera. The plane gets the same treatment in M6.
+Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh drives on the left), with a dashboard, analog speedometer, tell-tale lamps, a steering wheel that turns with the steering, live side mirrors and an amber next-Stop display; V switches to the chase camera. The plane also defaults to its **cockpit**: a panel with airspeed, attitude, altimeter, throttle, heading and vertical-speed instruments, a yoke that follows the controls, the high wing overhead; mouse drag looks around. L toggles the landing light; nav lights, beacon and strobes are always on.
 
 ## 13. UI
 [018](docs/wayfinder/tickets/018-prototype-hud-and-menus.md), prototype [prototypes/hud-and-menus](prototypes/hud-and-menus/PROTOTYPE-hud-and-menus.html)
