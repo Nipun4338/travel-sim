@@ -13,6 +13,7 @@ import { createStage, VehicleCamera } from './render/stage';
 import { Junctions } from './traffic/junctions';
 import { TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from './traffic/Traffic';
 import { BusHud } from './ui/hud';
+import { Minimap } from './ui/minimap';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
 import { RegionWorld } from './world/region';
@@ -26,6 +27,7 @@ const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 world.timestep = 1 / 60;
 const events = new RAPIER.EventQueue(true);
 const hud = new BusHud();
+const minimap = new Minimap();
 const results = new ResultsScreen();
 
 // A relaxing drive by default; ?mode=scored turns on Taka, Fines, stars and failing Runs (a
@@ -64,6 +66,7 @@ let roadMask: RoadMask | null = null;
 if (region) {
   const lanes = await region.loadLanes();
   roadMask = new RoadMask(lanes);
+  minimap.setRegion(region.route, lanes);
   junctions = new Junctions(lanes, region.route, scene);
   const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
   traffic = new Traffic(
@@ -137,6 +140,7 @@ input.onAction(action => {
     case 'hazard': lights.toggleHazard(); hud.toast(t(lights.hazard ? 'hazardOn' : 'hazardOff')); break;
     case 'language': setLang(getLang() === 'bn' ? 'en' : 'bn'); hud.toast(t('language')); break;
     case 'details': hud.showDetails = !hud.showDetails; break;
+    case 'map': hud.toast(t(minimap.toggle() ? 'mapOn' : 'mapOff')); break;
     case 'horn': break; // audio arrives in M9
   }
 });
@@ -243,6 +247,7 @@ startLoop(
     cam.update(busView.group, bus.forward, bus.up, frameDt);
     busView.updateMirrors(renderer, scene);
     renderer.render(scene, camera);
+    minimap.update(busPos.x, busPos.z, bus.forward.x, bus.forward.z, next?.name);
     if ((hudTimer += frameDt) > 0.1) {
       hudTimer = 0;
       hud.render({

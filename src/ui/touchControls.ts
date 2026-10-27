@@ -15,7 +15,7 @@ export function mountBusTouchControls(input: Input): void {
     <button class="pad gas"></button>
     <button class="pad door"></button>
     <button class="pad horn"></button>
-    <div class="lights-row"><button class="mini ind-l">◀</button><button class="mini head">💡</button><button class="mini ind-r">▶</button></div>`;
+    <div class="lights-row"><button class="mini ind-l">◀</button><button class="mini head">💡</button><button class="mini ind-r">▶</button><button class="mini map">🗺</button></div>`;
   document.body.appendChild(root);
   const label = () => {
     root.querySelector('.steer-area')!.textContent = t('touchSteer');
@@ -51,4 +51,5 @@ export function mountBusTouchControls(input: Input): void {
   root.querySelector('.ind-l')!.addEventListener('pointerdown', () => input.emit('indicatorLeft'));
   root.querySelector('.ind-r')!.addEventListener('pointerdown', () => input.emit('indicatorRight'));
   root.querySelector('.head')!.addEventListener('pointerdown', () => input.emit('lights'));
+  root.querySelector('.map')!.addEventListener('pointerdown', () => input.emit('map'));
 }

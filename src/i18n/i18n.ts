@@ -55,7 +55,7 @@ const EN: Dict = {
   passengers: 'Passengers {n}/{cap} ({s} standing)', doorsOpen: 'Doors open', doorsClosed: 'Doors closed',
   stopFirst: 'Stop first', comfort: 'Comfort', jerky: 'jerky {n}', leg: 'Leg {n}: {from} → {to}',
   junction: '{name} junction {d} m', junctionStop: 'STOP', junctionGo: 'GO', details: 'Tab: details',
-  keys: 'W/S gas·brake · A/D steer · F doors · V view · Tab details · L language · R restart · 1/2/3 Leg',
+  keys: 'W/S gas·brake · A/D steer · F doors · H horn · L lights · K high beam · Q/E indicators · X hazards · M map · V view · Tab details · ` language · R restart · 1/2/3 Leg',
   boardHint: 'Leg {n}: {from} → {to}. Open the doors (F) to board.',
   onTime: '{stop}: on time', arrLate: '{stop}: {s} s late', arrEarly: '{stop}: {s} s early', leftEarly: 'Left {stop} {s} s early!',
   missed: 'Missed {stop}!', leftBehind: '{n} left behind at {stop}', complaint: '"Drive carefully!" ({n} standing)',
@@ -71,14 +71,14 @@ const EN: Dict = {
   tripComplete: 'Trip complete', tripSummary: '{km} km · {time} · {pax} passengers · {stops} Stops served',
   touchGas: 'GAS', touchBrake: 'BRAKE', touchDoor: 'DOOR', touchHorn: 'HORN', touchSteer: 'drag ◀ ▶ to steer',
   lightsOff: 'Lights off', lightsParking: 'Parking lights', lightsLow: 'Headlights on', highBeamOn: 'High beam on', highBeamOff: 'High beam off', highBeamNeedsLights: 'Turn the headlights on first (L)',
-  hazardOn: 'Hazards on', hazardOff: 'Hazards off', arrived: '{stop}', passedStop: 'Passed {stop}',
+  hazardOn: 'Hazards on', hazardOff: 'Hazards off', north: 'N', mapOn: 'Map on', mapOff: 'Map off', arrived: '{stop}', passedStop: 'Passed {stop}',
 };
 const BN: Dict = {
   kmh: 'কিমি/ঘণ্টা', next: 'পরবর্তী', dueIn: '{t} পরে', late: '{t} দেরি', departsIn: 'ছাড়বে {t} পরে',
   passengers: 'যাত্রী {n}/{cap} ({s} জন দাঁড়িয়ে)', doorsOpen: 'দরজা খোলা', doorsClosed: 'দরজা বন্ধ',
   stopFirst: 'আগে থামুন', comfort: 'আরাম', jerky: 'ঝাঁকুনি {n}', leg: 'লেগ {n}: {from} → {to}',
   junction: '{name} মোড় {d} মি', junctionStop: 'থামুন', junctionGo: 'চলুন', details: 'Tab: বিস্তারিত',
-  keys: 'W/S গ্যাস·ব্রেক · A/D স্টিয়ারিং · F দরজা · V দৃশ্য · Tab বিস্তারিত · L ভাষা · R আবার · 1/2/3 লেগ',
+  keys: 'W/S গ্যাস·ব্রেক · A/D স্টিয়ারিং · F দরজা · H হর্ন · L বাতি · K হাই বিম · Q/E ইন্ডিকেটর · X হ্যাজার্ড · M মানচিত্র · V দৃশ্য · Tab বিস্তারিত · ` ভাষা · R আবার · 1/2/3 লেগ',
   boardHint: 'লেগ {n}: {from} → {to}। যাত্রী তুলতে দরজা খুলুন (F)।',
   onTime: '{stop}: সময়মতো', arrLate: '{stop}: {s} সেকেন্ড দেরি', arrEarly: '{stop}: {s} সেকেন্ড আগে', leftEarly: '{stop} থেকে {s} সেকেন্ড আগে ছেড়েছেন!',
   missed: '{stop} বাদ পড়েছে!', leftBehind: '{stop}-এ {n} জন রয়ে গেল', complaint: '"আস্তে চালান!" ({n} জন দাঁড়িয়ে)',
@@ -93,7 +93,7 @@ const BN: Dict = {
   tripComplete: 'যাত্রা শেষ', tripSummary: '{km} কিমি · {time} · {pax} যাত্রী · {stops}টি স্টপ',
   touchGas: 'গ্যাস', touchBrake: 'ব্রেক', touchDoor: 'দরজা', touchHorn: 'হর্ন', touchSteer: '◀ ▶ টেনে স্টিয়ারিং',
   lightsOff: 'লাইট বন্ধ', lightsParking: 'পার্কিং লাইট', lightsLow: 'হেডলাইট জ্বলছে', highBeamOn: 'হাই বিম চালু', highBeamOff: 'হাই বিম বন্ধ', highBeamNeedsLights: 'আগে হেডলাইট জ্বালান (L)',
-  hazardOn: 'হ্যাজার্ড চালু', hazardOff: 'হ্যাজার্ড বন্ধ', arrived: '{stop}', passedStop: '{stop} পেরিয়ে গেছেন',
+  hazardOn: 'হ্যাজার্ড চালু', hazardOff: 'হ্যাজার্ড বন্ধ', north: 'উ', mapOn: 'মানচিত্র চালু', mapOff: 'মানচিত্র বন্ধ', arrived: '{stop}', passedStop: '{stop} পেরিয়ে গেছেন',
 };
 
 /** Translated text with {placeholders}. Numbers passed as params are shown in the current digits. */
