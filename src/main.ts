@@ -29,6 +29,7 @@ import { conditionsMultiplier, pickConditions } from './world/conditions';
 import { streetLamps } from './world/streetLamps';
 import { buildTestTrack } from './world/testTrack';
 import { placeLandmarks } from './landmarks/place';
+import { Railways } from './world/railways';
 
 await RAPIER.init();
 
@@ -89,11 +90,13 @@ const quality = tier as QualityTier;
 let junctions: Junctions | null = null;
 let traffic: Traffic | null = null;
 let roadMask: RoadMask | null = null;
+let railways: Railways | null = null;
 if (region) {
   const lanes = await region.loadLanes();
   roadMask = new RoadMask(lanes);
   minimap.setRegion(region.route, lanes);
   placeLandmarks(scene, region.manifest.landmarks);
+  if (region.manifest.rails) railways = new Railways(scene, await (await fetch(`${import.meta.env.BASE_URL}regions/${regionId}/${region.manifest.rails}`)).json());
   junctions = new Junctions(lanes, region.route, scene);
   const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
   traffic = new Traffic(
@@ -117,6 +120,7 @@ busView.setBeamStyle(tier !== 'low', atmosphere.night, atmosphere.rainy || atmos
 const sounds = new BusSounds(regionId, conditions);
 if (traffic) traffic.onHonk = type => sounds.honk(type);
 let soundTimer = 0;
+let lastCrossingWarned: string | null = null;
 const lights = new BusLights();
 const comfort = new ComfortMeter();
 const cam = new VehicleCamera(camera, CAB_EYE, renderer.domElement);
@@ -244,7 +248,15 @@ function step(dt: number): void {
   }
   lights.update(dt, { brake: inp.brake, speed: bus.speed, gear: bus.gear, steerDeg: bus.steerDeg });
   junctions?.update(dt);
+  if (railways && traffic) traffic.closedCrossings = railways.closed;
   traffic?.update(dt, { x: busPos.x, z: busPos.z, hx: bus.forward.x, hz: bus.forward.z, speed: bus.speed });
+  if (railways) {
+    // A closed crossing just ahead: a one-time warning (traffic stops for it; so should the bus).
+    const c = railways.closed.find(k => { const dx = k.x - busPos.x, dz = k.z - busPos.z, a = dx * bus.forward.x + dz * bus.forward.z; return a > 0 && a < 120 && Math.abs(-dx * bus.forward.z + dz * bus.forward.x) < 12; });
+    const key = c ? `${c.x},${c.z}` : null;
+    if (key && key !== lastCrossingWarned) hud.toast(t('crossingClosed'), 3000);
+    lastCrossingWarned = key;
+  }
   world.step(events);
   comfort.update(bus.body.linvel(), bus.forward, bus.right, dt);
   const p = bus.body.translation();
@@ -300,6 +312,7 @@ startLoop(
     cam.update(busView.group, bus.forward, bus.up, frameDt);
     busView.updateMirrors(renderer, scene);
     atmosphere.update(frameDt, inCab, bus.kmh);
+    railways?.update(frameDt, camera.position);
     renderer.render(scene, camera);
     minimap.update(busPos.x, busPos.z, bus.forward.x, bus.forward.z, next?.name);
     if ((hudTimer += frameDt) > 0.1) {
@@ -329,7 +342,7 @@ setTimeout(() => {
 if (import.meta.env.DEV) {
   Object.assign(window, {
     __game: {
-      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView, pauseMenu,
+      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView, pauseMenu, get railways() { return railways; },
       get run() { return run; }, get progress() { return progress; },
       startLeg, step, setPaused: (p: boolean) => { paused = p; },
       setInput: (fn: typeof readInput | null) => { readInput = fn ?? (() => input.read()); },

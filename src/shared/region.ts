@@ -28,6 +28,7 @@ export interface RegionManifest {
   chunks: ChunkEntry[];
   route: string;       // file name of RouteData
   lanes: string;       // file name of LaneData
+  rails?: string;      // file name of RailData
   landmarks?: PlacedLandmark[];
   credits: string[];
 }
@@ -62,3 +63,8 @@ export interface LaneWay {
 }
 
 export interface LaneData { ways: LaneWay[]; }
+
+/** Railway lines for running trains (rail top height), and level crossings (SPEC §7, real OSM). */
+export interface RailLine { kind: 'rail' | 'metro'; points: [number, number, number][]; }
+export interface LevelCrossing { x: number; y: number; z: number; railHeadingDeg: number; roadHeadingDeg: number; roadWidth: number; }
+export interface RailData { lines: RailLine[]; crossings: LevelCrossing[]; }

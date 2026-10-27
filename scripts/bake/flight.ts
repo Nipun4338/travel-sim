@@ -6,7 +6,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as THREE from 'three';
-import type { ChunkLayer } from '../../src/shared/region';
+import type { ChunkLayer, RailLine } from '../../src/shared/region';
 import {
   BUILDING_STRIDE, ZONE_CHUNK, type ChallengeData, type Landmark, type Ring, type Runway, type Spawn, type ZoneChunk, type ZoneManifest,
 } from '../../src/shared/zone';
@@ -31,7 +31,7 @@ const CREDITS = [
 ];
 const C = {
   water: color(0x3f7fa8), green: color(0x6f8f4a), paved: color(0x8f8c86), runway: color(0x3a3a3c), taxiway: color(0x55555a),
-  road: color(0x48484b), white: color(0xe8e8e2), forest: [0x355f29, 0x3f6b2e, 0x4b7a34, 0x56843a].map(color),
+  road: color(0x48484b), white: color(0xe8e8e2), ballast: color(0x6f675c), forest: [0x355f29, 0x3f6b2e, 0x4b7a34, 0x56843a].map(color),
 };
 
 // Raw Overpass `out geom` elements.
@@ -66,6 +66,7 @@ async function main() {
   );
   const aeroRaw = await overpass(`[out:json][timeout:200];way["aeroway"~"^(runway|taxiway|apron)$"](${bb});out geom qt;`, join(raw, 'aeroway.json'));
   const riversRaw = await overpass(`[out:json][timeout:200];way["waterway"="river"](${bb});out geom qt;`, join(raw, 'rivers.json'));
+  const railRaw = await overpass(`[out:json][timeout:200];way["railway"~"^(rail|light_rail|subway)$"](${bb});out geom qt;`, join(raw, 'rail.json'));
   const ways = (d: OsmData) => (d.elements as unknown as GWay[]).filter(e => e.type === 'way' && e.geometry);
 
   // ---------- polygons ----------
@@ -225,6 +226,23 @@ async function main() {
     }
   }
 
+  // ---------- railways: track beds from the air, the metro on its viaduct ----------
+  const railLines: RailLine[] = [];
+  for (const kind of ['rail', 'metro'] as const) {
+    const ways_ = ways(railRaw).filter(w => (w.tags?.railway === 'rail') === (kind === 'rail') && w.tags?.service === undefined);
+    for (const chain of assembleChains(ways_.map(w => w.geometry!.map(xz)))) {
+      if (chain.every(([x, z]) => Math.abs(x) > H || Math.abs(z) > H)) continue;
+      const pts = densify(chain, 20);
+      if (kind === 'metro') {
+        geo.ribbon(pts.map(([x, z]) => [x, h(x, z) + 12, z] as V3), 9, C.paved, 'road', [0, 1], 1.2, C.paved);
+        backdrop.ribbon(pts.map(([x, z]) => [x, h(x, z) + 12, z] as V3), 9, C.paved, 'road', [0]);
+      } else geo.ribbon(pts.map(([x, z]) => [x, h(x, z) + 0.5, z] as V3), 4.5, C.ballast, 'road', [0, 1]);
+      const lift = kind === 'metro' ? 12.22 : 0.72;
+      railLines.push({ kind, points: densify(chain, 5).map(([x, z]) => [Math.round(x * 10) / 10, Math.round((h(x, z) + lift) * 100) / 100, Math.round(z * 10) / 10]) });
+    }
+  }
+  console.log(`      railways: ${railLines.length} lines, ${(railLines.reduce((s, l) => s + l.points.length, 0) * 5 / 1000).toFixed(0)} km`);
+
   // ---------- airport ----------
   for (const w of ways(aeroRaw)) {
     const pts = w.geometry!.map(xz), t = w.tags!.aeroway;
@@ -366,17 +384,19 @@ async function main() {
   const backdropFile = writeHashed(out, 'backdrop', 'glb', bd);
   const heightFile = writeHashed(out, 'height', 'bin', new Uint8Array(quant.buffer));
   const mapFile = writeHashed(out, 'map', 'json', JSON.stringify(mapRoads));
+  const railsFile = railLines.length ? writeHashed(out, 'rails', 'json', JSON.stringify({ lines: railLines, crossings: [] })) : undefined;
   const [spawnX, spawnZ] = 'runway' in zone.spawn ? [0, 0] : proj.toXZ(zone.spawn.lat, zone.spawn.lon);
   const body: Omit<ZoneManifest, 'version'> = {
     zone: id, origin: zone.origin, halfM: H, chunkSize: ZONE_CHUNK, backdrop: backdropFile,
     height: { file: heightFile, gridM: zone.gridM, n, min, step: STEP }, chunks, runways,
     spawn: 'runway' in zone.spawn ? spawnFor(zone.spawn) : { ...spawnFor(zone.spawn), x: spawnX, z: spawnZ },
     challenges, landmarks, map: mapFile, credits: CREDITS,
+    rails: railsFile,
     models: models.map(p => ({ id: p.def.id, x: Math.round(p.x * 10) / 10, y: Math.round(h(p.x, p.z) * 100) / 100, z: Math.round(p.z * 10) / 10, headingDeg: p.def.headingDeg })),
   };
   const manifest: ZoneManifest = { ...body, version: shortHash(JSON.stringify(body)) };
   writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
-  const keep = new Set(['manifest.json', backdropFile, heightFile, mapFile, ...chunks.flatMap(c => [...c.lods, ...(c.buildings ? [c.buildings] : [])])]);
+  const keep = new Set(['manifest.json', backdropFile, heightFile, mapFile, ...(railsFile ? [railsFile] : []), ...chunks.flatMap(c => [...c.lods, ...(c.buildings ? [c.buildings] : [])])]);
   for (const f of before) if (!keep.has(f)) rmSync(join(out, f));
   const mb = (b: number) => (b / 1e6).toFixed(1);
   console.log(`Done in ${((Date.now() - t0) / 1000).toFixed(0)} s: ${chunks.length} chunks, ${mb(total)} MB terrain GLB, ${mb(bldBytes)} MB buildings, `

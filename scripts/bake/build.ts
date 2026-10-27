@@ -9,7 +9,8 @@ import type { HeightSampler } from './terrain';
 
 const C = {
   ground: color(0xa39b8a), green: color(0x6f8f4a), leafy: color(0x7d9455), paved: color(0x8f8c86), sand: color(0xb3a17f),
-  road: color(0x3f3f42), roadMajor: color(0x37373a), rail: color(0x5a4a3f), white: color(0xe8e8e2), yellow: color(0xe0b52a),
+  road: color(0x3f3f42), roadMajor: color(0x37373a), rail: color(0x5a4a3f), ballast: color(0x7d7468), sleeper: color(0x8a847a),
+  steel: color(0x8d9196), girder: color(0x4a5a6a), white: color(0xe8e8e2), yellow: color(0xe0b52a),
   kerb: color(0xb9b2a5), kerbSide: color(0x8d877c),
   deck: color(0xb8b4ab), deckSide: color(0x8f8b83), pillar: color(0x9a968e), water: color(0x3f7fa8),
   roofTank: color(0x1f1f1f), trunk: color(0x5b4632),
@@ -130,6 +131,41 @@ function offsetLine(pts: [number, number][], off: number): [number, number][] {
   });
 }
 
+/**
+ * Railway track along a polyline at track-bed height: ballast (raised, in every LOD), concrete
+ * sleepers every 0.9 m and two steel rails at standard 1.676 m broad gauge (Bangladesh's main
+ * line around Dhaka). On a bridge, steel girders run along both sides.
+ */
+function buildTrack(geo: ChunkGeometry, pts: V3[], lods: number[], bridge: boolean, ballast = true): void {
+  if (ballast) geo.ribbon(pts, 3.8, C.ballast, 'road', lods, 0.3, C.ballast);
+  const flat = pts.map(([x, , z]) => [x, z] as [number, number]);
+  const yAt = (i: number) => pts[i][1];
+  let carry = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay, az] = pts[i - 1], [bx, by, bz] = pts[i], len = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / (len || 1), uz = (bz - az) / (len || 1);
+    for (let d = carry; d < len; d += 0.9) {
+      const x = ax + ux * d, z = az + uz * d, y = ay + ((by - ay) * d) / (len || 1);
+      // A sleeper across the track: a thin slab, rotated to the track's direction.
+      const hw = 1.3, hd = 0.12, rx = -uz, rz = ux;
+      const c = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([a, b]) => [x + rx * a + ux * b, y + 0.08, z + rz * a + uz * b] as V3);
+      geo.quad(c[0], c[3], c[2], c[1], C.sleeper, 'prop', [0]);
+    }
+    carry = (carry - len) % 0.9;
+    if (carry < 0) carry += 0.9;
+  }
+  for (const off of [-0.838, 0.838]) {
+    const line = offsetLine(flat, off).map(([x, z], i) => [x, yAt(i) + 0.22, z] as V3);
+    geo.ribbon(line, 0.09, C.steel, 'prop', [0, 1], 0.14, C.steel);
+  }
+  if (bridge) {
+    for (const off of [-2.6, 2.6]) {
+      const line = offsetLine(flat, off).map(([x, z], i) => [x, yAt(i) + 1.6, z] as V3);
+      geo.ribbon(line, 0.4, C.girder, 'prop', [0, 1], 1.8, C.girder);
+    }
+  }
+}
+
 /** Splits a polyline into runs that stay `gap` metres clear of junctions. */
 function clearOfJunctions(pts: [number, number][], junctions: PointGrid, gap: number): [number, number][][] {
   const runs: [number, number][][] = [];
@@ -181,12 +217,24 @@ export function buildRoads(
       continue;
     }
 
-    const elevated = isElevated(w, idx);
-    const width = isRail ? (elevated ? 9 : 4) : roadWidth(t);
+    // Rail: the metro (and any rail bridge high in the layers) is a viaduct; other rail bridges
+    // carry the track at ground level between steel girders.
+    const railBridge = !!isRail && !!t.bridge && t.bridge !== 'no';
+    const elevated = isRail ? railBridge && (t.railway !== 'rail' || (parseInt(t.layer ?? '0', 10) || 0) >= 3) : isElevated(w, idx);
+    if (isRail && !elevated) { buildTrack(geo, at(pts2, 0.3), [0, 1], railBridge); continue; }
+    const width = isRail ? 9 : roadWidth(t);
     if (elevated) {
       const layer = parseInt(t.layer ?? '1', 10) || 1;
       const deckH = isRail ? 12 : layer >= 3 ? 16 : layer === 2 ? 12 : 7;
       geo.ribbon(at(pts2, deckH), width, C.deck, 'deck', ALL, 1.2, C.deckSide);
+      if (isRail) {
+        // Two tracks on the viaduct, with parapet walls along both edges.
+        for (const off of [-2, 2]) buildTrack(geo, offsetLine(pts2, off).map(([x, z]) => [x, h(x, z) + deckH, z] as V3), [0], false, false);
+        for (const off of [-width / 2 + 0.15, width / 2 - 0.15]) {
+          const line = offsetLine(pts2, off).map(([x, z]) => [x, h(x, z) + deckH + 0.6, z] as V3);
+          geo.ribbon(line, 0.3, C.deckSide, 'deck', [0, 1], 0.6, C.deckSide);
+        }
+      }
       let acc = 0;
       for (let i = 1; i < pts2.length; i++) {
         acc += Math.hypot(pts2[i][0] - pts2[i - 1][0], pts2[i][1] - pts2[i - 1][1]);

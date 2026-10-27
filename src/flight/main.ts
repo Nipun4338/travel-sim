@@ -25,6 +25,7 @@ import { ZoneWorld, type ZoneQuality } from './zone';
 import { conditionsMultiplier, pickConditions } from '../world/conditions';
 import { PlaneSounds } from '../audio/planeSounds';
 import { placeLandmarks } from '../landmarks/place';
+import { Railways } from '../world/railways';
 
 const params = new URLSearchParams(location.search);
 // The menu's settings, unless the URL overrides them (handy for tests).
@@ -59,6 +60,8 @@ if (!params.has('invert')) controls.invert = settings.invertPitch;
 const rings = new RingView(scene);
 const sounds = new PlaneSounds(conditions);
 zone.landmarkSolids = placeLandmarks(scene, m.models);
+// Trains on the real railway, seen from the air (no crossings out here).
+const railways = m.rails ? new Railways(scene, await (await fetch(`${import.meta.env.BASE_URL}zones/${zoneId}/${m.rails}`)).json()) : null;
 
 // Map: the zone's main roads and runways, at a 3 km radius.
 const roads: MapSeg[] = [];
@@ -256,6 +259,7 @@ startLoop(step, frameDt => {
   const state = { kmh: plane.kmh, altM: plane.pos.y - 1.4, vsMs: plane.vel.y, headingDeg: plane.headingDeg, pitchDeg: plane.pitchDeg, bankDeg: plane.bankDeg, throttle: plane.throttle, stall: plane.stallWarning, landingLight };
   if (inCockpit && (panelTimer += frameDt) > 0.05) { panelTimer = 0; view.drawPanel(state); }
   atmosphere.update(frameDt, false);
+  railways?.update(frameDt, camera.position);
   renderer.render(scene, camera);
   if ((hudTimer += frameDt) > 0.1) {
     hudTimer = 0;
@@ -264,5 +268,5 @@ startLoop(step, frameDt => {
 });
 
 if (import.meta.env.DEV) {
-  Object.assign(window, { __flight: { plane, zone, view, cam, controls, hud, renderer, start, step, pauseMenu, get challenge() { return challenge; }, get current() { return current; }, setPaused: (p: boolean) => { paused = p; } } });
+  Object.assign(window, { __flight: { plane, zone, view, cam, controls, hud, renderer, railways, start, step, pauseMenu, get challenge() { return challenge; }, get current() { return current; }, setPaused: (p: boolean) => { paused = p; } } });
 }

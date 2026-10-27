@@ -2,7 +2,7 @@
 // public/regions/<id>/ (both gitignored). See SPEC §4 and docs/build-plan.md (M2).
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LOD_COUNT, type ChunkEntry, type LaneData, type RegionManifest, type RouteData } from '../../src/shared/region';
+import { LOD_COUNT, type ChunkEntry, type LaneData, type LevelCrossing, type RailData, type RailLine, type RegionManifest, type RouteData } from '../../src/shared/region';
 import { buildBuildings, buildRoads, buildTerrain, buildTrees, buildWater, junctionGrid, landuseIndex, roadIndex } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmWay } from './fetch';
@@ -169,13 +169,64 @@ async function main() {
   lap('chunks');
   const routeFile = writeHashed(out, 'route', 'json', JSON.stringify(route));
   const lanesFile = writeHashed(out, 'lanes', 'json', JSON.stringify(lanes));
+  const railsFile = writeHashed(out, 'rails', 'json', JSON.stringify(railData(roads, h, nearRoute)));
   const landmarks = placed.map(p => ({ id: p.def.id, x: Math.round(p.x * 10) / 10, y: Math.round(h(p.x, p.z) * 100) / 100, z: Math.round(p.z * 10) / 10, headingDeg: p.def.headingDeg }));
-  const body = { region: id, origin: region.origin, chunkSize: 1000, chunks, route: routeFile, lanes: lanesFile, landmarks, credits: CREDITS };
+  const body = { region: id, origin: region.origin, chunkSize: 1000, chunks, route: routeFile, lanes: lanesFile, rails: railsFile, landmarks, credits: CREDITS };
   const manifest: RegionManifest = { ...body, version: shortHash(JSON.stringify(body)) };
   writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
-  const keep = new Set(['manifest.json', routeFile, lanesFile, ...chunks.flatMap(c => c.lods)]);
+  const keep = new Set(['manifest.json', routeFile, lanesFile, railsFile, ...chunks.flatMap(c => c.lods)]);
   for (const f of before) if (!keep.has(f)) rmSync(join(out, f));
   console.log(`Done in ${((Date.now() - t0) / 1000).toFixed(0)} s: ${chunks.length} chunks, ${(total / 1e6).toFixed(1)} MB of GLB`);
+}
+
+/**
+ * Railway lines joined end to end (OSM splits them at every bridge and tag change), at rail-top
+ * height, for trains to run on; and the level crossings near the Route with the directions of the
+ * road and the track there.
+ */
+function railData(roads: Indexed, h: (x: number, z: number) => number, nearRoute: (x: number, z: number) => boolean): RailData {
+  const railWays = roads.ways.filter(wy => /^(subway|light_rail|rail)$/.test(wy.tags?.railway ?? ''));
+  const kindOf = (wy: OsmWay): RailLine['kind'] => (wy.tags!.railway === 'rail' ? 'rail' : 'metro');
+  const lines: RailLine[] = [];
+  for (const kind of ['rail', 'metro'] as const) {
+    const left = new Set(railWays.filter(wy => kindOf(wy) === kind));
+    while (left.size) {
+      const first = left.values().next().value as OsmWay;
+      left.delete(first);
+      let seq = [...first.nodes];
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const wy of left) {
+          const n = wy.nodes, head = seq[0], tail = seq[seq.length - 1];
+          if (n[0] === tail) seq = [...seq, ...n.slice(1)];
+          else if (n[n.length - 1] === tail) seq = [...seq, ...[...n].reverse().slice(1)];
+          else if (n[n.length - 1] === head) seq = [...n.slice(0, -1), ...seq];
+          else if (n[0] === head) seq = [...[...n].reverse().slice(0, -1), ...seq];
+          else continue;
+          left.delete(wy);
+          grew = true;
+        }
+      }
+      const flat = seq.map(id => roads.nodes.get(id)).filter(Boolean).map(nd => [nd!.x, nd!.z] as [number, number]);
+      if (flat.length < 2) continue;
+      // Metro trains run on the viaduct (12 m deck); main-line trains on the ballast.
+      const lift = kind === 'metro' ? 12 + 0.22 : 0.3 + 0.22;
+      const points = densify(flat, 5).map(([x, z]) => [Math.round(x * 10) / 10, Math.round((h(x, z) + lift) * 100) / 100, Math.round(z * 10) / 10] as [number, number, number]);
+      if (points.length > 3) lines.push({ kind, points });
+    }
+  }
+  const crossings: LevelCrossing[] = [];
+  const heading = (wy: OsmWay, id: number) => {
+    const i = wy.nodes.indexOf(id), a = roads.nodes.get(wy.nodes[Math.max(0, i - 1)])!, b = roads.nodes.get(wy.nodes[Math.min(wy.nodes.length - 1, i + 1)])!;
+    return Math.round((((Math.atan2(b.x - a.x, -(b.z - a.z)) * 180) / Math.PI) + 360) % 360);
+  };
+  for (const [id, nd] of roads.nodes) {
+    if (nd.tags?.railway !== 'level_crossing' || !nearRoute(nd.x, nd.z)) continue;
+    const rail = railWays.find(wy => wy.nodes.includes(id)), road = roads.ways.find(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway) && wy.nodes.includes(id));
+    if (!rail || !road) continue;
+    crossings.push({ x: Math.round(nd.x * 10) / 10, y: Math.round(h(nd.x, nd.z) * 100) / 100, z: Math.round(nd.z * 10) / 10, railHeadingDeg: heading(rail, id), roadHeadingDeg: heading(road, id), roadWidth: roadWidth(road.tags!) });
+  }
+  return { lines, crossings };
 }
 
 /**

@@ -74,5 +74,7 @@ export interface ZoneManifest {
   models?: PlacedLandmark[];
   /** Simplified road centrelines for the map: flat [x0, z0, x1, z1, …] per road. */
   map: string;
+  /** Railway lines for trains (RailData without crossings), if the zone has any. */
+  rails?: string;
   credits: string[];
 }

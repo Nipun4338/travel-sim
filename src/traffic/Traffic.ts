@@ -55,6 +55,9 @@ export class Traffic {
   private time = 0;
   private cap: number;
   private rnd: () => number;
+  /** Level crossings with their booms down: traffic stops short of them. */
+  closedCrossings: Array<{ x: number; z: number }> = [];
+
   /** Rain slows AI traffic (SPEC §7): `speedScale` is set to RAIN_TRAFFIC_FACTOR. */
   speedScale = 1;
 
@@ -141,6 +144,11 @@ export class Traffic {
     if (j && this.junctions.stateFor(j.j, hx, hz).stop) {
       const stopDist = (v.v * v.v) / (2 * spec.comfortDecel * 1.6);
       if (j.dist > Math.min(2, stopDist)) consider(j.dist, 0); // too close to stop: carry on through
+    }
+
+    for (const c of this.closedCrossings) {
+      const cx = c.x - tmp.x, cz = c.z - tmp.z, ca = cx * hx + cz * hz;
+      if (ca > 0 && ca < 80 && Math.abs(-cx * hz + cz * hx) < 9) consider(ca - 9, 0);
     }
 
     // Intelligent Driver Model.
