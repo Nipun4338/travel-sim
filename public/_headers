@@ -1,0 +1,19 @@
+# Cloudflare Pages caching (SPEC §16). Baked Region and Flight Zone files have content hashes in
+# their names, so they never change: cache for a year. Manifests and the service worker must be
+# checked every time so updates arrive.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/regions/*
+  Cache-Control: public, max-age=31536000, immutable
+/zones/*
+  Cache-Control: public, max-age=31536000, immutable
+/regions/*/manifest.json
+  ! Cache-Control
+  Cache-Control: no-cache
+/zones/*/manifest.json
+  ! Cache-Control
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/audio/*
+  Cache-Control: public, max-age=604800

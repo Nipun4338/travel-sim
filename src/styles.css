@@ -189,3 +189,11 @@ canvas { display: block; touch-action: none; }
 .menu-screen .vol { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
 .menu-screen .vol b { min-width: 90px; color: var(--cream); }
 .menu-screen .vol input { flex: 1; accent-color: var(--yellow); }
+
+/* Update bar, offline downloads and the OSM credit (M11). */
+.update-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 30; display: flex; gap: 12px; align-items: center; background: var(--teal); color: #fff; border: 3px solid var(--yellow); border-radius: 14px; padding: 6px 12px; font: 700 15px var(--art-font); }
+.update-bar button { font: 800 14px var(--art-font); background: var(--yellow); color: var(--maroon); border: 0; border-radius: 10px; padding: 4px 12px; cursor: pointer; }
+.menu-screen .offline { margin-top: 8px; font-size: 13px; color: var(--cream); }
+.menu-screen .store-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
+.menu-screen .osm-credit { position: fixed; right: 10px; bottom: 6px; font-size: 11px; color: var(--cream); opacity: .85; }
+.menu-screen .osm-credit a { color: var(--cream); }

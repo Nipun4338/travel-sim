@@ -3,6 +3,7 @@
 // comes back here. Offline downloads and the save code arrive with M11 and M9.
 import { amount, getLang, num, place, setLang, t, tAlt } from '../i18n/i18n';
 import { challengeUnlocked, landmarksFound, legKey, legUnlocked, loadProgress, type Progress } from '../core/progress';
+import { download, iosNeedsHomeScreen, offlineSupported, persist, remove, usage, type RegionMode } from '../core/offline';
 import { exportCode, importCode, readSave } from '../core/save';
 import { loadSettings, saveSettings, type QualitySetting, type Settings } from '../core/settings';
 import { BUS_LIVERIES, careerTaka, chooseLivery, PLANE_LIVERIES, type Livery } from '../config/liveries';
@@ -86,14 +87,32 @@ export async function showMenu(): Promise<void> {
     let html = '';
     if (st.screen === 'mode') html = modeScreen(p);
     if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : await flightSetup(p, st, settings);
-    if (st.screen === 'settings') html = settingsScreen(settings);
+    if (st.screen === 'settings') html = settingsScreen(settings, await storagePanel());
     if (st.screen === 'liveries') html = liveriesScreen();
     if (st.screen === 'licences') {
       await Promise.all(REGIONS.flatMap(r => [loadRoute(r), loadZone(r)]));
       html = licencesScreen();
     }
+    if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode, st.region));
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
-      <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}`;
+      <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}
+      <div class="osm-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">${t('osmCredit')}</a></div>`;
+    // Offline: download a Region-mode with progress, or delete one from Settings.
+    root.querySelector<HTMLButtonElement>('[data-download]')?.addEventListener('click', async e => {
+      const btn = e.currentTarget as HTMLButtonElement, [mode, region] = btn.dataset.download!.split(':') as [RegionMode, string];
+      btn.disabled = true;
+      try {
+        await download(mode, region, pr => { btn.textContent = t('downloading', { p: Math.floor((pr.done / pr.total) * 100) }); });
+        const kept = await persist();
+        await render();
+        if (!kept) root.querySelector('.offline')?.insertAdjacentHTML('beforeend', `<div>${t('storageWarn')}</div>`);
+      } catch { btn.disabled = false; btn.textContent = t('downloadFailed'); }
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach(el => el.addEventListener('click', async () => {
+      const [mode, region] = el.dataset.delete!.split(':') as [RegionMode, string];
+      await remove(mode, region);
+      await render();
+    }));
     root.querySelector('[data-lang]')!.addEventListener('click', () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); void render(); });
     root.querySelectorAll<HTMLElement>('button, [data-go]').forEach(el => el.addEventListener('click', () => audio.play('click', { gain: 0.5 })));
     root.querySelectorAll<HTMLElement>('[data-go]').forEach(el => el.addEventListener('click', () => {
@@ -176,6 +195,7 @@ function conditionsPanel(st: State, s: Settings): string {
     ${s.scored && mult !== null && mult > 1 ? `<div class="bonus">${t('takaBonus', { x: num(mult) })}</div>` : ''}
     <div class="links"><button class="btn" data-go='{"start":true}'>${t('start')}</button>
     <button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
+    <!--offline-->
   </div>`;
 }
 
@@ -228,7 +248,31 @@ async function flightSetup(p: Progress, st: State, s: Settings): Promise<string>
   </div>`;
 }
 
-function settingsScreen(s: Settings): string {
+const mb = (bytes: number) => t('mb', { n: num((bytes / 1e6).toFixed(1)) });
+
+/** The Run setup's offline line: a download button, its result, or the iPhone home-screen hint. */
+async function offlineLine(mode: RegionMode, region: string): Promise<string> {
+  if (!offlineSupported()) return '';
+  if (iosNeedsHomeScreen()) return `<div class="offline">${t('addToHome')}</div>`;
+  const u = await usage(mode, region);
+  if (u.complete) return `<div class="offline">✓ ${t('downloaded')} · ${mb(u.bytes)}</div>`;
+  return `<div class="offline"><button class="btn alt" data-download="${mode}:${region}">${t('downloadOffline')}</button></div>`;
+}
+
+/** Settings: storage used per Region-mode, with Delete. */
+async function storagePanel(): Promise<string> {
+  if (!offlineSupported()) return '';
+  const rows: string[] = [];
+  for (const mode of ['bus', 'flight'] as const) for (const r of REGIONS) {
+    const u = await usage(mode, r);
+    if (!u.bytes) continue;
+    rows.push(`<div class="store-row"><span>${t(mode === 'bus' ? 'busMode' : 'flightMode')} · ${t(`region.${r}`)} · ${mb(u.bytes)}${u.complete ? '' : ` (${t('partial')})`}</span>
+      <button class="chip" data-delete="${mode}:${r}">${t('delete')}</button></div>`);
+  }
+  return `<div class="panel"><h2>${dual('storage')}</h2>${rows.join('') || `<p class="help">${t('storageNone')}</p>`}<p class="help">${t('storageWarn')}</p></div>`;
+}
+
+function settingsScreen(s: Settings, storage: string): string {
   const chip = (k: string, v: string, label: string, on: boolean) => `<button class="chip ${on ? 'on' : ''}" data-set="${k}=${v}">${label}</button>`;
   const qs: QualitySetting[] = ['auto', 'low', 'medium', 'high'];
   return `<div class="menu-row">
@@ -242,6 +286,7 @@ function settingsScreen(s: Settings): string {
         <input type="range" min="0" max="1" step="0.05" value="${s[k]}" data-vol="${k}"></label>`).join('')}
       <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
     </div>
+    ${storage}
     <div class="panel">
       <h2>${dual('saveCode')}</h2>
       <p class="help">${t('saveCodeHelp')}</p>
@@ -288,6 +333,7 @@ function licencesScreen(): string {
     ...credits,
     'Three.js © three.js authors, MIT · Rapier © Dimforge, Apache 2.0 · meshoptimizer © Arseny Kapoulkine, MIT · glTF Transform © Don McCurdy, MIT',
     'Noto Sans Bengali and Baloo Da 2: SIL Open Font License 1.1',
+    'The baked map data (Regions and Flight Zones) is derived from OpenStreetMap and is available under the Open Database License (ODbL) 1.0.',
     ...SOUND_CREDITS,
   ];
   return `<div class="menu-row"><div class="panel licences">

@@ -391,6 +391,8 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
   - Code lives in GitHub; baked Regions are build output and stay out of git.
   - Deploy with `wrangler pages deploy`, from a local machine first and GitHub Actions later.
 
+- **As built (M11):** `vite-plugin-pwa` (Workbox) precaches a 7.4 MB shell (code, styles, icons, sounds) and serves Regions and Flight Zones `CacheFirst` from one cache, with manifests `NetworkFirst`. "Download for offline" in Run setup fills that same cache with every file a Region-mode lists (Dhaka bus: 22.8 MB), then asks `persist()` and shows the one-line warning if it's refused; Settings lists storage per Region-mode with Delete; iPhone Safari tabs get the Add to Home Screen hint instead. A new shell shows "Update available, restart". `public/_headers` serves hashed files `immutable` for a year and manifests and `sw.js` as `no-cache`. The build is 2,752 files and 94 MB, inside Cloudflare Pages' free plan (20,000 files, 25 MiB per file, unlimited bandwidth). `npm run deploy` builds and runs `wrangler pages deploy` from a machine that has the baked data.
+
 ## 17. Licences and credits the game must show
 [002](docs/research/map-data-and-licences.md), [003](docs/research/vehicle-models.md), [019](docs/wayfinder/tickets/019-decide-audio.md)
 
