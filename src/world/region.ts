@@ -27,6 +27,7 @@ export class RegionWorld {
   private chunks = new Map<string, LoadedChunk>();
   private loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   private body: RAPIER.RigidBody;
+  private layers = new Map<number, ChunkLayer>();
   readonly root = new THREE.Group();
 
   constructor(private baseUrl: string, scene: THREE.Scene, private world: RAPIER.World) {
@@ -108,15 +109,20 @@ export class RegionWorld {
         v[i * 3] = p.x; v[i * 3 + 1] = p.y; v[i * 3 + 2] = p.z;
       }
       const idx = index ? Uint32Array.from(index.array as ArrayLike<number>) : Uint32Array.from({ length: pos.count }, (_, i) => i);
-      c.colliders.push(this.world.createCollider(RAPIER.ColliderDesc.trimesh(v, idx).setFriction(1), this.body));
+      const col = this.world.createCollider(RAPIER.ColliderDesc.trimesh(v, idx).setFriction(1), this.body);
+      this.layers.set(col.handle, o.name as ChunkLayer);
+      c.colliders.push(col);
     });
   }
 
   private removeColliders(c: LoadedChunk): void {
-    c.colliders.forEach(col => this.world.removeCollider(col, false));
+    c.colliders.forEach(col => { this.layers.delete(col.handle); this.world.removeCollider(col, false); });
     c.colliders = [];
     if (c.lod !== 0) c.lod0 = null;
   }
+
+  /** The chunk layer a collider was built from, if it belongs to this Region. */
+  layerOf(handle: number): ChunkLayer | undefined { return this.layers.get(handle); }
 
   /** True if the chunk under `pos` has its colliders, so the bus can't fall through. */
   hasCollidersAt(pos: { x: number; z: number }): boolean {

@@ -18,3 +18,23 @@ canvas { display: block; touch-action: none; }
 .touch .door { right: 16px; bottom: 148px; height: 56px; }
 .touch .horn { right: 112px; bottom: 112px; height: 56px; }
 @media (max-width: 700px) { .hud { font-size: 12px; min-width: 170px; } .hud .speed b { font-size: 22px; } .hud .keys { display: none; } }
+
+.hud .next { font-size: 15px; margin-top: 2px; }
+.hud .late { color: #c0392b; font-weight: 700; }
+.hud .taka { font-size: 18px; font-weight: 700; }
+.hud .leg { font-size: 11px; color: #555; }
+
+.results { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.45); }
+.results[hidden] { display: none; }
+.results .panel { background: #fff; border-radius: 14px; padding: 16px 20px; min-width: 300px; max-width: 92vw; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+.results h2 { margin: 0 0 2px; }
+.results .sub { color: #555; font-size: 12px; margin: 4px 0; }
+.results table { width: 100%; border-collapse: collapse; margin: 8px 0; font-variant-numeric: tabular-nums; }
+.results td { padding: 2px 0; }
+.results td:last-child { text-align: right; }
+.results td.neg { color: #c0392b; }
+.results tr.total td { border-top: 1px solid #ccc; font-weight: 700; padding-top: 4px; }
+.results .stars b { color: #e6a700; letter-spacing: 2px; }
+.results .buttons { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+.results button { font: 600 14px system-ui; padding: 6px 14px; border-radius: 8px; border: 1px solid #333; background: #fff; cursor: pointer; }
+.results button:first-child { background: #222; color: #fff; }

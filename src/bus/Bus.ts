@@ -15,6 +15,7 @@ const tmpQ = new THREE.Quaternion();
 export class Bus {
   readonly handling: BusHandling = { ...ARCADE_PLUS };
   body!: RAPIER.RigidBody;
+  chassis!: RAPIER.Collider;
   vehicle!: RAPIER.DynamicRayCastVehicleController;
   doorsOpen = false;
   steerDeg = 0;
@@ -37,9 +38,10 @@ export class Bus {
         .setRotation({ x: tmpQ.x, y: tmpQ.y, z: tmpQ.z, w: tmpQ.w })
         .setCanSleep(false),
     );
-    this.world.createCollider(
+    this.chassis = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(BUS_HALF_EXTENTS.x, BUS_HALF_EXTENTS.y, BUS_HALF_EXTENTS.z)
         .setFriction(0.5)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
         .setMassProperties(BUS_MASS, { x: 0, y: this.handling.comY, z: 0 }, BUS_INERTIA, { x: 0, y: 0, z: 0, w: 1 }),
       this.body,
     );

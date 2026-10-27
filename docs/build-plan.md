@@ -5,7 +5,8 @@ Milestones for building v1 from [SPEC.md](../SPEC.md). Each one ends with someth
 | # | Milestone | Done when | SPEC |
 |---|---|---|---|
 | M1 | **Scaffold + drivable bus** | `npm run dev` opens a Vite + TypeScript app where the Arcade-plus bus drives on a test track, with keyboard, gamepad and touch input, and a minimal HUD | §2, §3, §6 handling, §12 |
-| M2 | **Bake script: Dhaka corridor** | `npm run bake` turns OSM + GLO-30 + Open Buildings into 1 km chunk GLBs and Route/Stop/lane JSON for the Dhaka Route, and the bus drives it | §4, §5 |
+| M2 | **Bake script: Dhaka corridor** | `npm run bake` turns OSM + GLO-30 into 1 km chunk GLBs and Route/Stop/lane JSON for the Dhaka Route, and the bus drives it | §4, §5 |
+| M2b | **Dhaka visual pass + vehicle models** | the corridor reads as Dhaka in flat low-poly: lane markings, medians and crossings; ground coloured by land use (paved, compounds, water, green); footpaths and foot-over-bridges; window bands, rooftop clutter (water tanks, rails) and a believable colour palette on buildings; trees, signs, shop awnings and rickshaw-art billboards; Google 2.5D heights once exported from Earth Engine; and the CC bus, CNG, rickshaw and jeep models from SPEC §11 replacing the placeholder blocks | §4, §10, §11 |
 | M3 | **Bus gameplay** | Legs, Timetable, doors, passengers, Jerky Moments, Fines, Taka earned and the results screen all work on Dhaka Leg 1 | §6 |
 | M4 | **AI traffic** | lane-following traffic, junction phases and per-tier caps | §7 |
 | M5 | **Bandarban bake + Route** | the hill Route with graded hairpins, hand-placed Stops, oncoming jeeps | §4, §5 |
