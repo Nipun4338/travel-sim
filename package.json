@@ -11,7 +11,7 @@
     "bake": "tsx scripts/bake/index.ts",
     "bake:flight": "tsx scripts/bake/flight.ts",
     "audio": "tsx scripts/audio/build.ts",
-    "deploy": "npm run build && npx wrangler@4 pages deploy dist --project-name travel-sim"
+    "deploy": "npm run build && npx wrangler@4 pages deploy dist --project-name travel-sim --branch main"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
