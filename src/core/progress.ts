@@ -1,6 +1,7 @@
 // Progress and career stats (SPEC §15): which Legs and Challenges are done, best results, and the
-// career totals shown on the mode select. Device-only; M9 moves this into IndexedDB with an
-// export/import save code. Everything is playable from the start except the unlock order.
+// career totals shown on the mode select, kept in the save. Everything is playable from the start
+// except the unlock order.
+import { emptyProgress, readSave, updateSave } from './save';
 
 export interface BestRun { done: boolean; stars?: number; taka?: number; }
 export interface BestChallenge extends BestRun { grade?: 'butter' | 'good' | 'firm'; }
@@ -20,23 +21,12 @@ export interface Progress {
   career: Career;
 }
 
-const KEY = 'travel-sim.progress';
-const LANDMARKS_KEY = 'travel-sim.landmarks';
-
 export function loadProgress(): Progress {
-  let p: Progress;
-  try { p = JSON.parse(localStorage.getItem(KEY) ?? 'null'); } catch { p = null as unknown as Progress; }
-  p ??= { legs: {}, challenges: {}, career: { km: 0, passengers: 0, stops: 0, flightsLanded: 0, taka: 0 } };
-  // Challenges finished before progress existed (M6 kept a plain list).
-  try {
-    for (const id of JSON.parse(localStorage.getItem('travel-sim.flight.done') ?? '[]') as string[]) p.challenges[id] ??= { done: true };
-  } catch { /* ignore */ }
-  return p;
+  const p = readSave().progress ?? emptyProgress();
+  return JSON.parse(JSON.stringify(p)) as Progress;
 }
 
-function save(p: Progress): void {
-  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage blocked */ }
-}
+function save(p: Progress): void { updateSave(d => { d.progress = p; }); }
 
 export const legKey = (region: string, leg: number | 'full') => `${region}:${leg}`;
 
@@ -86,10 +76,6 @@ export function recordLanding(sinkMs: number): void {
   save(p);
 }
 
-export function landmarksFound(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LANDMARKS_KEY) ?? '[]')); } catch { return new Set(); }
-}
+export function landmarksFound(): Set<string> { return new Set(readSave().landmarks ?? []); }
 
-export function saveLandmarks(s: Set<string>): void {
-  try { localStorage.setItem(LANDMARKS_KEY, JSON.stringify([...s])); } catch { /* storage blocked */ }
-}
+export function saveLandmarks(found: Set<string>): void { updateSave(d => { d.landmarks = [...found]; }); }

@@ -10,7 +10,8 @@ import { legUnlocked, loadProgress, recordLeg } from './core/progress';
 import { effectiveQuality, loadSettings } from './core/settings';
 import { startLoop } from './core/loop';
 import { getLang, legTitle, place, setLang, t } from './i18n/i18n';
-import { BusView, CAB_EYE } from './render/BusView';
+import { currentLivery } from './config/liveries';
+import { BusView, CAB_EYE, type BusLivery } from './render/BusView';
 import { Atmosphere, type Tier } from './render/atmosphere';
 import { setMaterialConditions } from './render/materials';
 import { createStage, VehicleCamera } from './render/stage';
@@ -107,7 +108,7 @@ document.getElementById('loading')?.remove();
 
 const bus = new Bus(world, legPose(initialTrip));
 bus.wet = atmosphere.rainy;
-const busView = new BusView(scene);
+const busView = new BusView(scene, currentLivery<BusLivery>('bus'));
 busView.setBeamStyle(tier !== 'low', atmosphere.night, atmosphere.rainy || atmosphere.foggy);
 const lights = new BusLights();
 const comfort = new ComfortMeter();
@@ -196,7 +197,7 @@ function handle(evs: RunEvent[]): void {
       if (r.status === 'finished') {
         recordLeg(regionId, key, {
           done: true, stars: scored ? Math.round((r.stars.punctuality + r.stars.comfort + r.stars.safety) / 3) : undefined,
-          taka: scored ? r.takaEarned : undefined, km: r.km, passengers: r.passengersCarried, stops: r.stopsServed,
+          taka: Math.max(0, r.takaEarned), km: r.km, passengers: r.passengersCarried, stops: r.stopsServed,
         });
       }
       // Next: the following Leg, then the Full Route once every Leg is done.

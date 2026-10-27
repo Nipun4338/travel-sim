@@ -8,7 +8,8 @@ import { effectiveQuality, loadSettings } from '../core/settings';
 import { getLang, num, place, setLang, t } from '../i18n/i18n';
 import { Atmosphere } from '../render/atmosphere';
 import { setMaterialConditions } from '../render/materials';
-import { COCKPIT_EYE, PlaneView } from '../render/PlaneView';
+import { currentLivery } from '../config/liveries';
+import { COCKPIT_EYE, PlaneView, type PlaneLivery } from '../render/PlaneView';
 import { createStage } from '../render/stage';
 import type { ChallengeData, Spawn } from '../shared/zone';
 import { distText, FlightHud } from '../ui/flightHud';
@@ -49,7 +50,7 @@ const m = zone.manifest;
 
 const plane = new FlightModel(zone);
 plane.turbulence = atmosphere.rainy ? 1 : 0;
-const view = new PlaneView(scene);
+const view = new PlaneView(scene, currentLivery<PlaneLivery>('plane'));
 const cam = new FlightCamera(camera, COCKPIT_EYE, renderer.domElement);
 const controls = new FlightControls();
 if (!params.has('invert')) controls.invert = settings.invertPitch;
@@ -137,7 +138,7 @@ function showEnd(data: ChallengeData, failedKey: string | null, result: Paramete
     { label: t('menu'), run: backToMenu },
   ];
   if (!failedKey && m.challenges[idx + 1]) actions.unshift({ label: t('nextChallenge'), run: () => { paused = false; void start(idx + 1); } });
-  hud.showResults(t(`ch.${data.id}`), result, failedKey, actions);
+  hud.showResults(t(`ch.${data.id}`), result, failedKey, actions, scored);
 }
 
 controls.onAction((a: FlightAction) => {
@@ -192,7 +193,7 @@ function step(dt: number): void {
       if (ev.type === 'ring') hud.toast(ev.hit ? t('ring', { n: ev.n, of: ev.of }) : t('ringMissed', { n: ev.n }));
       if (ev.type === 'done') {
         const r = ev.result;
-        recordChallenge(current.id, { done: true, stars: scored ? r.stars : undefined, taka: scored ? r.taka : undefined, grade: r.landing?.onTarget ? r.landing.grade : undefined });
+        recordChallenge(current.id, { done: true, stars: scored ? r.stars : undefined, taka: r.taka, grade: r.landing?.onTarget ? r.landing.grade : undefined });
         showEnd(current, null, r);
       }
     }

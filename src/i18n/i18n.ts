@@ -106,7 +106,12 @@ const EN: Dict = {
   quality: 'Quality', 'q.auto': 'Auto', 'q.low': 'Low', 'q.medium': 'Medium', 'q.high': 'High', invertPitch: 'Invert pitch',
   on: 'On', off: 'Off', languageLabel: 'Language', playStyle: 'Play style', relaxed: 'Relaxed', scoredStyle: 'Scored (Taka and stars)',
   controls: 'Controls', notBakedShort: 'Not baked yet', paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Menu',
-  chooseRoute: 'Choose a trip', chooseFlight: 'Choose a flight', km1: '{n} km', bestTk: 'best ৳ {n}', mapLabel: 'Map', legN: 'Leg {n}', speedLabel: 'Speed', altitudeLabel: 'Altitude', airspeedLabel: 'Airspeed', glidePath: 'Glide path', glideHigh: '▼ high {m} m', glideLow: '▲ low {m} m', glideOn: '● on the path', boardHintShort: 'Open the doors (F) to board.', ringsCount: '{n} Rings',
+  chooseRoute: 'Choose a trip', chooseFlight: 'Choose a flight', km1: '{n} km', bestTk: 'best ৳ {n}', mapLabel: 'Map', legN: 'Leg {n}', liveries: 'Liveries', unlockAt: '৳ {n} to unlock', inUse: 'In use', choose: 'Use',
+  'livery.city': 'City', 'livery.river': 'River Blue', 'livery.sunrise': 'Sunrise', 'livery.teal': 'Teal Express', 'livery.rickshaw': 'Rickshaw Art',
+  'livery.classic': 'Classic', 'livery.monsoon': 'Monsoon', 'livery.mangrove': 'Mangrove', 'livery.jute': 'Golden Jute',
+  saveCode: 'Save code', exportCode: 'Show my save code', importCode: 'Load a save code', copy: 'Copy', copied: 'Copied',
+  saveCodeHelp: 'Keep this code to move your progress to another device, or to restore it if the browser clears its storage.',
+  importDone: 'Save loaded', importFailed: 'That code did not work', pasteCode: 'Paste a save code here', speedLabel: 'Speed', altitudeLabel: 'Altitude', airspeedLabel: 'Airspeed', glidePath: 'Glide path', glideHigh: '▼ high {m} m', glideLow: '▲ low {m} m', glideOn: '● on the path', boardHintShort: 'Open the doors (F) to board.', ringsCount: '{n} Rings',
   zoneNotBaked: 'Flight Zone "{id}" is not baked: run npm run bake:flight -- {id}', offField: 'off-field',
 };
 const BN: Dict = {
@@ -160,7 +165,12 @@ const BN: Dict = {
   quality: 'গ্রাফিক্সের মান', 'q.auto': 'স্বয়ংক্রিয়', 'q.low': 'কম', 'q.medium': 'মাঝারি', 'q.high': 'উচ্চ', invertPitch: 'পিচ উল্টো',
   on: 'চালু', off: 'বন্ধ', languageLabel: 'ভাষা', playStyle: 'খেলার ধরন', relaxed: 'আরামে', scoredStyle: 'পয়েন্টসহ (টাকা ও তারা)',
   controls: 'নিয়ন্ত্রণ', notBakedShort: 'এখনও তৈরি হয়নি', paused: 'বিরতি', resume: 'চালিয়ে যান', restart: 'আবার শুরু', menu: 'মেনু',
-  chooseRoute: 'যাত্রা বেছে নিন', chooseFlight: 'ফ্লাইট বেছে নিন', km1: '{n} কিমি', bestTk: 'সেরা ৳ {n}', mapLabel: 'মানচিত্র', legN: 'লেগ {n}', speedLabel: 'গতি', altitudeLabel: 'উচ্চতা', airspeedLabel: 'গতি', glidePath: 'অবতরণ পথ', glideHigh: '▼ {m} মি উঁচুতে', glideLow: '▲ {m} মি নিচুতে', glideOn: '● ঠিক পথে', boardHintShort: 'যাত্রী তুলতে দরজা খুলুন (F)।', ringsCount: '{n}টি রিং',
+  chooseRoute: 'যাত্রা বেছে নিন', chooseFlight: 'ফ্লাইট বেছে নিন', km1: '{n} কিমি', bestTk: 'সেরা ৳ {n}', mapLabel: 'মানচিত্র', legN: 'লেগ {n}', liveries: 'রং ও নকশা', unlockAt: '৳ {n} আয় হলে খুলবে', inUse: 'ব্যবহার হচ্ছে', choose: 'বেছে নিন',
+  'livery.city': 'শহুরে', 'livery.river': 'নদী নীল', 'livery.sunrise': 'সূর্যোদয়', 'livery.teal': 'টিল এক্সপ্রেস', 'livery.rickshaw': 'রিকশা আর্ট',
+  'livery.classic': 'ক্লাসিক', 'livery.monsoon': 'বর্ষা', 'livery.mangrove': 'ম্যানগ্রোভ', 'livery.jute': 'সোনালি আঁশ',
+  saveCode: 'সেভ কোড', exportCode: 'আমার সেভ কোড দেখান', importCode: 'সেভ কোড বসান', copy: 'কপি', copied: 'কপি হয়েছে',
+  saveCodeHelp: 'অন্য ডিভাইসে অগ্রগতি নিতে, বা ব্রাউজার স্টোরেজ মুছে ফেললে ফেরত আনতে এই কোডটি রেখে দিন।',
+  importDone: 'সেভ লোড হয়েছে', importFailed: 'এই কোডটি কাজ করেনি', pasteCode: 'এখানে সেভ কোড পেস্ট করুন', speedLabel: 'গতি', altitudeLabel: 'উচ্চতা', airspeedLabel: 'গতি', glidePath: 'অবতরণ পথ', glideHigh: '▼ {m} মি উঁচুতে', glideLow: '▲ {m} মি নিচুতে', glideOn: '● ঠিক পথে', boardHintShort: 'যাত্রী তুলতে দরজা খুলুন (F)।', ringsCount: '{n}টি রিং',
   zoneNotBaked: '"{id}" ফ্লাইট এলাকা তৈরি হয়নি: npm run bake:flight -- {id} চালান', offField: 'রানওয়ের বাইরে',
 };
 

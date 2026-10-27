@@ -3,7 +3,11 @@
 // comes back here. Offline downloads and the save code arrive with M11 and M9.
 import { amount, getLang, num, place, setLang, t, tAlt } from '../i18n/i18n';
 import { challengeUnlocked, landmarksFound, legKey, legUnlocked, loadProgress, type Progress } from '../core/progress';
+import { exportCode, importCode, readSave } from '../core/save';
 import { loadSettings, saveSettings, type QualitySetting, type Settings } from '../core/settings';
+import { BUS_LIVERIES, careerTaka, chooseLivery, PLANE_LIVERIES, type Livery } from '../config/liveries';
+import type { BusLivery } from '../render/BusView';
+import type { PlaneLivery } from '../render/PlaneView';
 import type { RegionManifest, RouteData } from '../shared/region';
 import type { ZoneManifest } from '../shared/zone';
 import { conditionsMultiplier, fogAllowed, type TimeOfDay, type Weather } from '../world/conditions';
@@ -13,7 +17,7 @@ const REGIONS = ['dhaka', 'bandarban'] as const;
 type Region = (typeof REGIONS)[number];
 
 interface State {
-  screen: 'mode' | 'setup' | 'settings' | 'licences';
+  screen: 'mode' | 'setup' | 'settings' | 'licences' | 'liveries';
   mode: Mode;
   region: Region;
   trip: number | 'full' | 'free';
@@ -76,9 +80,10 @@ export async function showMenu(): Promise<void> {
   async function render(): Promise<void> {
     const p = loadProgress();
     let html = '';
-    if (st.screen === 'mode') html = modeScreen(p, settings);
+    if (st.screen === 'mode') html = modeScreen(p);
     if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : await flightSetup(p, st, settings);
     if (st.screen === 'settings') html = settingsScreen(settings);
+    if (st.screen === 'liveries') html = liveriesScreen();
     if (st.screen === 'licences') {
       await Promise.all(REGIONS.flatMap(r => [loadRoute(r), loadZone(r)]));
       html = licencesScreen();
@@ -98,15 +103,32 @@ export async function showMenu(): Promise<void> {
       if (k === 'invert') settings.invertPitch = v === '1';
       if (k === 'scored') settings.scored = v === '1';
       if (k === 'lang') setLang(v as 'bn' | 'en');
-      saveSettings(settings);
+      if (k === 'livery') { const [kind, id] = v.split(':'); chooseLivery(kind as 'bus' | 'plane', id); }
+      else saveSettings(settings);
       void render();
     }));
+    // Save code: show it to copy, or paste one in to replace this device's save.
+    root.querySelector('[data-export]')?.addEventListener('click', async () => {
+      const box = root.querySelector<HTMLTextAreaElement>('.save-code')!;
+      box.value = await exportCode();
+      box.select();
+    });
+    root.querySelector('[data-copy]')?.addEventListener('click', async () => {
+      const box = root.querySelector<HTMLTextAreaElement>('.save-code')!;
+      if (!box.value) box.value = await exportCode();
+      try { await navigator.clipboard.writeText(box.value); root.querySelector('.save-msg')!.textContent = t('copied'); } catch { box.select(); }
+    });
+    root.querySelector('[data-import]')?.addEventListener('click', async () => {
+      const box = root.querySelector<HTMLTextAreaElement>('.save-code')!;
+      try { await importCode(box.value); Object.assign(settings, loadSettings()); await render(); root.querySelector('.save-msg')!.textContent = t('importDone'); }
+      catch { root.querySelector('.save-msg')!.textContent = t('importFailed'); }
+    });
   }
 
   await render();
 }
 
-function modeScreen(p: Progress, s: Settings): string {
+function modeScreen(p: Progress): string {
   const c = p.career;
   const card = (mode: Mode, cls: string, blurb: string, verb: string) => `
     <div class="panel card ${cls}">
@@ -120,12 +142,13 @@ function modeScreen(p: Progress, s: Settings): string {
     ${card('flight', 'flight', 'flightBlurb', 'fly')}
     <div class="panel career">
       <h2>${dual('career')}</h2>
-      ${s.scored ? `<div>${t('careerTaka', { n: amount(c.taka) })}</div>` : ''}
+      <div>${t('careerTaka', { n: amount(c.taka) })}</div>
       <div>${t('careerKm', { n: num(c.km.toFixed(1)) })}</div>
       <div>${t('careerPax', { n: amount(c.passengers) })} · ${t('careerStops', { n: c.stops })}</div>
       <div>${t('careerLandings', { n: c.flightsLanded })}${c.bestLandingSink !== undefined ? ` · ${t('careerBest', { v: num(c.bestLandingSink.toFixed(1)) })}` : ''}</div>
       <div>${t('landmarks', { n: landmarksFound().size, of: landmarkTotal })}</div>
-      <div class="links"><button class="btn alt" data-go='{"screen":"settings"}'>${t('settings')}</button>
+      <div class="links"><button class="btn alt" data-go='{"screen":"liveries"}'>${t('liveries')}</button>
+      <button class="btn alt" data-go='{"screen":"settings"}'>${t('settings')}</button>
       <button class="btn alt" data-go='{"screen":"licences"}'>${t('licences')}</button></div>
     </div></div>`;
 }
@@ -207,11 +230,45 @@ function settingsScreen(s: Settings): string {
       <div class="chips"><b>${t('invertPitch')}</b>${chip('invert', '0', t('off'), !s.invertPitch)}${chip('invert', '1', t('on'), s.invertPitch)}</div>
       <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
     </div>
+    <div class="panel">
+      <h2>${dual('saveCode')}</h2>
+      <p class="help">${t('saveCodeHelp')}</p>
+      <textarea class="save-code" rows="3" spellcheck="false" placeholder="${t('pasteCode')}"></textarea>
+      <div class="links"><button class="btn" data-export>${t('exportCode')}</button><button class="btn alt" data-copy>${t('copy')}</button>
+      <button class="btn alt" data-import>${t('importCode')}</button></div>
+      <div class="save-msg"></div>
+    </div>
     <div class="panel keys">
       <h2>${dual('controls')}</h2>
       <p><b>${t('busMode')}</b> · ${t('keys')}</p>
       <p><b>${t('flightMode')}</b> · ${t('flightKeys')}</p>
     </div></div>`;
+}
+
+function liveriesScreen(): string {
+  const tk = careerTaka();
+  const chosen = { bus: currentId('bus'), plane: currentId('plane') };
+  const swatch = (cols: number[]) => cols.map(c => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('');
+  const list = (kind: 'bus' | 'plane', items: Array<Livery<BusLivery>> | Array<Livery<PlaneLivery>>) => items.map(l => {
+    const open = l.unlockTk <= tk, on = chosen[kind] === l.id;
+    const cols = Object.values(l.colours as unknown as Record<string, number>);
+    return `<div class="livery ${open ? '' : 'locked'} ${on ? 'on' : ''}">
+      <span class="swatch">${swatch(cols)}</span><b>${t(`livery.${l.id}`)}</b>
+      <span>${on ? t('inUse') : open ? `<button class="chip" data-set="livery=${kind}:${l.id}">${t('choose')}</button>` : `🔒 ${t('unlockAt', { n: amount(l.unlockTk) })}`}</span></div>`;
+  }).join('');
+  return `<div class="menu-row">
+    <div class="panel"><h2>${dual('busMode')}</h2>${list('bus', BUS_LIVERIES)}</div>
+    <div class="panel"><h2>${dual('flightMode')}</h2>${list('plane', PLANE_LIVERIES)}</div>
+    <div class="panel"><h2>${dual('liveries')}</h2><p>${t('careerTaka', { n: amount(tk) })}</p>
+      <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div></div>
+  </div>`;
+}
+
+/** The Livery in use: the saved choice if unlocked, else the first. */
+function currentId(kind: 'bus' | 'plane'): string {
+  const list = kind === 'bus' ? BUS_LIVERIES : PLANE_LIVERIES;
+  const id = readSave().liveries?.[kind];
+  return list.find(l => l.id === id && l.unlockTk <= careerTaka())?.id ?? list[0].id;
 }
 
 function licencesScreen(): string {

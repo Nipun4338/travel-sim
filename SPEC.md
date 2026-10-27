@@ -365,6 +365,7 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
   - career stats: km driven, passengers carried, Stops served, flights landed, best landing, landmarks found.
 - **Storage:** device-only IndexedDB, plus an **Export / Import save code**. No accounts, no server.
 - **Liveries:** career Taka earned unlocks ~5 bus and ~4 plane Liveries at thresholds. Nothing is ever spent.
+- **As built (M9):** one IndexedDB record (settings, progress, career, landmarks, chosen Liveries), loaded at start-up; older localStorage progress is carried over once. The save code is that record deflated and base64url-encoded (`TS1-…`, ~300 characters). Career Taka counts fares and charter fees in both play styles, so relaxed players unlock Liveries too (bus at ৳ 5k / 15k / 30k / 60k, plane at ৳ 8k / 20k / 40k). The Helper call-out script is in [docs/audio/helper-callouts.md](docs/audio/helper-callouts.md).
 
 ## 16. Hosting, caching and deploy
 [022](docs/wayfinder/tickets/022-choose-hosting-and-caching.md), [021 research](docs/research/hosting-and-caching.md)

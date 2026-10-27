@@ -96,13 +96,12 @@ export class Challenge {
     } else if (this.data.kind === 'takeoff') quality = this.maxOff <= 10;
     else quality = this.overCeiling === 0 && this.time <= this.data.parS;
     const stars = 1 + (ringsMissed === 0 ? 1 : 0) + (quality ? 1 : 0);
-    let taka = 0;
-    if (this.scored) {
-      taka = this.data.feeTk + ringsHit * FLIGHT_TK.ring - ringsMissed * FLIGHT_TK.missedRing;
-      if (this.time <= this.data.parS) taka += FLIGHT_TK.parBonus;
-      if (l?.onTarget) taka += FLIGHT_TK.landing[l.grade];
-      taka = Math.max(0, Math.round(taka * this.conditionsMult));
-    }
+    // Charter fees are earned in both play styles (they unlock Liveries); relaxed mode just doesn't
+    // show them, and missed Rings cost nothing there.
+    let taka = this.data.feeTk + ringsHit * FLIGHT_TK.ring - (this.scored ? ringsMissed * FLIGHT_TK.missedRing : 0);
+    if (this.time <= this.data.parS) taka += FLIGHT_TK.parBonus;
+    if (l?.onTarget) taka += FLIGHT_TK.landing[l.grade];
+    taka = Math.max(0, Math.round(taka * this.conditionsMult));
     return {
       type: 'done',
       result: {

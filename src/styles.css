@@ -80,6 +80,7 @@ canvas { display: block; touch-action: none; }
 .flight-touch .thr { position: absolute; width: 170px; left: -60px; top: 75px; transform: rotate(-90deg); }
 .flight-touch .brake { right: 84px; bottom: 20px; width: 70px; height: 70px; }
 
+
 /* Wipers (SPEC §9): two blades sweeping across the windscreen in rain, cab view only. */
 .wipers { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .wipers[hidden] { display: none; }
@@ -179,3 +180,13 @@ canvas { display: block; touch-action: none; }
 @media (pointer: coarse) { .hud-corner.glide { display: block; bottom: auto; right: auto; top: 86px; left: 50%; transform: translateX(-50%); } .hud-corner.glide[hidden] { display: none; } }
 /* Toasts sit below the banner and the flight heading badge. */
 .toast { top: 92px; }
+
+/* Liveries and the save code (M9). */
+.menu-screen .livery { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 5px 8px; border: 2px solid transparent; border-radius: 12px; }
+.menu-screen .livery.on { border-color: var(--yellow); background: rgba(247,198,0,.12); }
+.menu-screen .livery.locked { opacity: .55; }
+.menu-screen .swatch { display: inline-flex; border: 2px solid var(--cream); border-radius: 6px; overflow: hidden; }
+.menu-screen .swatch i { width: 14px; height: 22px; }
+.menu-screen .save-code { width: 100%; box-sizing: border-box; font: 12px ui-monospace, monospace; border-radius: 10px; border: 2px solid var(--cream); background: rgba(0,0,0,.35); color: #fff; padding: 6px; }
+.menu-screen .help, .menu-screen .save-msg { font-size: 12px; color: var(--cream); }
+

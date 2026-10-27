@@ -91,7 +91,7 @@ export class FlightHud {
   hideResults(): void { this.card.hidden = true; }
 
   /** End of a Challenge. `failed` is a reason key (scored mode only). */
-  showResults(title: string, r: ChallengeResult | null, failed: string | null, actions: Array<{ label: string; run: () => void }>): void {
+  showResults(title: string, r: ChallengeResult | null, failed: string | null, actions: Array<{ label: string; run: () => void }>, scoredMode = false): void {
     const lines: string[] = [];
     if (r) {
       lines.push(`${t('ringsSummary', { hit: r.ringsHit, of: r.rings })} · ${clock(r.timeS)} (${t('parTime', { t: clock(r.parS) })})`);
@@ -103,7 +103,7 @@ export class FlightHud {
       }
       if (r.maxOffCentreM !== undefined) lines.push(t('centreline', { m: r.maxOffCentreM.toFixed(1) }));
     }
-    const scored = r && r.taka > 0;
+    const scored = scoredMode && r;
     this.card.innerHTML = `<div class="panel">
       <h2>${failed ? t('challengeFailed') : t('challengeDone')}</h2>
       <div class="sub">${title}</div>

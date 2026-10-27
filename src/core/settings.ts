@@ -1,5 +1,6 @@
-// Player settings (SPEC §13), remembered on the device. Language lives in i18n. M9 moves these
-// into the IndexedDB save with the export code; until then, localStorage.
+// Player settings (SPEC §13), kept in the save (IndexedDB, with the export code). Language lives in
+// i18n, as it's needed before the save loads.
+import { readSave, updateSave } from './save';
 
 export type QualitySetting = 'auto' | 'low' | 'medium' | 'high';
 
@@ -10,16 +11,11 @@ export interface Settings {
   scored: boolean;
 }
 
-const KEY = 'travel-sim.settings';
 const DEFAULTS: Settings = { quality: 'auto', invertPitch: false, scored: false };
 
-export function loadSettings(): Settings {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return { ...DEFAULTS }; }
-}
+export function loadSettings(): Settings { return { ...DEFAULTS, ...readSave().settings }; }
 
-export function saveSettings(s: Settings): void {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
-}
+export function saveSettings(s: Settings): void { updateSave(d => { d.settings = { ...s }; }); }
 
 /** Auto picks Low on touch phones and Medium elsewhere (SPEC §2 targets). */
 export function effectiveQuality(q: QualitySetting): 'low' | 'medium' | 'high' {
