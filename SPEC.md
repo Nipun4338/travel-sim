@@ -258,7 +258,7 @@ A HORN key and touch button, with no Fine.
 - **Visibility:** the built-in linear `Fog`. Far distance: day 1500 m, night 600 m, rain 400 m, hill fog ~220 m (near 15 m).
 - **Rain:** camera-local `LineSegments` streaks: Low 800, Medium 2,000, High 4,000.
 - **Wet roads:** darker Phong with specular on Medium and High; darker only on Low. Puddles are decorative only.
-- **Wipers:** a cockpit-view overlay in rain.
+- **Wipers:** a cab-view overlay in rain: drops land and build up on the glass (faster when driving), big ones run down, and two blades sweep their arcs, clearing exactly the drops they pass; the corners they don't reach stay wet.
 - **Valley mist:** soft-edged transparent planes, High only, in hill fog.
 - **Night:**
   - Dhaka windows come from an emissive window texture, switched on at night.

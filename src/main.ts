@@ -284,7 +284,7 @@ startLoop(
     busView.updateCab(frameDt, { kmh: bus.kmh, steerDeg: bus.steerDeg, doorsOpen: bus.doorsOpen, nextStop: next && place(next.name), nextDistM }, lights);
     cam.update(busView.group, bus.forward, bus.up, frameDt);
     busView.updateMirrors(renderer, scene);
-    atmosphere.update(frameDt, inCab);
+    atmosphere.update(frameDt, inCab, bus.kmh);
     renderer.render(scene, camera);
     minimap.update(busPos.x, busPos.z, bus.forward.x, bus.forward.z, next?.name);
     if ((hudTimer += frameDt) > 0.1) {

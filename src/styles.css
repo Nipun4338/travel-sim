@@ -81,14 +81,6 @@ canvas { display: block; touch-action: none; }
 .flight-touch .brake { right: 84px; bottom: 20px; width: 70px; height: 70px; }
 
 
-/* Wipers (SPEC §9): two blades sweeping across the windscreen in rain, cab view only. */
-.wipers { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.wipers[hidden] { display: none; }
-.wipers i { position: absolute; bottom: 38%; width: 34vw; height: 8px; background: #151515; border-radius: 3px; transform-origin: 100% 50%; animation: wipe 1.6s ease-in-out infinite; }
-.wipers i:first-child { right: 52%; }
-.wipers i:last-child { right: 14%; animation-delay: .05s; }
-@keyframes wipe { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(-160deg); } }
-
 /* ===================== M8: "Bus art" (SPEC §13) =====================
    Dhaka bus and rickshaw-art palette, chunky rounded type, patterned borders. These rules come
    last so they restyle the earlier HUD pieces. */
@@ -190,3 +182,6 @@ canvas { display: block; touch-action: none; }
 .menu-screen .save-code { width: 100%; box-sizing: border-box; font: 12px ui-monospace, monospace; border-radius: 10px; border: 2px solid var(--cream); background: rgba(0,0,0,.35); color: #fff; padding: 6px; }
 .menu-screen .help, .menu-screen .save-msg { font-size: 12px; color: var(--cream); }
 
+/* Rain on the windscreen (cab view). */
+.windscreen { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+.windscreen[hidden] { display: none; }

@@ -3,6 +3,7 @@
 // camera-local rain streaks, a CSS wiper overlay, and soft transparent mist planes on High.
 import * as THREE from 'three';
 import type { Conditions } from '../world/conditions';
+import { WindscreenRain } from './windscreen';
 
 export type Tier = 'low' | 'medium' | 'high';
 
@@ -29,7 +30,7 @@ export class Atmosphere {
   readonly foggy: boolean;
   private rain: THREE.LineSegments | null = null;
   private mist: THREE.Group | null = null;
-  private wipers: HTMLDivElement | null = null;
+  private windscreen: WindscreenRain | null = null;
 
   constructor(
     private scene: THREE.Scene, private camera: THREE.Camera, readonly conditions: Conditions,
@@ -101,17 +102,13 @@ export class Atmosphere {
     this.scene.add(this.mist);
   }
 
-  /** Wipers sweep across the windscreen in rain, in the cab view only. */
+  /** Drops on the bus windscreen and wipers that clear them, in rain, in the cab view only. */
   enableWipers(): void {
-    if (!this.rainy || this.wipers) return;
-    this.wipers = document.createElement('div');
-    this.wipers.className = 'wipers';
-    this.wipers.innerHTML = '<i></i><i></i>';
-    document.body.appendChild(this.wipers);
+    if (this.rainy && !this.windscreen) this.windscreen = new WindscreenRain();
   }
 
-  update(dt: number, inCab: boolean): void {
-    if (this.wipers) this.wipers.hidden = !inCab;
+  update(dt: number, inCab: boolean, kmh = 0): void {
+    this.windscreen?.update(dt, inCab, kmh);
     if (!this.rain) return;
     this.rain.position.copy(this.camera.position).add(new THREE.Vector3(0, -15, 0));
     const p = this.rain.geometry.attributes.position.array as Float32Array;
