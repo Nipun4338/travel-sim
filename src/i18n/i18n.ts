@@ -92,6 +92,9 @@ const EN: Dict = {
   landingLightOn: 'Landing light on', landingLightOff: 'Landing light off', touchStick: 'drag = stick',
   flightKeys: 'W/S pitch (W nose down) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · L landing light · V view · M map · Tab details · ` language · R restart · 0 free flight · 1/2/3 Challenge',
   alt: 'Alt {m} m', agl: '{m} m above ground', vs: '{v} m/s', hdg: '{d}°', centreline: '{m} m off the centreline',
+  'time.morning': 'Morning', 'time.midday': 'Midday', 'time.golden': 'Golden hour', 'time.night': 'Night',
+  'weather.clear': 'Clear', 'weather.rain': 'Monsoon rain', 'weather.fog': 'Hill fog', 'ledger.conditions': 'Conditions bonus',
+  nightHint: 'It is dark: headlights on (L)', conditionsLine: '{time} · {weather}',
   zoneNotBaked: 'Flight Zone "{id}" is not baked: run npm run bake:flight -- {id}', offField: 'off-field',
 };
 const BN: Dict = {
@@ -131,6 +134,9 @@ const BN: Dict = {
   landingLightOn: 'ল্যান্ডিং লাইট চালু', landingLightOff: 'ল্যান্ডিং লাইট বন্ধ', touchStick: 'টানুন = স্টিক',
   flightKeys: 'W/S নাক ওঠানো-নামানো (W = নাক নিচে) · A/D কাত · Q/E রাডার · Shift/Z থ্রটল · B ব্রেক · L ল্যান্ডিং লাইট · V দৃশ্য · M মানচিত্র · Tab বিস্তারিত · ` ভাষা · R আবার · 0 মুক্ত উড্ডয়ন · 1/2/3 চ্যালেঞ্জ',
   alt: 'উচ্চতা {m} মি', agl: 'মাটি থেকে {m} মি', vs: '{v} মি/সে', hdg: '{d}°', centreline: 'মধ্যরেখা থেকে {m} মি',
+  'time.morning': 'সকাল', 'time.midday': 'দুপুর', 'time.golden': 'বিকেল', 'time.night': 'রাত',
+  'weather.clear': 'পরিষ্কার আকাশ', 'weather.rain': 'বর্ষার বৃষ্টি', 'weather.fog': 'পাহাড়ি কুয়াশা', 'ledger.conditions': 'আবহাওয়া বোনাস',
+  nightHint: 'অন্ধকার: হেডলাইট জ্বালান (L)', conditionsLine: '{time} · {weather}',
   zoneNotBaked: '"{id}" ফ্লাইট এলাকা তৈরি হয়নি: npm run bake:flight -- {id} চালান', offField: 'রানওয়ের বাইরে',
 };
 

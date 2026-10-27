@@ -4,6 +4,8 @@ export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  sun: THREE.DirectionalLight;
+  hemi: THREE.HemisphereLight;
 }
 
 /**
@@ -19,7 +21,8 @@ export function createStage(opts: { far?: number; logDepth?: boolean } = {}): St
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xa9cde0);
   scene.fog = new THREE.Fog(0xa9cde0, 375, 1500);
-  scene.add(new THREE.HemisphereLight(0xdfefff, 0x6b7d4a, 1.1));
+  const hemi = new THREE.HemisphereLight(0xdfefff, 0x6b7d4a, 1.1);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
   sun.position.set(-200, 900, 150);
   scene.add(sun);
@@ -30,7 +33,7 @@ export function createStage(opts: { far?: number; logDepth?: boolean } = {}): St
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
-  return { renderer, scene, camera };
+  return { renderer, scene, camera, sun, hemi };
 }
 
 /**

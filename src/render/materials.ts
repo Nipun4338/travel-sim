@@ -27,12 +27,51 @@ function windowTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/**
+ * Night windows: 8 × 8 bays with about a third lit, warm or cool, so a facade doesn't light up
+ * uniformly. Used as the walls' emissive map with its own repeat (1/8 of the colour map's).
+ */
+function litWindowTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, 512, 512);
+  let s = 11;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let by = 0; by < 8; by++) for (let bx = 0; bx < 8; bx++) {
+    if (rnd() > 0.35) continue;
+    g.fillStyle = rnd() < 0.75 ? '#ffd38a' : '#d8ecff';
+    g.fillRect(bx * 64 + 15, by * 64 + 21, 34, 24);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / 8, 1 / 8);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 const flat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 const decal = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 let walls: THREE.MeshLambertMaterial | null = null;
+let road: THREE.Material = flat;
+
+/**
+ * Time and weather for chunk materials (SPEC §9): lit windows at night; wet roads in rain, darker
+ * everywhere and with a specular sheen on Medium and High. Call before chunks load.
+ */
+export function setMaterialConditions(c: { night: boolean; wet: boolean; sheen: boolean }): void {
+  const w = materialFor('wall') as THREE.MeshLambertMaterial;
+  if (c.night && !w.emissiveMap) { w.emissiveMap = litWindowTexture(); w.emissive.setHex(0xffffff); w.needsUpdate = true; }
+  w.emissiveIntensity = c.night ? 0.9 : 0;
+  road = !c.wet ? flat
+    : c.sheen ? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, color: 0x8a8a8a, specular: 0x555555, shininess: 60 })
+    : new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, color: 0x7a7a7a });
+}
 
 export function materialFor(layer: ChunkLayer): THREE.Material {
   if (layer === 'wall') return (walls ??= new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, map: windowTexture() }));
   if (layer === 'marking' || layer === 'water') return decal;
+  if (layer === 'road') return road;
   return flat;
 }

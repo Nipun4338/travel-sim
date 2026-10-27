@@ -22,7 +22,7 @@ export interface RunStop {
   leftEarly?: boolean;
 }
 
-export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision' | 'junction';
+export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision' | 'junction' | 'conditions';
 export interface LedgerEntry { kind: LedgerKind; tk: number; label: string; }
 
 export type RunEvent =
@@ -90,7 +90,11 @@ export class Run {
    * `scored` (off by default: the game is a relaxing drive, not a competition) turns on failing
    * the Run on an accident or leaving the road; Fines are always recorded for the summary.
    */
-  constructor(private route: RouteData, fromStop: string, toStop: string, targetKmh: number, seed = 1, readonly scored = false) {
+  /** `conditionsMult` multiplies Taka earned for rain, fog and night (SPEC §6). */
+  constructor(
+    private route: RouteData, fromStop: string, toStop: string, targetKmh: number, seed = 1, readonly scored = false,
+    private conditionsMult = 1,
+  ) {
     const i0 = route.stops.findIndex(s => s.name === fromStop), i1 = route.stops.findIndex(s => s.name === toStop);
     if (i0 < 0 || i1 <= i0) throw new Error(`Bad Leg ${fromStop} → ${toStop}`);
     const legStops = route.stops.slice(i0, i1 + 1);
@@ -109,7 +113,10 @@ export class Run {
   }
 
   get nextStop(): RunStop | undefined { return this.stops[this.current]; }
-  get takaEarned(): number { return this.ledger.reduce((s, e) => s + e.tk, 0); }
+  private get base(): number { return this.ledger.reduce((s, e) => s + e.tk, 0); }
+  /** The conditions bonus on a positive total; Fines aren't multiplied into a bigger loss. */
+  private get conditionsTk(): number { return this.base > 0 ? Math.round(this.base * (this.conditionsMult - 1)) : 0; }
+  get takaEarned(): number { return this.base + this.conditionsTk; }
   get standing(): number { return this.onboard.filter(p => !p.seated).length; }
   get capacity(): number { return SEATS + STANDING; }
 
@@ -262,7 +269,7 @@ export class Run {
       scored: this.scored,
       stopsServed: this.stops.filter(s => s.served).length,
       takaEarned: this.takaEarned,
-      ledger: this.ledger,
+      ledger: this.conditionsTk ? [...this.ledger, { kind: 'conditions', tk: this.conditionsTk, label: `×${this.conditionsMult}` }] : this.ledger,
       stars: {
         punctuality: stars.punctuality(arrivals.length ? onTime / arrivals.length : 0),
         comfort: stars.comfort(this.jerkyMoments / Math.max(0.1, legKm)),

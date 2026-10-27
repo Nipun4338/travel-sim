@@ -44,6 +44,9 @@ export interface BusObstacle { x: number; z: number; hx: number; hz: number; spe
 const tmp = { x: 0, y: 0, z: 0, hx: 1, hz: 0 };
 const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
 
+/** AI traffic speed in monsoon rain. */
+export const RAIN_TRAFFIC_FACTOR = 0.85;
+
 export class Traffic {
   readonly network: LaneNetwork;
   private vehicles: Vehicle[] = [];
@@ -52,6 +55,9 @@ export class Traffic {
   private time = 0;
   private cap: number;
   private rnd: () => number;
+  /** Rain slows AI traffic (SPEC §7): `speedScale` is set to RAIN_TRAFFIC_FACTOR. */
+  speedScale = 1;
+
   /** Event hook: a vehicle sounds its horn (audio arrives in M9). */
   onHonk: (type: VehicleType) => void = () => {};
 
@@ -115,7 +121,7 @@ export class Traffic {
 
   private drive(v: Vehicle, dt: number, bus: BusObstacle): void {
     const spec = SPECS[v.type];
-    const v0 = spec.speedKmh / 3.6;
+    const v0 = (spec.speedKmh / 3.6) * this.speedScale;
     this.network.sample(v.path, v.s, tmp);
     const hx = tmp.hx, hz = tmp.hz;
 

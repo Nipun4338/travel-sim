@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { lightPoints } from '../render/atmosphere';
 import { materialFor } from '../render/materials';
 import type { ChunkLayer } from '../shared/region';
 import { BUILDING_STRIDE, type Runway, type ZoneChunk, type ZoneManifest } from '../shared/zone';
@@ -42,6 +43,8 @@ export class ZoneWorld implements FlightGround {
   private boxGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
   private bldMat = new THREE.MeshLambertMaterial({ flatShading: true });
   private pending = new Set<Promise<void>>();
+  /** At night (Dhaka), every third building shows a lit window: a city of points from the air. */
+  cityLights = false;
 
   constructor(private baseUrl: string, scene: THREE.Scene, private quality: ZoneQuality = 'medium') {
     scene.add(this.root);
@@ -181,6 +184,12 @@ export class ZoneWorld implements FlightGround {
             cells.get(key)!.push(k);
           }
         }
+      }
+      if (this.cityLights) {
+        const pts: number[] = [];
+        for (let k = 0; k < count; k += 3) pts.push(boxes[k].x, boxes[k].y1 - 1.5, boxes[k].z);
+        // Lights follow the boxes' thinning: drawn only while the chunk's buildings are.
+        mesh.add(lightPoints(pts, 0xffd9a0, 2.2, true));
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;

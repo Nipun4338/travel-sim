@@ -249,6 +249,9 @@ A HORN key and touch button, with no Fine.
 - **Weather:** **Clear**, **Monsoon rain**, or **Hill fog** (Bandarban only).
 - **Default:** "Random", which weights monsoon higher in Bandarban.
 - **Gameplay effects:** see Bus Mode, AI traffic and Flight Mode. Night changes no rules.
+- **Until Run setup (M8):** `?time=morning|midday|golden|night` and `?weather=clear|rain|fog`; without them it's Random (Dhaka 70% clear / 30% rain; Bandarban 45% clear / 35% rain / 20% hill fog). Today's conditions show as a toast after the start, with a headlights reminder at night.
+- **Flight visibility:** the quality tier's clear-day range (9–20 km), half at night, 4 km in rain, 1.8 km in hill fog. Rain turbulence rocks the wings and bumps the height a little; it never builds up.
+- **Flight night lights:** runway edge, threshold (green), end (red) and approach lights, also in rain and fog; Dhaka's window lights (every third building) and street lights along the main roads.
 
 **Rendering techniques (validated at 30 fps on a phone at Low and Medium):**
 - **Sky and light:** per-time sky colour, fog colour, sun/moon directional light and hemisphere light. Rain and fog grey the sky and cut the sun to ×0.4.

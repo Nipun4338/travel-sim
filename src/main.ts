@@ -4,25 +4,29 @@ import { ComfortMeter } from './bus/comfort';
 import { BusLights } from './bus/lights';
 import { RouteProgress } from './bus/run/progress';
 import { Run, type RunEvent } from './bus/run/Run';
-import { DWELL_ALLOWANCE_S, TARGET_KMH } from './config/scoring';
+import { DWELL_ALLOWANCE_S, RAIN_TIMETABLE_FACTOR, TARGET_KMH } from './config/scoring';
 import { Input, type BusInput } from './core/input';
 import { startLoop } from './core/loop';
 import { getLang, place, setLang, t } from './i18n/i18n';
 import { BusView, CAB_EYE } from './render/BusView';
+import { Atmosphere, type Tier } from './render/atmosphere';
+import { setMaterialConditions } from './render/materials';
 import { createStage, VehicleCamera } from './render/stage';
 import { Junctions } from './traffic/junctions';
-import { TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from './traffic/Traffic';
+import { RAIN_TRAFFIC_FACTOR, TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from './traffic/Traffic';
 import { BusHud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
 import { RegionWorld } from './world/region';
 import { RoadMask } from './world/roadMask';
+import { conditionsMultiplier, pickConditions } from './world/conditions';
+import { streetLamps } from './world/streetLamps';
 import { buildTestTrack } from './world/testTrack';
 
 await RAPIER.init();
 
-const { renderer, scene, camera } = createStage();
+const { renderer, scene, camera, sun, hemi } = createStage();
 const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 world.timestep = 1 / 60;
 const events = new RAPIER.EventQueue(true);
@@ -34,6 +38,13 @@ const results = new ResultsScreen();
 // setting in M8).
 const params = new URLSearchParams(location.search);
 const scored = params.get('mode') === 'scored';
+
+// Time of day and weather (SPEC §9), fixed for the session; chunk materials must know before loading.
+const tier = (params.get('quality') ?? 'medium') as Tier;
+const conditions = pickConditions(params.get('world') ?? 'dhaka', params);
+setMaterialConditions({ night: conditions.time === 'night', wet: conditions.weather === 'rain', sheen: tier !== 'low' });
+const atmosphere = new Atmosphere(scene, camera, conditions, { sun, hemi }, { tier, dayFar: 1500 });
+atmosphere.enableWipers();
 
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
@@ -73,12 +84,19 @@ if (region) {
     lanes, scene, world, junctions, TRAFFIC_CAP[quality] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null,
     TRAFFIC_STYLES[regionId] ?? TRAFFIC_STYLES.dhaka,
   );
+  if (atmosphere.rainy) traffic.speedScale = RAIN_TRAFFIC_FACTOR;
+  // Street lamps light Dhaka's main roads at night; Bandarban stays dark apart from headlights.
+  if (atmosphere.night && regionId === 'dhaka') scene.add(...streetLamps(lanes));
+  const pts = region.route.points;
+  atmosphere.addValleyMist(pts.filter((_, i) => i % 60 === 0).map(([x, y, z]) => ({ x, y, z })));
 }
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
 document.getElementById('loading')?.remove();
 
 const bus = new Bus(world, legPose(0));
+bus.wet = atmosphere.rainy;
 const busView = new BusView(scene);
+busView.setBeamStyle(tier !== 'low', atmosphere.night, atmosphere.rainy || atmosphere.foggy);
 const lights = new BusLights();
 const comfort = new ComfortMeter();
 const cam = new VehicleCamera(camera, CAB_EYE, renderer.domElement);
@@ -116,7 +134,8 @@ async function startLeg(leg: number): Promise<void> {
   lastJunction = null;
   if (region && legs) {
     const { from, to } = legs[legIndex];
-    run = new Run(region.route, from, to, TARGET_KMH[regionId] ?? 22, legIndex + 1, scored);
+    const targetKmh = (TARGET_KMH[regionId] ?? 22) * (atmosphere.rainy ? RAIN_TIMETABLE_FACTOR : 1);
+    run = new Run(region.route, from, to, targetKmh, legIndex + 1, scored, conditionsMultiplier(conditions));
     progress = new RouteProgress(region.route, region.route.stops.find(s => s.name === from)!.index);
     hud.toast(t('boardHint', { n: legIndex + 1, from: place(from), to: place(to) }), 4000);
   }
@@ -246,6 +265,7 @@ startLoop(
     busView.updateCab(frameDt, { kmh: bus.kmh, steerDeg: bus.steerDeg, doorsOpen: bus.doorsOpen, nextStop: next && place(next.name), nextDistM }, lights);
     cam.update(busView.group, bus.forward, bus.up, frameDt);
     busView.updateMirrors(renderer, scene);
+    atmosphere.update(frameDt, inCab);
     renderer.render(scene, camera);
     minimap.update(busPos.x, busPos.z, bus.forward.x, bus.forward.z, next?.name);
     if ((hudTimer += frameDt) > 0.1) {
@@ -265,6 +285,11 @@ startLoop(
 );
 
 void startLeg(0);
+// After the boarding hint: today's conditions, and a reminder about headlights after dark.
+setTimeout(() => {
+  const line = t('conditionsLine', { time: t(`time.${conditions.time}`), weather: t(`weather.${conditions.weather}`) });
+  hud.toast(atmosphere.night ? `${line} · ${t('nightHint')}` : line, 4000);
+}, 4500);
 
 if (import.meta.env.DEV) {
   Object.assign(window, {

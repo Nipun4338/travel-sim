@@ -51,6 +51,9 @@ export class FlightModel {
   onGround = true;
   crashed = false;
   stallWarning = false;
+  /** Monsoon rain: light turbulence (SPEC §8), 0..1. */
+  turbulence = 0;
+  private gust = { v: 0, r: 0, t: 0 };
   private sink = 0;
   private rates = { p: 0, r: 0, y: 0 };
   private tmpQ = new THREE.Quaternion();
@@ -131,6 +134,12 @@ export class FlightModel {
       ty = -(inp.yaw || inp.roll) * P.nosewheelRate * Math.min(1, s / 5);
       if (s < sStall * 1.1) tp = Math.min(tp, 0);
     }
+    if (this.turbulence && !this.onGround) {
+      // Bumps, not drift: a new gust every ~0.7 s rocks the wings (wing levelling recovers) and lifts
+      // or drops the plane a little; neither builds up over time.
+      if ((this.gust.t -= dt) <= 0) this.gust = { v: (Math.random() - 0.5) * 3 * this.turbulence, r: (Math.random() - 0.5) * 14 * this.turbulence, t: 0.4 + Math.random() * 0.6 };
+      tr += this.gust.r;
+    }
     const k = 1 - Math.exp(-P.response * dt);
     this.rates.p += (tp - this.rates.p) * k;
     this.rates.r += (tr - this.rates.r) * k;
@@ -158,7 +167,7 @@ export class FlightModel {
     // Velocity along the nose, plus sink as lift is lost.
     this.sink += ((1 - lift) * P.stallSink - this.sink) * (1 - Math.exp(-1.5 * dt));
     this.vel.copy(fwd).multiplyScalar(this.speed);
-    if (!this.onGround) this.vel.y -= this.sink;
+    if (!this.onGround) this.vel.y -= this.sink - (this.turbulence ? this.gust.v : 0);
     this.pos.addScaledVector(this.vel, dt);
 
     const g = this.ground.height(this.pos.x, this.pos.z);

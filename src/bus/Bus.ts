@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import {
-  ARCADE_PLUS, BUS_HALF_EXTENTS, HILL_ASSIST, BUS_INERTIA, BUS_MASS, BUS_WHEELS, SUSPENSION_REST, SUSPENSION_TRAVEL,
+  ARCADE_PLUS, BUS_HALF_EXTENTS, HILL_ASSIST, BUS_INERTIA, BUS_MASS, BUS_WHEELS, RAIN_GRIP, SUSPENSION_REST, SUSPENSION_TRAVEL,
   WHEEL_RADIUS, type BusHandling,
 } from '../config/bus';
 import type { BusInput } from '../core/input';
@@ -19,6 +19,8 @@ export class Bus {
   vehicle!: RAPIER.DynamicRayCastVehicleController;
   doorsOpen = false;
   steerDeg = 0;
+  /** Monsoon rain: tyre grip drops from 1.6 to 1.2 (SPEC §6), so braking takes longer too. */
+  wet = false;
   gear: 'D' | 'R' | 'N' = 'N';
   readonly forward = new THREE.Vector3();
   readonly right = new THREE.Vector3();
@@ -98,7 +100,7 @@ export class Bus {
       this.vehicle.setWheelSuspensionStiffness(i, h.stiffness);
       this.vehicle.setWheelSuspensionCompression(i, h.compression);
       this.vehicle.setWheelSuspensionRelaxation(i, h.relaxation);
-      this.vehicle.setWheelFrictionSlip(i, h.grip);
+      this.vehicle.setWheelFrictionSlip(i, this.wet ? RAIN_GRIP : h.grip);
       this.vehicle.setWheelMaxSuspensionForce(i, 1e6);
       this.vehicle.setWheelMaxSuspensionTravel(i, SUSPENSION_TRAVEL);
       this.vehicle.setWheelBrake(i, brakeImpulse);

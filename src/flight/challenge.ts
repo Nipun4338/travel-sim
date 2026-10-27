@@ -37,7 +37,8 @@ export class Challenge {
   private overCeiling = 0;
   private landing?: Landing;
 
-  constructor(readonly data: ChallengeData, private scored: boolean) {}
+  /** `conditionsMult`: Taka ×1.2 in rain or fog, ×1.1 at night, stacking (SPEC §8). */
+  constructor(readonly data: ChallengeData, private scored: boolean, private conditionsMult = 1) {}
 
   get ring() { return this.data.rings[this.next]; }
 
@@ -100,7 +101,7 @@ export class Challenge {
       taka = this.data.feeTk + ringsHit * FLIGHT_TK.ring - ringsMissed * FLIGHT_TK.missedRing;
       if (this.time <= this.data.parS) taka += FLIGHT_TK.parBonus;
       if (l?.onTarget) taka += FLIGHT_TK.landing[l.grade];
-      taka = Math.max(0, Math.round(taka));
+      taka = Math.max(0, Math.round(taka * this.conditionsMult));
     }
     return {
       type: 'done',

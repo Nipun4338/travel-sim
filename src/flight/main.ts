@@ -1,10 +1,11 @@
 // Flight Mode (SPEC §8): `?play=flight&world=dhaka|bandarban`, optionally `&challenge=1..3`.
 // Free flight by default, with a landmark checklist; Challenges unlock in order per zone. Relaxed by
 // default: a crash just puts you back at the start. `?mode=scored` adds Taka, stars and failing.
-import * as THREE from 'three';
 import { OUTSIDE_ZONE_FAIL_S } from '../config/flight';
 import { startLoop } from '../core/loop';
 import { getLang, num, place, setLang, t } from '../i18n/i18n';
+import { Atmosphere } from '../render/atmosphere';
+import { setMaterialConditions } from '../render/materials';
 import { COCKPIT_EYE, PlaneView } from '../render/PlaneView';
 import { createStage } from '../render/stage';
 import type { ChallengeData, Spawn } from '../shared/zone';
@@ -14,8 +15,10 @@ import { FlightCamera } from './camera';
 import { Challenge, gradeFor } from './challenge';
 import { FlightModel, runwayFrame, type FlightEvent } from './FlightModel';
 import { FlightControls, type FlightAction } from './input';
+import { roadLights, runwayLights } from './lights';
 import { RingView } from './rings';
 import { ZoneWorld, type ZoneQuality } from './zone';
+import { conditionsMultiplier, pickConditions } from '../world/conditions';
 
 const params = new URLSearchParams(location.search);
 const scored = params.get('mode') === 'scored';
@@ -23,11 +26,15 @@ const zoneId = params.get('world') ?? 'dhaka';
 const quality = (params.get('quality') ?? 'medium') as ZoneQuality;
 const FOG: Record<ZoneQuality, number> = { low: 9000, medium: 14000, high: 20000 };
 
-const { renderer, scene, camera } = createStage({ far: FOG[quality] * 1.3, logDepth: true });
-scene.fog = new THREE.Fog(0xa9cde0, FOG[quality] * 0.3, FOG[quality]);
+const { renderer, scene, camera, sun, hemi } = createStage({ far: FOG[quality] * 1.3, logDepth: true });
+// Time of day and weather (SPEC §9), fixed for the session.
+const conditions = pickConditions(zoneId, params);
+setMaterialConditions({ night: false, wet: conditions.weather === 'rain', sheen: quality !== 'low' });
+const atmosphere = new Atmosphere(scene, camera, conditions, { sun, hemi }, { tier: quality, dayFar: FOG[quality], flight: true });
 const hud = new FlightHud();
 const minimap = new Minimap();
 const zone = new ZoneWorld(`${import.meta.env.BASE_URL}zones/${zoneId}`, scene, quality);
+zone.cityLights = atmosphere.night && zoneId === 'dhaka';
 if (!(await zone.init())) {
   hud.toast(t('zoneNotBaked', { id: zoneId }), 600000);
   document.getElementById('loading')?.remove();
@@ -36,6 +43,7 @@ if (!(await zone.init())) {
 const m = zone.manifest;
 
 const plane = new FlightModel(zone);
+plane.turbulence = atmosphere.rainy ? 1 : 0;
 const view = new PlaneView(scene);
 const cam = new FlightCamera(camera, COCKPIT_EYE, renderer.domElement);
 const controls = new FlightControls();
@@ -46,6 +54,9 @@ const roads: MapSeg[] = [];
 const mapData: number[][] = await (await fetch(`${import.meta.env.BASE_URL}zones/${zoneId}/${m.map}`)).json();
 for (const line of mapData) for (let i = 2; i < line.length; i += 2) roads.push([line[i - 2], line[i - 1], line[i], line[i + 1], 6, false]);
 for (const r of m.runways) roads.push([r.a.x, r.a.z, r.b.x, r.b.z, 60, false]);
+// Lights: runways at night and in murk; Dhaka's streets at night. Bandarban stays dark.
+if (atmosphere.night || atmosphere.rainy || atmosphere.foggy) scene.add(...runwayLights(m.runways, (x, z) => zone.height(x, z)));
+if (atmosphere.night && zoneId === 'dhaka') scene.add(roadLights(mapData, (x, z) => zone.height(x, z)));
 
 // ---------- progress: landmarks found and Challenges done (localStorage until M11 saves) ----------
 const load = (key: string): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')); } catch { return new Set(); } };
@@ -85,7 +96,7 @@ async function start(which: number | 'free'): Promise<void> {
     const prev = m.challenges[which - 1];
     if (prev && !done.has(prev.id)) { hud.toast(t('locked', { prev: t(`ch.${prev.id}`) })); return; }
     current = data;
-    challenge = new Challenge(data, scored);
+    challenge = new Challenge(data, scored, conditionsMultiplier(conditions));
     rings.set(data.rings);
     const path: Array<[number, number]> = [[data.spawn.x, data.spawn.z], ...data.rings.map(r => [r.x, r.z] as [number, number])];
     minimap.setLayers(roads, path, data.rings.map((r, i) => ({ x: r.x, z: r.z, name: `ring${i}` })), 3000);
@@ -205,6 +216,7 @@ function goalText(): { title: string; goal?: string; warn?: string } {
 
 const initial = parseInt(params.get('challenge') ?? '', 10);
 await start(Number.isFinite(initial) && initial >= 1 ? initial - 1 : 'free');
+setTimeout(() => hud.toast(t('conditionsLine', { time: t(`time.${conditions.time}`), weather: t(`weather.${conditions.weather}`) }), 3500), 4200);
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
 document.getElementById('loading')?.remove();
 
@@ -221,6 +233,7 @@ startLoop(step, frameDt => {
   minimap.update(plane.pos.x, plane.pos.z, fwd.x, fwd.z, challenge?.ring ? `ring${challenge.next}` : undefined);
   const state = { kmh: plane.kmh, altM: plane.pos.y - 1.4, vsMs: plane.vel.y, headingDeg: plane.headingDeg, pitchDeg: plane.pitchDeg, bankDeg: plane.bankDeg, throttle: plane.throttle, stall: plane.stallWarning, landingLight };
   if (inCockpit && (panelTimer += frameDt) > 0.05) { panelTimer = 0; view.drawPanel(state); }
+  atmosphere.update(frameDt, false);
   renderer.render(scene, camera);
   if ((hudTimer += frameDt) > 0.1) {
     hudTimer = 0;
