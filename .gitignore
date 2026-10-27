@@ -11,3 +11,8 @@ regions-out/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# raw downloads for the bake
+data/raw/
+# baked Region output
+public/regions/

@@ -29,7 +29,7 @@ export class BusHud {
       <div>Doors: <b>${s.doorsOpen ? 'OPEN' : 'closed'}</b> · Stops ${s.stopsServed}/${s.stopsTotal}</div>
       <div>Comfort <span class="bar"><i style="width:${pct}%" class="${s.comfort < 0.5 ? 'low' : ''}"></i></span></div>
       <div>Jerky moments: ${s.jerkyMoments} · View: ${s.camera}</div>
-      <div class="keys">W/S gas·brake · A/D steer · F doors · V view · R reset · 1 street · 2 hill</div>`;
+      <div class="keys">W/S gas·brake · A/D steer · F doors · V view · R reset · 1 Route start · 2 Leg 2 start</div>`;
   }
 
   toast(msg: string): void {
