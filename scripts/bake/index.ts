@@ -9,6 +9,7 @@ import { copernicusWindow, overpass, type OsmWay } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
 import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, roadRank, roadWidth, routeThroughStops, setWidthOverrides, type Indexed } from './osm';
 import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
+import { flyoverProfiles } from './flyovers';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
@@ -89,7 +90,10 @@ async function main() {
   const majorRoads = roadIndex(roads, 2), allRoads = roadIndex(roads, 0);
   const onRoad = (x: number, z: number) => majorRoads.onRoad(x, z);
   const junctions = junctionGrid(roads);
-  const rd = buildRoads(geo, roads, h, onRoad, junctions, region.footpaths);
+  const flyovers = region.gradeRoads ? new Map<number, (s: number) => number>() : flyoverProfiles(roads.ways.filter(wy => wy.tags?.highway).map(wy => ({
+    id: wy.id, nodes: wy.nodes, tags: wy.tags!, pts: wy.nodes.map(n => roads.nodes.get(n)).filter(Boolean).map(nd => [nd!.x, nd!.z] as [number, number]),
+  })));
+  const rd = buildRoads(geo, roads, h, onRoad, junctions, region.footpaths, flyovers, region.gradeRoads);
   lap('roads');
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);
@@ -132,20 +136,27 @@ async function main() {
     ways: roads.ways.filter(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway)).map(wy => {
       const t = wy.tags!;
       const nodes = wy.nodes.filter(nid => roads.nodes.has(nid));
-      const lift = 0.12 + roadRank(t.highway) * 0.01; // same as the road ribbon
+      // Same height as the road ribbon, or the flyover deck (with its ramps).
+      const flyover = flyovers.get(wy.id);
+      let along = 0, last: [number, number] | null = null;
+      const lift = (x: number, z: number) => {
+        if (last) along += Math.hypot(x - last[0], z - last[1]);
+        last = [x, z];
+        return flyover ? flyover(along) : 0.12 + roadRank(t.highway) * 0.01;
+      };
       const points: [number, number, number][] = [], nodeAt: number[] = [];
       nodes.forEach((nid, i) => {
         const nd = roads.nodes.get(nid)!;
         if (i > 0) {
           const pv = roads.nodes.get(nodes[i - 1])!, n = Math.max(1, Math.ceil(Math.hypot(nd.x - pv.x, nd.z - pv.z) / 10));
-          for (let k = 1; k < n; k++) { const x = pv.x + ((nd.x - pv.x) * k) / n, z = pv.z + ((nd.z - pv.z) * k) / n; points.push([x, h(x, z) + lift, z]); }
+          for (let k = 1; k < n; k++) { const x = pv.x + ((nd.x - pv.x) * k) / n, z = pv.z + ((nd.z - pv.z) * k) / n; points.push([x, h(x, z) + lift(x, z), z]); }
         }
         nodeAt.push(points.length);
-        points.push([nd.x, h(nd.x, nd.z) + lift, nd.z]);
+        points.push([nd.x, h(nd.x, nd.z) + lift(nd.x, nd.z), nd.z]);
       });
       const width = roadWidth(t);
       const lanes = parseInt(t.lanes ?? '', 10) || Math.max(1, Math.round(width / 3.2));
-      return { id: wy.id, highway: t.highway, lanes, width, dir: isOneway(t), elevated: isElevated(wy, roads), nodes, nodeAt, points };
+      return { id: wy.id, highway: t.highway, lanes, width, dir: isOneway(t), elevated: !region.gradeRoads && isElevated(wy, roads), nodes, nodeAt, points };
     }),
   };
 

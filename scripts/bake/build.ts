@@ -193,7 +193,7 @@ function dashes(pts: [number, number][], dash: number, space: number): [number, 
 
 export function buildRoads(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, onRoad: (x: number, z: number) => boolean, junctions: PointGrid,
-  footpaths = true,
+  footpaths = true, flyovers: Map<number, (s: number) => number> = new Map(), bridgesAtGrade = false,
 ): { pillars: number; skipped: number; crossings: number; footbridges: number } {
   let pillars = 0, skipped = 0, crossings = 0, footbridges = 0;
   const lift = (rank: number) => 0.12 + rank * 0.01; // major roads draw over minor ones at junctions
@@ -220,9 +220,43 @@ export function buildRoads(
     // Rail: the metro (and any rail bridge high in the layers) is a viaduct; other rail bridges
     // carry the track at ground level between steel girders.
     const railBridge = !!isRail && !!t.bridge && t.bridge !== 'no';
-    const elevated = isRail ? railBridge && (t.railway !== 'rail' || (parseInt(t.layer ?? '0', 10) || 0) >= 3) : isElevated(w, idx);
+    // In the hills a road `layer` marks a river bridge, already graded straight across: no deck.
+    const elevated = isRail ? railBridge && (t.railway !== 'rail' || (parseInt(t.layer ?? '0', 10) || 0) >= 3) : !bridgesAtGrade && isElevated(w, idx);
     if (isRail && !elevated) { buildTrack(geo, at(pts2, 0.3), [0, 1], railBridge); continue; }
     const width = isRail ? 9 : roadWidth(t);
+    const profile = !isRail ? flyovers.get(w.id) : undefined;
+    if (elevated && profile) {
+      // A flyover: deck height from its profile (ramping down where it meets the street),
+      // parapets, lamp posts, and pillars wherever it's high enough to stand on them.
+      const cum = [0];
+      for (let i = 1; i < pts2.length; i++) cum.push(cum[i - 1] + Math.hypot(pts2[i][0] - pts2[i - 1][0], pts2[i][1] - pts2[i - 1][1]));
+      const ground = pts2.map(([x, z]) => h(x, z)), lift = cum.map(profile);
+      const tops = pts2.map(([x, z], i) => [x, ground[i] + lift[i], z] as V3);
+      geo.deck(tops, ground, width, C.deck, C.deckSide, 'deck', ALL);
+      for (const off of [-width / 2 + 0.15, width / 2 - 0.15]) {
+        const edge = offsetLine(pts2, off).map(([x, z], i) => [x, tops[i][1] + 0.5, z] as V3);
+        geo.ribbon(edge, 0.3, C.deckSide, 'deck', [0, 1], 0.5, C.deckSide);
+      }
+      let since = 0, sinceLamp = 20;
+      for (let i = 1; i < pts2.length; i++) {
+        const step = cum[i] - cum[i - 1];
+        since += step; sinceLamp += step;
+        const [x, z] = pts2[i], g = ground[i];
+        if (sinceLamp >= 40) {
+          sinceLamp = 0;
+          const [lx, lz] = offsetLine(pts2, -width / 2 + 0.4)[i];
+          geo.box(lx, lz, 0.12, 0.12, tops[i][1], tops[i][1] + 8, C.pillar, 'prop', [0]);
+        }
+        if (since < 30 || lift[i] < 4.5) continue;
+        since = 0;
+        // OSM puts a flyover's centreline above the road beneath it; real pillars stand in
+        // medians and verges, so skip any that would land in a carriageway.
+        if ([[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dz]) => onRoad(x + dx, z + dz))) { skipped++; continue; }
+        geo.box(x, z, 0.7, 0.7, g, tops[i][1] - 1.2, C.pillar, 'pillar', [0, 1]);
+        pillars++;
+      }
+      continue;
+    }
     if (elevated) {
       const layer = parseInt(t.layer ?? '1', 10) || 1;
       const deckH = isRail ? 12 : layer >= 3 ? 16 : layer === 2 ? 12 : 7;

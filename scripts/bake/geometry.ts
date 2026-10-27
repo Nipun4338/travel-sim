@@ -94,6 +94,36 @@ export class ChunkGeometry {
       }
     }
   }
+
+  /**
+   * An elevated deck whose height varies (a flyover with its ramps): where it's high, a 1.2 m slab
+   * with an underside; where it's low on a ramp, retaining walls down to the ground instead.
+   * `ground[i]` is the ground height under `pts[i]`.
+   */
+  deck(pts: V3[], ground: number[], width: number, color: THREE.Color, sideColor: THREE.Color, layer: ChunkLayer, lods: number[]): void {
+    if (pts.length < 2) return;
+    const L: V3[] = [], R: V3[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      let tx = b[0] - a[0], tz = b[2] - a[2];
+      const len = Math.hypot(tx, tz) || 1; tx /= len; tz /= len;
+      const rx = -tz, rz = tx, h = width / 2;
+      L.push([pts[i][0] - rx * h, pts[i][1], pts[i][2] - rz * h]);
+      R.push([pts[i][0] + rx * h, pts[i][1], pts[i][2] + rz * h]);
+    }
+    const SLAB = 1.2, OPEN = 4.5;
+    const bottom = (i: number) => (pts[i][1] - ground[i] >= OPEN ? pts[i][1] - SLAB : ground[i] - 0.3);
+    for (let i = 0; i < pts.length - 1; i++) {
+      this.quad(L[i], R[i], R[i + 1], L[i + 1], color, layer, lods);
+      const at = (v: V3, y: number): V3 => [v[0], y, v[2]];
+      const b0 = bottom(i), b1 = bottom(i + 1);
+      this.quad(L[i], L[i + 1], at(L[i + 1], b1), at(L[i], b0), sideColor, layer, lods);
+      this.quad(at(R[i], b0), at(R[i + 1], b1), R[i + 1], R[i], sideColor, layer, lods);
+      if (pts[i][1] - ground[i] >= OPEN && pts[i + 1][1] - ground[i + 1] >= OPEN) {
+        this.quad(at(L[i], b0), at(L[i + 1], b1), at(R[i + 1], b1), at(R[i], b0), sideColor, layer, lods);
+      }
+    }
+  }
 }
 
 /** Splits a polyline so no segment is longer than `maxLen`, so grading follows the terrain. */

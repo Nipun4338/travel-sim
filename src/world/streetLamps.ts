@@ -10,7 +10,7 @@ const SPACING = 35;
 export function streetLamps(lanes: LaneData): THREE.Object3D[] {
   const heads: number[] = [], pools: Array<[number, number, number]> = [];
   for (const w of lanes.ways) {
-    if (!LIT.test(w.highway) || w.elevated) continue;
+    if (!LIT.test(w.highway)) continue;
     let along = 0, next = SPACING / 2;
     for (let i = 1; i < w.points.length; i++) {
       const [ax, ay, az] = w.points[i - 1], [bx, by, bz] = w.points[i];
@@ -22,7 +22,8 @@ export function streetLamps(lanes: LaneData): THREE.Object3D[] {
         // One-way carriageways (dual roads) get lamps on their outer kerb only: with traffic on the
         // left, that is the left of the direction of travel (side −1 is left of node order).
         for (const side of w.dir === 0 ? [-1, 1] : [-w.dir]) {
-          const off = w.width / 2 + 0.8;
+          // Flyovers carry their lamps on the deck edge; at street level they stand on the kerb.
+          const off = w.elevated ? w.width / 2 - 0.4 : w.width / 2 + 0.8;
           heads.push(x + rx * off * side, y + 8, z + rz * off * side);
           pools.push([x + rx * (off - 2.5) * side, y + 0.08, z + rz * (off - 2.5) * side]);
         }

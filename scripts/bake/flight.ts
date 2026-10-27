@@ -14,6 +14,7 @@ import { buildingHeight, pickWall } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmData } from './fetch';
 import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
+import { flyoverProfiles } from './flyovers';
 import { pbfBuildings } from './pbf';
 import { ChunkGeometry, color, densify, hash01, type V3 } from './geometry';
 import { roadRank, roadWidth } from './osm';
@@ -198,10 +199,23 @@ async function main() {
   // ---------- roads ----------
   const mapRoads: number[][] = [];
   const lift = zone.forest ? 0.8 : 0.4;
+  // Flyovers and the Elevated Expressway stand on their decks, ramping down to the street.
+  // (In the hills a road `layer` marks a river bridge, not a flyover.)
+  const flyovers = zone.forest ? new Map<number, (s: number) => number>() : flyoverProfiles(ways(roadsRaw).map(w => ({ id: w.id, nodes: (w as GWay & { nodes?: number[] }).nodes ?? [], tags: w.tags!, pts: w.geometry!.map(xz) })));
   for (const w of ways(roadsRaw)) {
     const pts = w.geometry!.map(xz);
     if (pts.every(([x, z]) => Math.abs(x) > H || Math.abs(z) > H)) continue;
     const rank = roadRank(w.tags!.highway);
+    const profile = flyovers.get(w.id);
+    if (profile) {
+      const dense = densify(pts, 20), ground = dense.map(([x, z]) => h(x, z));
+      let along = 0;
+      const tops = dense.map(([x, z], i) => { if (i) along += Math.hypot(x - dense[i - 1][0], z - dense[i - 1][1]); return [x, ground[i] + profile(along) + lift, z] as V3; });
+      geo.deck(tops, ground, Math.max(6, roadWidth(w.tags!)), C.road, C.paved, 'road', [0, 1]);
+      for (let i = 2; i < dense.length; i += 2) if (tops[i][1] - ground[i] > 4.5) geo.box(dense[i][0], dense[i][1], 0.8, 0.8, ground[i], tops[i][1] - 1.2, C.paved, 'road', [0]);
+      mapRoads.push(simplify(pts, 25).flatMap(([x, z]) => [Math.round(x), Math.round(z)]));
+      continue;
+    }
     const ribbon = densify(pts, 20).map(([x, z]) => [x, h(x, z) + lift, z] as V3);
     geo.ribbon(ribbon, Math.max(6, roadWidth(w.tags!)), C.road, 'road', rank >= 4 ? [0, 1] : [0]);
     mapRoads.push(simplify(pts, 25).flatMap(([x, z]) => [Math.round(x), Math.round(z)]));
