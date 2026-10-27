@@ -11,6 +11,7 @@ This spec consolidates the wayfinding map ([docs/wayfinder/map.md](docs/wayfinde
 **In v1:**
 - Two independent modes, **Bus Mode** and **Flight Mode**, in two Regions, **Dhaka** and **Bandarban**.
 - Realism target **Arcade-plus**: believable handling and simple rules, with no detailed simulation.
+- **A relaxing drive, not a competition** (revised 2026-10-27, user direction): the default Bus Mode has no money, Fines, stars or failing Runs. The view while driving comes first: the game opens in the driver's cab, and on-screen text is kept to a minimum. The scored rules in §6 remain as an optional mode (`?mode=scored` now; a setting in M8).
 - Desktop browser (keyboard, gamepad) and mobile browser (touch), shipped as an installable PWA.
 - A personal/portfolio project.
 
@@ -152,7 +153,12 @@ The bus is 12 t, 11 × 2.8 × 2.5 m, on 4 raycast wheels (radius 0.52 m, rest le
 - Capacity is 40 seated + 30 standing. Passengers left behind when the bus is full cost a small penalty.
 - Standing passengers feel rough driving ×2.
 
-### Score: Taka earned
+### Relaxed mode (default)
+- Runs never fail. Collisions, leaving the road and running a junction are not penalised or announced.
+- Messages only name the Stop you arrive at or pass.
+- The end of a Leg shows a calm trip summary: distance, time, passengers carried, Stops served.
+
+### Score: Taka earned (scored mode only)
 Fares collected, plus on-time bonuses, minus **Fines**, then multiplied for conditions: **rain ×1.2, fog ×1.2, night ×1.1**, stacking. Fines:
 - **Jerky Moment:** a Fine per standing passenger, plus a passenger complaint on screen. A Jerky Moment is when the bus goes above **1.5 m/s² sideways** or **1.8 m/s² forward/back** (smoothed, edge-triggered).
 - **Collision:** scaled by impact speed; under 5 km/h is near zero.
@@ -164,8 +170,16 @@ Exact fare and fine amounts are tuning values.
 
 ### End of a Run
 - **Finish:** at the Leg's last Stop.
-- **Fail:** an impact above **30 km/h**, or the bus leaving the road. Lateness never fails a Run.
-- **Results screen:** Taka earned, plus 1–3 stars each for **punctuality, comfort and safety**.
+- **Fail (scored mode only):** an impact above **30 km/h**, or the bus leaving the road. Lateness never fails a Run.
+- **Results screen (scored mode):** Taka earned, plus 1–3 stars each for **punctuality, comfort and safety**.
+
+### Lights (revised 2026-10-27)
+Worked like a real bus. Every light shows on the bus and on a matching tell-tale lamp on the dashboard.
+- **Headlights:** off → parking → low beam.
+- **High beam:** only with the low beam on.
+- **Indicators:** cancel themselves once the bus has turned and straightened.
+- **Hazards.**
+- **Brake and reversing lights:** automatic.
 
 ### Horn
 A HORN key and touch button, with no Fine.
@@ -277,10 +291,10 @@ Check each model's separable parts (wheels, doors, control surfaces) in Sketchfa
 
 | | Keyboard | Gamepad | Touch (validated on a phone) |
 |---|---|---|---|
-| Bus | W/↑ gas · S/↓ brake/reverse · A/D steer · F doors · H horn · V camera | left stick steer, RT gas, LT brake | drag-to-steer area bottom-left (~45% × 45%, 70 px = full lock); GAS and BRAKE bottom-right; DOOR and HORN above GAS |
+| Bus | W/↑ gas · S/↓ brake/reverse · A/D steer · F doors · H horn · L headlights · K high beam · Q/E indicators · X hazards · V camera · Tab details · ` language · mouse-drag to look around in the cab | left stick steer, RT gas, LT brake | drag-to-steer area bottom-left (~45% × 45%, 70 px = full lock); GAS and BRAKE bottom-right; DOOR and HORN above GAS; ◀ 💡 ▶ (indicators, headlights) top-right |
 | Plane | W/S pitch (**W = nose down**, invert option) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · V camera | left stick, RT/LT throttle, LB/RB rudder, A brakes | floating virtual stick bottom-left (70 px = full deflection; drag down = nose up); vertical throttle slider and BRAKE bottom-right; no touch rudder |
 
-Cameras: chase and cockpit for both vehicles.
+Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh drives on the left), with a dashboard, analog speedometer, tell-tale lamps, a steering wheel that turns with the steering, live side mirrors and an amber next-Stop display; V switches to the chase camera. The plane gets the same treatment in M6.
 
 ## 13. UI
 [018](docs/wayfinder/tickets/018-prototype-hud-and-menus.md), prototype [prototypes/hud-and-menus](prototypes/hud-and-menus/PROTOTYPE-hud-and-menus.html)
@@ -301,7 +315,7 @@ Cameras: chase and cockpit for both vehicles.
   - results;
   - settings: quality, invert pitch, language, storage per Region with Delete, export/import save code;
   - licences.
-- **Language:** English / বাংলা / **Both (default)**.
+- **Language (revised 2026-10-27):** **বাংলা by default**, English optional. That covers Bangla text and Stop names, Bangla numerals (৳ ১,২৪০, ৩৫ কিমি/ঘণ্টা) and the Noto Sans Bengali font. The choice is remembered on the device.
 
 ## 14. Audio
 [019](docs/wayfinder/tickets/019-decide-audio.md)

@@ -48,6 +48,9 @@ export interface BusSample {
 export interface RunResult {
   status: 'finished' | 'failed';
   reason?: string;
+  reasonKmh?: number;
+  scored: boolean;
+  stopsServed: number;
   takaEarned: number;
   ledger: LedgerEntry[];
   stars: { punctuality: number; comfort: number; safety: number };
@@ -74,6 +77,7 @@ export class Run {
   time = 0;
   status: 'running' | 'finished' | 'failed' = 'running';
   failReason = '';
+  failKmh?: number;
   jerkyMoments = 0;
   passengersCarried = 0;
   private current = 0;          // next Stop to serve
@@ -82,7 +86,11 @@ export class Run {
   private atStop = -1;          // Stop the bus is stopped at with doors open, or -1
   private readonly kmStart: number;
 
-  constructor(private route: RouteData, fromStop: string, toStop: string, targetKmh: number, seed = 1) {
+  /**
+   * `scored` (off by default: the game is a relaxing drive, not a competition) turns on failing
+   * the Run on an accident or leaving the road; Fines are always recorded for the summary.
+   */
+  constructor(private route: RouteData, fromStop: string, toStop: string, targetKmh: number, seed = 1, readonly scored = false) {
     const i0 = route.stops.findIndex(s => s.name === fromStop), i1 = route.stops.findIndex(s => s.name === toStop);
     if (i0 < 0 || i1 <= i0) throw new Error(`Bad Leg ${fromStop} → ${toStop}`);
     const legStops = route.stops.slice(i0, i1 + 1);
@@ -114,7 +122,7 @@ export class Run {
 
     // Leaving the road fails the Run (SPEC §6).
     this.offRoadTime = bus.onRoad ? 0 : this.offRoadTime + dt;
-    if (this.offRoadTime > OFF_ROAD_FAIL_S) return this.fail('The bus left the road', ev);
+    if (this.scored && this.offRoadTime > OFF_ROAD_FAIL_S) return this.fail('fail.road', ev);
 
     const stop = this.nextStop;
     if (!stop) return ev;
@@ -222,7 +230,7 @@ export class Run {
     const tk = collisionFineTk(impactKmh);
     this.add('collision', -tk, `Collision at ${Math.round(impactKmh)} km/h`);
     const ev: RunEvent[] = [{ type: 'collision', impactKmh, tk }];
-    if (impactKmh > ACCIDENT_KMH) return this.fail(`Accident at ${Math.round(impactKmh)} km/h`, ev);
+    if (this.scored && impactKmh > ACCIDENT_KMH) return this.fail('fail.accident', ev, Math.round(impactKmh));
     return ev;
   }
 
@@ -233,9 +241,11 @@ export class Run {
     return [{ type: 'junction', name, tk: TK.junction }];
   }
 
-  private fail(reason: string, ev: RunEvent[]): RunEvent[] {
+  /** `reason` is an i18n key; `kmh` fills its {kmh} placeholder. */
+  private fail(reason: string, ev: RunEvent[], kmh?: number): RunEvent[] {
     this.status = 'failed';
     this.failReason = reason;
+    this.failKmh = kmh;
     ev.push({ type: 'failed', reason });
     return ev;
   }
@@ -248,6 +258,9 @@ export class Run {
     return {
       status: this.status === 'failed' ? 'failed' : 'finished',
       reason: this.failReason || undefined,
+      reasonKmh: this.failKmh,
+      scored: this.scored,
+      stopsServed: this.stops.filter(s => s.served).length,
       takaEarned: this.takaEarned,
       ledger: this.ledger,
       stars: {

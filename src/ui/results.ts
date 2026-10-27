@@ -1,11 +1,9 @@
-// Results screen after a Run (SPEC §6). Plain styling for now; the bus-art look comes in M8.
+// End-of-Leg screen. Relaxed (default): a calm trip summary. Scored mode adds the Taka breakdown
+// and stars (SPEC §6). Plain styling for now; the bus-art look comes in M8.
 import type { LedgerKind, RunResult } from '../bus/run/Run';
+import { amount, clock, num, place, t } from '../i18n/i18n';
 
-const LABELS: Record<LedgerKind, string> = {
-  fare: 'Fares', onTime: 'On-time bonus', late: 'Late arrivals', early: 'Early departures', missed: 'Missed Stops',
-  leftBehind: 'Passengers left behind', jerky: 'Rough driving', collision: 'Collisions', junction: 'Junctions run',
-};
-const tk = (n: number) => `${n < 0 ? '−' : ''}৳ ${Math.abs(Math.round(n)).toLocaleString('en-IN')}`;
+const tk = (n: number) => `${n < 0 ? '−' : ''}৳ ${amount(Math.abs(n))}`;
 const starText = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
 export interface ResultsActions { retry: () => void; next?: () => void; }
@@ -21,27 +19,32 @@ export class ResultsScreen {
 
   get visible(): boolean { return !this.el.hidden; }
 
-  show(title: string, r: RunResult, actions: ResultsActions): void {
-    const sums = new Map<LedgerKind, number>();
-    for (const e of r.ledger) sums.set(e.kind, (sums.get(e.kind) ?? 0) + e.tk);
-    const mins = Math.floor(r.seconds / 60), secs = Math.round(r.seconds % 60).toString().padStart(2, '0');
-    this.el.innerHTML = `
-      <div class="panel">
-        <h2>${r.status === 'failed' ? 'Run failed' : 'Leg complete'}</h2>
-        <div class="sub">${title}${r.reason ? ` · ${r.reason}` : ''}</div>
-        <table>${[...sums].map(([k, v]) => `<tr><td>${LABELS[k]}</td><td class="${v < 0 ? 'neg' : ''}">${tk(v)}</td></tr>`).join('')}
-          <tr class="total"><td>Taka earned</td><td>${tk(r.takaEarned)}</td></tr></table>
+  show(leg: { n: number; from: string; to: string }, r: RunResult, actions: ResultsActions): void {
+    const title = t('leg', { n: leg.n, from: place(leg.from), to: place(leg.to) });
+    const time = clock(r.seconds);
+    let body: string;
+    if (!r.scored) {
+      body = `<h2>${t('tripComplete')}</h2><div class="sub">${title}</div>
+        <p class="summary">${t('tripSummary', { km: num(r.km.toFixed(1)), time, pax: r.passengersCarried, stops: r.stopsServed })}</p>`;
+    } else {
+      const sums = new Map<LedgerKind, number>();
+      for (const e of r.ledger) sums.set(e.kind, (sums.get(e.kind) ?? 0) + e.tk);
+      const reason = r.reason ? ` · ${t(r.reason, { kmh: r.reasonKmh ?? 0 })}` : '';
+      body = `<h2>${r.status === 'failed' ? t('runFailed') : t('legComplete')}</h2><div class="sub">${title}${reason}</div>
+        <table>${[...sums].map(([k, v]) => `<tr><td>${t('ledger.' + k)}</td><td class="${v < 0 ? 'neg' : ''}">${tk(v)}</td></tr>`).join('')}
+          <tr class="total"><td>${t('takaEarned')}</td><td>${tk(r.takaEarned)}</td></tr></table>
         <div class="stars">
-          <div>Punctuality <b>${starText(r.stars.punctuality)}</b></div>
-          <div>Comfort <b>${starText(r.stars.comfort)}</b></div>
-          <div>Safety <b>${starText(r.stars.safety)}</b></div>
+          <div>${t('punctuality')} <b>${starText(r.stars.punctuality)}</b></div>
+          <div>${t('comfort')} <b>${starText(r.stars.comfort)}</b></div>
+          <div>${t('safety')} <b>${starText(r.stars.safety)}</b></div>
         </div>
-        <div class="sub">${r.km.toFixed(1)} km · ${mins}:${secs} · ${r.passengersCarried} passengers · ${r.jerkyMoments} jerky moments</div>
-        <div class="buttons">
-          ${actions.next && r.status === 'finished' ? '<button data-a="next">Next Leg</button>' : ''}
-          <button data-a="retry">Retry</button>
-        </div>
-      </div>`;
+        <div class="sub">${t('summary', { km: num(r.km.toFixed(1)), time, pax: r.passengersCarried, jerky: r.jerkyMoments })}</div>`;
+    }
+    this.el.innerHTML = `<div class="panel">${body}
+      <div class="buttons">
+        ${actions.next && r.status === 'finished' ? `<button data-a="next">${t('nextLeg')}</button>` : ''}
+        <button data-a="retry">${t('retry')}</button>
+      </div></div>`;
     this.el.querySelector('[data-a="retry"]')!.addEventListener('click', () => { this.hide(); actions.retry(); });
     this.el.querySelector('[data-a="next"]')?.addEventListener('click', () => { this.hide(); actions.next!(); });
     this.el.hidden = false;

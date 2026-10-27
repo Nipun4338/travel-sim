@@ -1,7 +1,10 @@
-// Minimal bus HUD. The full bus-art look and corner layout arrive in M8 (SPEC §13).
+// Driving comes first: a slim strip with the next Stop, and everything else behind Tab.
+// In the cab the speed is on the dashboard, so the strip leaves it out. The full bus-art look and
+// corner layout arrive in M8 (SPEC §13).
+import { amount, clock, num, place, t } from '../i18n/i18n';
 
 export interface RunHudState {
-  leg: string;
+  leg: { n: number; from: string; to: string };
   nextStop: string;
   distanceM: number;
   dueInS: number;        // negative = late
@@ -11,6 +14,7 @@ export interface RunHudState {
   standing: number;
   taka: number;
   clockS: number;
+  scored: boolean;
   junction?: { name: string; stop: boolean; secondsLeft: number; distM: number };
 }
 
@@ -20,42 +24,54 @@ export interface BusHudState {
   doorsOpen: boolean;
   comfort: number;      // 0..1
   jerkyMoments: number;
-  camera: string;
+  inCab: boolean;
   run?: RunHudState;
 }
 
-const mmss = (s: number) => `${Math.floor(Math.abs(s) / 60)}:${Math.floor(Math.abs(s) % 60).toString().padStart(2, '0')}`;
+const dist = (m: number) => (m < 1000 ? `${num(Math.round(m / 10) * 10)} ${t('m')}` : `${num((m / 1000).toFixed(1))} ${t('km')}`);
 
 export class BusHud {
-  private el = document.createElement('div');
+  private strip = document.createElement('div');
+  private details = document.createElement('div');
   private toastEl = document.createElement('div');
   private toastTimer = 0;
+  showDetails = false;
 
   constructor() {
-    this.el.className = 'hud';
+    this.strip.className = 'hud-strip';
+    this.details.className = 'hud-details';
     this.toastEl.className = 'toast';
-    document.body.append(this.el, this.toastEl);
+    document.body.append(this.strip, this.details, this.toastEl);
   }
 
   render(s: BusHudState): void {
-    const pct = Math.round(s.comfort * 100);
     const r = s.run;
-    const runHtml = r ? `
-      <div class="next"><b>${r.nextStop}</b> · ${r.distanceM < 1000 ? `${Math.round(r.distanceM)} m` : `${(r.distanceM / 1000).toFixed(1)} km`}</div>
-      <div>${r.departing ? `departs in ${mmss(Math.max(0, r.dueInS))}` : r.dueInS >= 0 ? `due in ${mmss(r.dueInS)}` : `<span class="late">${mmss(r.dueInS)} late</span>`} · clock ${mmss(r.clockS)}</div>
-      <div>Passengers ${r.onboard}/${r.capacity} (${r.standing} standing)</div>
-      ${r.junction ? `<div class="junction ${r.junction.stop ? 'stop' : 'go'}">${r.junction.name} junction ${Math.round(r.junction.distM)} m: <b>${r.junction.stop ? 'STOP' : 'GO'}</b> ${mmss(r.junction.secondsLeft)}</div>` : ''}
-      <div class="taka">৳ ${Math.round(r.taka).toLocaleString('en-IN')}</div>
-      <div class="leg">${r.leg}</div>` : '';
-    this.el.innerHTML = `
-      <div class="speed"><b>${Math.abs(s.kmh).toFixed(0)}</b> km/h · ${s.gear}</div>
-      ${runHtml}
-      <div>Doors: <b>${s.doorsOpen ? 'OPEN' : 'closed'}</b></div>
-      <div>Comfort <span class="bar"><i style="width:${pct}%" class="${s.comfort < 0.5 ? 'low' : ''}"></i></span> · jerky ${s.jerkyMoments}</div>
-      <div class="keys">W/S gas·brake · A/D steer · F doors · V view · R restart Leg · 1/2/3 Leg</div>`;
+    const parts: string[] = [];
+    if (!s.inCab) parts.push(`<b>${num(Math.abs(s.kmh).toFixed(0))}</b> ${t('kmh')}`);
+    if (r) {
+      parts.push(`${t('next')}: <b>${place(r.nextStop)}</b> · ${dist(r.distanceM)}`);
+      if (r.junction && r.junction.distM < 120) {
+        parts.push(`<span class="${r.junction.stop ? 'stop' : 'go'}">${place(r.junction.name)} · ${r.junction.stop ? t('junctionStop') : t('junctionGo')}</span>`);
+      }
+    }
+    this.strip.innerHTML = parts.join('<span class="sep"></span>');
+    this.strip.hidden = parts.length === 0;
+
+    this.details.hidden = !this.showDetails;
+    if (!this.showDetails) return;
+    const timing = r ? (r.departing ? t('departsIn', { t: clock(Math.max(0, r.dueInS)) }) : r.dueInS >= 0 ? t('dueIn', { t: clock(r.dueInS) }) : t('late', { t: clock(r.dueInS) })) : '';
+    this.details.innerHTML = `
+      ${r ? `<div class="leg">${t('leg', { n: r.leg.n, from: place(r.leg.from), to: place(r.leg.to) })}</div>
+      <div>${timing}</div>
+      <div>${t('passengers', { n: r.onboard, cap: r.capacity, s: r.standing })}</div>
+      ${r.scored ? `<div class="taka">৳ ${amount(r.taka)}</div>` : ''}` : ''}
+      <div>${s.doorsOpen ? t('doorsOpen') : t('doorsClosed')}</div>
+      <div>${t('comfort')} <span class="bar"><i style="width:${Math.round(s.comfort * 100)}%" class="${s.comfort < 0.5 ? 'low' : ''}"></i></span></div>
+      <div class="keys">${t('keys')}</div>`;
   }
 
-  toast(msg: string, ms = 1600): void {
+  toast(msg: string, ms = 2200): void {
+    if (!msg) return;
     this.toastEl.textContent = msg;
     this.toastEl.style.opacity = '1';
     clearTimeout(this.toastTimer);

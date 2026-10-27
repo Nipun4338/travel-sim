@@ -1,17 +1,31 @@
 import type { Input } from '../core/input';
+import { onLangChange, t } from '../i18n/i18n';
 
-/** Bus touch layout validated on a phone (SPEC §12): steer area bottom-left; GAS, BRAKE, DOOR, HORN bottom-right. */
+/**
+ * Bus touch layout validated on a phone (SPEC §12): steer area bottom-left; GAS, BRAKE, DOOR, HORN
+ * bottom-right; indicators and headlights along the top right.
+ */
 export function mountBusTouchControls(input: Input): void {
   if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) return;
   const root = document.createElement('div');
   root.className = 'touch';
   root.innerHTML = `
-    <div class="steer-area">drag ◀ ▶ to steer</div>
-    <button class="pad brake">BRAKE</button>
-    <button class="pad gas">GAS</button>
-    <button class="pad door">DOOR</button>
-    <button class="pad horn">HORN</button>`;
+    <div class="steer-area"></div>
+    <button class="pad brake"></button>
+    <button class="pad gas"></button>
+    <button class="pad door"></button>
+    <button class="pad horn"></button>
+    <div class="lights-row"><button class="mini ind-l">◀</button><button class="mini head">💡</button><button class="mini ind-r">▶</button></div>`;
   document.body.appendChild(root);
+  const label = () => {
+    root.querySelector('.steer-area')!.textContent = t('touchSteer');
+    root.querySelector('.brake')!.textContent = t('touchBrake');
+    root.querySelector('.gas')!.textContent = t('touchGas');
+    root.querySelector('.door')!.textContent = t('touchDoor');
+    root.querySelector('.horn')!.textContent = t('touchHorn');
+  };
+  label();
+  onLangChange(label);
 
   const area = root.querySelector<HTMLElement>('.steer-area')!;
   let startX: number | null = null;
@@ -34,4 +48,7 @@ export function mountBusTouchControls(input: Input): void {
   hold('.brake', 'brake');
   root.querySelector('.door')!.addEventListener('pointerdown', () => input.emit('doors'));
   root.querySelector('.horn')!.addEventListener('pointerdown', () => input.emit('horn'));
+  root.querySelector('.ind-l')!.addEventListener('pointerdown', () => input.emit('indicatorLeft'));
+  root.querySelector('.ind-r')!.addEventListener('pointerdown', () => input.emit('indicatorRight'));
+  root.querySelector('.head')!.addEventListener('pointerdown', () => input.emit('lights'));
 }

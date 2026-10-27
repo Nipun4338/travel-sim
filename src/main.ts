@@ -1,18 +1,20 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Bus, type Pose } from './bus/Bus';
 import { ComfortMeter } from './bus/comfort';
+import { BusLights } from './bus/lights';
 import { RouteProgress } from './bus/run/progress';
 import { Run, type RunEvent } from './bus/run/Run';
 import { DWELL_ALLOWANCE_S, TARGET_KMH } from './config/scoring';
-import { Input } from './core/input';
+import { Input, type BusInput } from './core/input';
 import { startLoop } from './core/loop';
-import { BusView } from './render/BusView';
+import { getLang, place, setLang, t } from './i18n/i18n';
+import { BusView, CAB_EYE } from './render/BusView';
 import { createStage, VehicleCamera } from './render/stage';
+import { Junctions } from './traffic/junctions';
+import { TRAFFIC_CAP, Traffic, type QualityTier } from './traffic/Traffic';
 import { BusHud } from './ui/hud';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
-import { Junctions } from './traffic/junctions';
-import { TRAFFIC_CAP, Traffic, type QualityTier } from './traffic/Traffic';
 import { RegionWorld } from './world/region';
 import { buildTestTrack } from './world/testTrack';
 
@@ -25,15 +27,19 @@ const events = new RAPIER.EventQueue(true);
 const hud = new BusHud();
 const results = new ResultsScreen();
 
+// A relaxing drive by default; ?mode=scored turns on Taka, Fines, stars and failing Runs (a
+// setting in M8).
+const params = new URLSearchParams(location.search);
+const scored = params.get('mode') === 'scored';
+
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
-const params = new URLSearchParams(location.search);
 const regionId = params.get('world') ?? 'dhaka';
 if (regionId !== 'test') {
   region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, world);
   if (!(await region.init())) {
     region = null;
-    hud.toast(`Region "${regionId}" isn't baked: run npm run bake -- ${regionId}`, 5000);
+    hud.toast(t('notBaked', { id: regionId }), 5000);
   }
 }
 let testSpawns: Pose[] = [];
@@ -59,21 +65,31 @@ if (region) {
   const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
   traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[quality] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null);
 }
+await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
 document.getElementById('loading')?.remove();
 
 const bus = new Bus(world, legPose(0));
 const busView = new BusView(scene);
+const lights = new BusLights();
 const comfort = new ComfortMeter();
-const cam = new VehicleCamera(camera);
+const cam = new VehicleCamera(camera, CAB_EYE, renderer.domElement);
 const input = new Input();
 mountBusTouchControls(input);
 
-// ---------- Runs (Bus Mode gameplay, SPEC §6); only on a baked Region ----------
+// ---------- Runs (Bus Mode, SPEC §6); only on a baked Region ----------
 let legIndex = 0;
 let run: Run | null = null;
 let progress: RouteProgress | null = null;
 const busPos = legPose(0).position.clone();
 let paused = false; // dev hook for scripted tests
+let impact: { startKmh: number; steps: number } | null = null; // speed lost over a few steps after a hit
+let jerkySeen = 0;
+let lastJunction: string | null = null; // junction the bus is inside, so each entry is judged once
+
+const currentLeg = () => {
+  const l = region!.route.legs[legIndex];
+  return { n: legIndex + 1, from: l.from, to: l.to };
+};
 
 async function startLeg(leg: number): Promise<void> {
   results.hide();
@@ -91,54 +107,63 @@ async function startLeg(leg: number): Promise<void> {
   lastJunction = null;
   if (region && legs) {
     const { from, to } = legs[legIndex];
-    run = new Run(region.route, from, to, TARGET_KMH[regionId] ?? 22, legIndex + 1);
+    run = new Run(region.route, from, to, TARGET_KMH[regionId] ?? 22, legIndex + 1, scored);
     progress = new RouteProgress(region.route, region.route.stops.find(s => s.name === from)!.index);
-    hud.toast(`Leg ${legIndex + 1}: ${from} → ${to}. Open the doors (F) to board.`, 3500);
+    hud.toast(t('boardHint', { n: legIndex + 1, from: place(from), to: place(to) }), 4000);
   }
 }
 
 input.onAction(action => {
   switch (action) {
-    case 'doors': hud.toast(!bus.toggleDoors() ? 'Stop first' : bus.doorsOpen ? 'Doors open' : 'Doors closed'); break;
+    case 'doors': hud.toast(!bus.toggleDoors() ? t('stopFirst') : bus.doorsOpen ? t('doorsOpen') : t('doorsClosed')); break;
     case 'camera': cam.toggle(); break;
     case 'reset': void startLeg(legIndex); break;
     case 'leg1': void startLeg(0); break;
     case 'leg2': void startLeg(1); break;
     case 'leg3': void startLeg(2); break;
+    case 'lights':
+      lights.cycleHeadlights();
+      hud.toast(t(lights.headlights === 'off' ? 'lightsOff' : lights.headlights === 'parking' ? 'lightsParking' : 'lightsLow'));
+      break;
+    case 'highBeam': hud.toast(!lights.toggleHighBeam() ? t('highBeamNeedsLights') : t(lights.highBeam ? 'highBeamOn' : 'highBeamOff')); break;
+    case 'indicatorLeft': lights.signal('left'); break;
+    case 'indicatorRight': lights.signal('right'); break;
+    case 'hazard': lights.toggleHazard(); hud.toast(t(lights.hazard ? 'hazardOn' : 'hazardOff')); break;
+    case 'language': setLang(getLang() === 'bn' ? 'en' : 'bn'); hud.toast(t('language')); break;
+    case 'details': hud.showDetails = !hud.showDetails; break;
     case 'horn': break; // audio arrives in M9
   }
 });
 
-const EVENT_TEXT: Partial<Record<RunEvent['type'], (e: never) => string>> = {
-  arrived: (e: Extract<RunEvent, { type: 'arrived' }>) =>
-    `${e.stop}: ${Math.abs(e.lateS) <= 30 ? 'on time' : e.lateS > 0 ? `${Math.round(e.lateS)} s late` : `${Math.round(-e.lateS)} s early`}`,
-  departed: (e: Extract<RunEvent, { type: 'departed' }>) => (e.earlyS > 0 ? `Left ${e.stop} ${Math.round(e.earlyS)} s early!` : ''),
-  missed: (e: Extract<RunEvent, { type: 'missed' }>) => `Missed ${e.stop}!`,
-  leftBehind: (e: Extract<RunEvent, { type: 'leftBehind' }>) => `${e.count} passengers left behind at ${e.stop}`,
-  complaint: (e: Extract<RunEvent, { type: 'complaint' }>) => (e.standing ? `"Drive carefully!" (${e.standing} standing)` : ''),
-  collision: (e: Extract<RunEvent, { type: 'collision' }>) => `Collision! −৳ ${e.tk}`,
-  junction: (e: Extract<RunEvent, { type: 'junction' }>) => `Ran the ${e.name} junction! −৳ ${e.tk}`,
-};
+/** What to say about a Run event. Relaxed mode only mentions Stops; scored mode adds Fines. */
+function eventText(e: RunEvent): string {
+  switch (e.type) {
+    case 'arrived':
+      if (!scored) return place(e.stop);
+      return Math.abs(e.lateS) <= 30 ? t('onTime', { stop: place(e.stop) })
+        : e.lateS > 0 ? t('arrLate', { stop: place(e.stop), s: Math.round(e.lateS) }) : t('arrEarly', { stop: place(e.stop), s: Math.round(-e.lateS) });
+    case 'missed': return scored ? t('missed', { stop: place(e.stop) }) : t('passedStop', { stop: place(e.stop) });
+    case 'departed': return scored && e.earlyS > 0 ? t('leftEarly', { stop: place(e.stop), s: Math.round(e.earlyS) }) : '';
+    case 'leftBehind': return scored ? t('leftBehind', { n: e.count, stop: place(e.stop) }) : '';
+    case 'complaint': return scored && e.standing ? t('complaint', { n: e.standing }) : '';
+    case 'collision': return scored ? t('collision', { tk: e.tk }) : '';
+    case 'junction': return scored ? t('ranJunction', { name: place(e.name), tk: e.tk }) : '';
+    default: return '';
+  }
+}
 
 function handle(evs: RunEvent[]): void {
   for (const e of evs) {
-    const text = EVENT_TEXT[e.type]?.(e as never);
-    if (text) hud.toast(text);
+    hud.toast(eventText(e));
     if ((e.type === 'finished' || e.type === 'failed') && run && region) {
-      const { from, to } = region.route.legs[legIndex];
       const hasNext = legIndex < region.route.legs.length - 1;
-      results.show(`Leg ${legIndex + 1} · ${from} → ${to}`, run.result(), {
+      results.show(currentLeg(), run.result(), {
         retry: () => void startLeg(legIndex),
         next: hasNext ? () => void startLeg(legIndex + 1) : undefined,
       });
     }
   }
 }
-
-// Collisions: measure the speed lost over the few steps after the chassis hits a building or pillar.
-let impact: { startKmh: number; steps: number } | null = null;
-let jerkySeen = 0;
-let lastJunction: string | null = null; // junction the bus is inside, so each entry is judged once
 
 function onRoad(): boolean {
   if (!region) return true;
@@ -150,75 +175,48 @@ function onRoad(): boolean {
 }
 
 let hudTimer = 0;
-let readInput = () => input.read();
+let readInput = (): BusInput => input.read();
 
 function step(dt: number): void {
-    // Hold the simulation while the ground under the bus is still streaming in, or on the results screen.
-    if (results.visible || (region && !region.hasCollidersAt(busPos))) return;
-    const kmhBefore = Math.abs(bus.kmh);
-    bus.update(readInput(), dt);
-    junctions?.update(dt);
-    traffic?.update(dt, { x: busPos.x, z: busPos.z, hx: bus.forward.x, hz: bus.forward.z, speed: bus.speed });
-    world.step(events);
-    comfort.update(bus.body.linvel(), bus.forward, bus.right, dt);
-    const p = bus.body.translation();
-    busPos.set(p.x, p.y, p.z);
+  // Hold the simulation while the ground under the bus is still streaming in, or on the results screen.
+  if (results.visible || (region && !region.hasCollidersAt(busPos))) return;
+  const kmhBefore = Math.abs(bus.kmh);
+  const inp = readInput();
+  bus.update(inp, dt);
+  lights.update(dt, { brake: inp.brake, speed: bus.speed, gear: bus.gear, steerDeg: bus.steerDeg });
+  junctions?.update(dt);
+  traffic?.update(dt, { x: busPos.x, z: busPos.z, hx: bus.forward.x, hz: bus.forward.z, speed: bus.speed });
+  world.step(events);
+  comfort.update(bus.body.linvel(), bus.forward, bus.right, dt);
+  const p = bus.body.translation();
+  busPos.set(p.x, p.y, p.z);
 
-    events.drainCollisionEvents((h1, h2, started) => {
-      if (!started || !region || impact) return;
-      const other = h1 === bus.chassis.handle ? h2 : h2 === bus.chassis.handle ? h1 : -1;
-      const layer = other >= 0 ? region.layerOf(other) : undefined;
-      const vehicle = other >= 0 && !!traffic?.isVehicle(other);
-      if (vehicle) { traffic!.hit(other); hud.toast('Honk! Honk!'); }
-      if (vehicle || layer === 'building' || layer === 'wall' || layer === 'pillar') impact = { startKmh: kmhBefore, steps: 0 };
-    });
+  events.drainCollisionEvents((h1, h2, started) => {
+    if (!started || !region || impact) return;
+    const other = h1 === bus.chassis.handle ? h2 : h2 === bus.chassis.handle ? h1 : -1;
+    const layer = other >= 0 ? region.layerOf(other) : undefined;
+    const vehicle = other >= 0 && !!traffic?.isVehicle(other);
+    if (vehicle) { traffic!.hit(other); if (scored) hud.toast(t('honk')); }
+    if (vehicle || layer === 'building' || layer === 'wall' || layer === 'pillar') impact = { startKmh: kmhBefore, steps: 0 };
+  });
 
-    if (run && progress) {
-      if (impact && ++impact.steps >= 4) {
-        handle(run.collision(Math.max(0, impact.startKmh - Math.abs(bus.kmh))));
-        impact = null;
-      }
-      if (comfort.jerkyMoments > jerkySeen) { jerkySeen = comfort.jerkyMoments; handle(run.jerky()); }
-      // Entering a junction while the police hold the bus's direction is a Fine (SPEC §7).
-      const inJ = junctions?.inside(p.x, p.z) ?? null;
-      if (inJ && inJ.name !== lastJunction && junctions!.stateFor(inJ, bus.forward.x, bus.forward.z).stop) handle(run.junction(inJ.name));
-      lastJunction = inJ?.name ?? null;
-      progress.update(p.x, p.z);
-      handle(run.update(dt, {
-        routeIndex: progress.index, lateralM: progress.lateralM, kmh: bus.kmh, doorsOpen: bus.doorsOpen, onRoad: onRoad(),
-      }));
+  if (run && progress) {
+    if (impact && ++impact.steps >= 4) {
+      handle(run.collision(Math.max(0, impact.startKmh - Math.abs(bus.kmh))));
+      impact = null;
     }
-    if (p.y < -50) void startLeg(legIndex);
+    if (comfort.jerkyMoments > jerkySeen) { jerkySeen = comfort.jerkyMoments; handle(run.jerky()); }
+    // Entering a junction while the police hold the bus's direction (a Fine in scored mode, SPEC §7).
+    const inJ = junctions?.inside(p.x, p.z) ?? null;
+    if (inJ && inJ.name !== lastJunction && junctions!.stateFor(inJ, bus.forward.x, bus.forward.z).stop) handle(run.junction(inJ.name));
+    lastJunction = inJ?.name ?? null;
+    progress.update(p.x, p.z);
+    handle(run.update(dt, {
+      routeIndex: progress.index, lateralM: progress.lateralM, kmh: bus.kmh, doorsOpen: bus.doorsOpen, onRoad: onRoad(),
+    }));
+  }
+  if (p.y < -50) void startLeg(legIndex);
 }
-
-startLoop(
-  dt => { if (!paused) step(dt); },
-  frameDt => {
-    region?.update(busPos);
-    busView.sync(bus);
-    cam.update(busView.group, bus.forward, bus.up, frameDt);
-    renderer.render(scene, camera);
-    if ((hudTimer += frameDt) > 0.1) {
-      hudTimer = 0;
-      const next = run?.nextStop;
-      const km = region?.route.cumKm;
-      hud.render({
-        kmh: bus.kmh, gear: bus.gear, doorsOpen: bus.doorsOpen, comfort: comfort.comfortNow,
-        jerkyMoments: comfort.jerkyMoments, camera: cam.mode,
-        run: run && next && progress && km && region ? {
-          leg: `Leg ${legIndex + 1}: ${region.route.legs[legIndex].from} → ${region.route.legs[legIndex].to}`,
-          nextStop: next.name,
-          distanceM: Math.max(0, (km[next.index] - km[progress.index]) * 1000),
-          dueInS: next.scheduled + (next === run.stops[0] ? DWELL_ALLOWANCE_S : 0) - run.time,
-          departing: next === run.stops[0],
-          onboard: run.onboard.length, capacity: run.capacity, standing: run.standing,
-          taka: run.takaEarned, clockS: run.time,
-          junction: junctionAhead(),
-        } : undefined,
-      });
-    }
-  },
-);
 
 function junctionAhead() {
   if (!junctions) return undefined;
@@ -228,12 +226,43 @@ function junctionAhead() {
   return { name: a.j.name, stop: st.stop, secondsLeft: st.secondsLeft, distM: Math.max(0, a.dist) };
 }
 
+startLoop(
+  dt => { if (!paused) step(dt); },
+  frameDt => {
+    region?.update(busPos);
+    busView.sync(bus);
+    busView.syncLights(lights);
+    const inCab = cam.mode === 'cockpit';
+    busView.setCabVisible(inCab);
+    const next = run?.nextStop;
+    const km = region?.route.cumKm;
+    const nextDistM = next && progress && km ? Math.max(0, (km[next.index] - km[progress.index]) * 1000) : undefined;
+    busView.updateCab(frameDt, { kmh: bus.kmh, steerDeg: bus.steerDeg, doorsOpen: bus.doorsOpen, nextStop: next && place(next.name), nextDistM }, lights);
+    cam.update(busView.group, bus.forward, bus.up, frameDt);
+    busView.updateMirrors(renderer, scene);
+    renderer.render(scene, camera);
+    if ((hudTimer += frameDt) > 0.1) {
+      hudTimer = 0;
+      hud.render({
+        kmh: bus.kmh, gear: bus.gear, doorsOpen: bus.doorsOpen, comfort: comfort.comfortNow, jerkyMoments: comfort.jerkyMoments, inCab,
+        run: run && next && nextDistM !== undefined && region ? {
+          leg: currentLeg(), nextStop: next.name, distanceM: nextDistM,
+          dueInS: next.scheduled + (next === run.stops[0] ? DWELL_ALLOWANCE_S : 0) - run.time,
+          departing: next === run.stops[0],
+          onboard: run.onboard.length, capacity: run.capacity, standing: run.standing,
+          taka: run.takaEarned, clockS: run.time, scored, junction: junctionAhead(),
+        } : undefined,
+      });
+    }
+  },
+);
+
 void startLeg(0);
 
 if (import.meta.env.DEV) {
   Object.assign(window, {
     __game: {
-      bus, world, input, comfort, region, results, traffic, junctions,
+      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView,
       get run() { return run; }, get progress() { return progress; },
       startLeg, step, setPaused: (p: boolean) => { paused = p; },
       setInput: (fn: typeof readInput | null) => { readInput = fn ?? (() => input.read()); },
