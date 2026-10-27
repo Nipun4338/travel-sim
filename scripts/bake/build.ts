@@ -367,8 +367,9 @@ export function buildTrees(
   }
   // Scattered trees in green land use, on a jittered 15 m grid.
   const STEP = 15;
-  const xs = [...idx.nodes.values()].map(nd => nd.x), zs = [...idx.nodes.values()].map(nd => nd.z);
-  for (let x = Math.min(...xs); x < Math.max(...xs); x += STEP) for (let z = Math.min(...zs); z < Math.max(...zs); z += STEP) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const nd of idx.nodes.values()) { x0 = Math.min(x0, nd.x); x1 = Math.max(x1, nd.x); z0 = Math.min(z0, nd.z); z1 = Math.max(z1, nd.z); }
+  for (let x = x0; x < x1; x += STEP) for (let z = z0; z < z1; z += STEP) {
     const kind = ground.at(x, z);
     if ((kind === 'green' || kind === 'leafy') && hash01(x * 0.37 + z * 0.11) < 0.45) plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z));
   }

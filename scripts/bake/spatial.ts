@@ -32,8 +32,10 @@ export class PolygonIndex<T> {
     for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length]; area += a.x * b.y - b.x * a.y; }
     const id = this.polys.push({ ring, area: Math.abs(area / 2), data }) - 1;
     const xs = ring.map(p => p.x), zs = ring.map(p => p.y);
-    for (let gx = Math.floor(Math.min(...xs) / this.cell); gx <= Math.floor(Math.max(...xs) / this.cell); gx++) {
-      for (let gz = Math.floor(Math.min(...zs) / this.cell); gz <= Math.floor(Math.max(...zs) / this.cell); gz++) {
+    const gx0 = Math.floor(Math.min(...xs) / this.cell), gx1 = Math.floor(Math.max(...xs) / this.cell);
+    const gz0 = Math.floor(Math.min(...zs) / this.cell), gz1 = Math.floor(Math.max(...zs) / this.cell);
+    for (let gx = gx0; gx <= gx1; gx++) {
+      for (let gz = gz0; gz <= gz1; gz++) {
         const k = `${gx},${gz}`;
         if (!this.cells.has(k)) this.cells.set(k, []);
         this.cells.get(k)!.push(id);
