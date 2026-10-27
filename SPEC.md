@@ -74,7 +74,7 @@ A **custom TypeScript bake script** runs at build time and writes, per Region:
 **Rules:**
 - **Roads are graded into the terrain.** This matters for the Bandarban hairpins. The Bandarban road has no width or lane tags in OSM, so use defaults.
 - **Dual carriageways** are mapped in OSM as one-way pairs; the lane graph must route each Stop on the correct side.
-- **Elevated roads** are baked from OSM bridge ways as decks on pillars, stacked by `layer` because OSM has no height tags: the Elevated Expressway (`layer=3`), MRT Line 6 (`bridge=viaduct`, `layer=6`), and the Mohakhali and Kuril flyovers (`layer=1`). The Dhaka–Ashulia Elevated Expressway is baked *as under construction* (pillars and partial deck). The bus drives at ground level under all of them.
+- **Elevated roads** are baked from OSM bridge ways as decks (top, sides and underside) on pillars, stacked by `layer` because OSM has no height tags: the Elevated Expressway (`layer=3`), MRT Line 6 (`bridge=viaduct`, `layer=6`), and the Mohakhali and Kuril flyovers (`layer=1`). The Dhaka–Ashulia Elevated Expressway is baked *as under construction* (pillars and partial deck). The bus drives at ground level under all of them.
 - **Detail:**
   - Bus Mode: full detail within **~250 m** of the Route, with a low-detail backdrop beyond.
   - Flight Mode: the whole Flight Zone at low and medium detail, baked separately (`npm run bake:flight -- <zone>`, output in `public/zones/`). It does not reuse the corridor chunks: the two use different origins and chunk grids.

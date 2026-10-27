@@ -68,8 +68,8 @@ export class ChunkGeometry {
   }
 
   /**
-   * A ribbon along a polyline at per-point heights. With `thickness`, adds side faces down to
-   * y - thickness (used for elevated decks).
+   * A ribbon along a polyline at per-point heights. With `thickness`, adds side faces and an
+   * underside down to y - thickness (used for elevated decks).
    */
   ribbon(pts: V3[], width: number, color: THREE.Color, layer: ChunkLayer, lods: number[], thickness = 0, sideColor?: THREE.Color): void {
     if (pts.length < 2) return;
@@ -89,6 +89,8 @@ export class ChunkGeometry {
         const sc = sideColor ?? color;
         this.quad(L[i], L[i + 1], down(L[i + 1]), down(L[i]), sc, layer, lods);
         this.quad(down(R[i]), down(R[i + 1]), R[i + 1], R[i], sc, layer, lods);
+        // The soffit: seen from the street under a flyover, without it the deck is see-through.
+        this.quad(down(L[i]), down(L[i + 1]), down(R[i + 1]), down(R[i]), sc, layer, lods);
       }
     }
   }
