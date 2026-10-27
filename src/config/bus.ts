@@ -51,6 +51,13 @@ export const ARCADE_PLUS: BusHandling = {
 
 export const RAIN_GRIP = 1.2;
 
+/**
+ * Hill assist, standing in for a low gear: while the gas is pressed uphill, the engine gets this
+ * share of the slope's gravity pull as extra force. Flat-road handling is unchanged; without it
+ * the 18 kN Arcade-plus engine stalls above ~13% (Bandarban roads are steeper in places).
+ */
+export const HILL_ASSIST = 0.6;
+
 // Comfort limits for a Jerky Moment (SPEC §6).
 export const JERKY_LATERAL = 1.5;
 export const JERKY_LONGITUDINAL = 1.8;

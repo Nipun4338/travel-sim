@@ -11,11 +11,12 @@ import { getLang, place, setLang, t } from './i18n/i18n';
 import { BusView, CAB_EYE } from './render/BusView';
 import { createStage, VehicleCamera } from './render/stage';
 import { Junctions } from './traffic/junctions';
-import { TRAFFIC_CAP, Traffic, type QualityTier } from './traffic/Traffic';
+import { TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from './traffic/Traffic';
 import { BusHud } from './ui/hud';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
 import { RegionWorld } from './world/region';
+import { RoadMask } from './world/roadMask';
 import { buildTestTrack } from './world/testTrack';
 
 await RAPIER.init();
@@ -59,11 +60,16 @@ if (region) await region.prime(legPose(0).position);
 const quality = (params.get('quality') ?? 'medium') as QualityTier;
 let junctions: Junctions | null = null;
 let traffic: Traffic | null = null;
+let roadMask: RoadMask | null = null;
 if (region) {
   const lanes = await region.loadLanes();
+  roadMask = new RoadMask(lanes);
   junctions = new Junctions(lanes, region.route, scene);
   const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
-  traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[quality] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null);
+  traffic = new Traffic(
+    lanes, scene, world, junctions, TRAFFIC_CAP[quality] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null,
+    TRAFFIC_STYLES[regionId] ?? TRAFFIC_STYLES.dhaka,
+  );
 }
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
 document.getElementById('loading')?.remove();
@@ -165,13 +171,9 @@ function handle(evs: RunEvent[]): void {
   }
 }
 
+/** The bus counts as off the road once its centre is more than 1.5 m outside every carriageway. */
 function onRoad(): boolean {
-  if (!region) return true;
-  for (let i = 0; i < 4; i++) {
-    const ground = bus.vehicle.wheelGroundObject(i);
-    if (ground && region.layerOf(ground.handle) === 'road') return true;
-  }
-  return false;
+  return !roadMask || roadMask.onRoad(busPos.x, busPos.z, 1.5);
 }
 
 let hudTimer = 0;

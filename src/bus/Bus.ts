@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import {
-  ARCADE_PLUS, BUS_HALF_EXTENTS, BUS_INERTIA, BUS_MASS, BUS_WHEELS, SUSPENSION_REST, SUSPENSION_TRAVEL,
+  ARCADE_PLUS, BUS_HALF_EXTENTS, HILL_ASSIST, BUS_INERTIA, BUS_MASS, BUS_WHEELS, SUSPENSION_REST, SUSPENSION_TRAVEL,
   WHEEL_RADIUS, type BusHandling,
 } from '../config/bus';
 import type { BusInput } from '../core/input';
@@ -83,6 +83,7 @@ export class Bus {
       if (v > 0.5) brake = Math.max(brake, input.brake);
       else engine = -h.engineForce * h.reverseForceRatio * input.brake * Math.max(0, 1 + kmh / h.reverseTopKmh);
     }
+    if (engine > 0 && this.forward.y > 0) engine += (HILL_ASSIST * BUS_MASS * G * this.forward.y * input.gas) / 2; // per rear wheel
     if (!input.gas && !input.brake && Math.abs(v) < 0.3) brake = 0.3; // auto-hold when idle
     if (this.doorsOpen) { engine = 0; brake = 1; }
     this.gear = engine < 0 ? 'R' : Math.abs(v) < 0.3 && !input.gas ? 'N' : 'D';

@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { LOD_COUNT, type ChunkEntry, type LaneData, type RegionManifest, type RouteData } from '../../src/shared/region';
 import { buildBuildings, buildRoads, buildTerrain, buildTrees, buildWater, junctionGrid, landuseIndex, roadIndex } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
-import { copernicusWindow, overpass } from './fetch';
+import { copernicusWindow, overpass, type OsmWay } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
-import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, roadRank, roadWidth, routeThroughStops } from './osm';
+import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, roadRank, roadWidth, routeThroughStops, setWidthOverrides, type Indexed } from './osm';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex } from './spatial';
-import { groundSampler } from './terrain';
+import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
 
 const CREDITS = [
   'Map data © OpenStreetMap contributors, ODbL (openstreetmap.org/copyright)',
@@ -23,6 +23,7 @@ async function main() {
   if (!region) throw new Error(`Unknown region "${id}". Known: ${Object.keys(REGIONS).join(', ')}`);
   const raw = join('data', 'raw', id), out = join('public', 'regions', id);
   const proj = projection(region.origin);
+  setWidthOverrides(region.widths);
   const [s, w, n, e] = region.bbox;
   const t0 = Date.now();
   let tLast = Date.now();
@@ -40,12 +41,15 @@ async function main() {
   const stopXZ = region.stops.map(st => {
     const node = st.osmNode !== undefined ? roads.nodes.get(st.osmNode) : undefined;
     const [x, z] = node ? [node.x, node.z] : proj.toXZ(st.lat, st.lon);
-    return { x, z };
+    // Hand-placed Stops (no OSM node) may sit off the road, e.g. Chimbuk's Tourist Centre.
+    return { x, z, radius: node ? 90 : 250 };
   });
   const graph = buildGraph(roads);
   const routed = routeThroughStops(roads, graph, stopXZ);
   const { path, replaced, cuts } = cutUturnLoops(roads, routed.path);
   const stopNodes = routed.stopNodes.map(id => replaced.get(id) ?? id);
+  const snaps = stopNodes.map((id, i) => { const nd = roads.nodes.get(id)!; return `${region.stops[i].name} ${Math.hypot(nd.x - stopXZ[i].x, nd.z - stopXZ[i].z).toFixed(0)} m`; });
+  console.log(`      Stops snapped to the road: ${snaps.join(' · ')}`);
   console.log(`      cut ${cuts.length} U-turn detour(s)${cuts.length ? ': ' + cuts.join('; ') : ''}`);
   const routeXZ = path.map(id => { const nd = roads.nodes.get(id)!; return [nd.x, nd.z] as [number, number]; });
 
@@ -68,30 +72,37 @@ async function main() {
 
   console.log('[4/6] Reading the GLO-30 ground window');
   const dem = await copernicusWindow(region.bbox, join(raw, 'glo30.json'));
-  const h = groundSampler(dem, proj);
+  const natural = groundSampler(dem, proj, region.terrainFilter.minPx, region.terrainFilter.blurPx);
+  const h = region.gradeRoads ? gradedSampler(natural, gradingChains(roads)) : natural;
 
   console.log('[5/6] Building geometry');
   const geo = new ChunkGeometry();
   const [xMin, zMax] = proj.toXZ(s, w), [xMax, zMin] = proj.toXZ(n, e);
   const ground = landuseIndex(landuse);
   lap('setup');
-  buildTerrain(geo, h, ground, xMin, xMax, zMin, zMax);
+  const routeGrid = new PointGrid(region.corridorM);
+  densify(routeXZ, 40).forEach(([x, z]) => routeGrid.add(x, z));
+  const nearRoute = (x: number, z: number) => routeGrid.near(x, z, region.corridorM);
+  buildTerrain(geo, h, ground, xMin, xMax, zMin, zMax, region.terrainSpacing, nearRoute, region.defaultGround);
   lap('terrain');
   const majorRoads = roadIndex(roads, 2), allRoads = roadIndex(roads, 0);
   const onRoad = (x: number, z: number) => majorRoads.onRoad(x, z);
   const junctions = junctionGrid(roads);
-  const rd = buildRoads(geo, roads, h, onRoad, junctions);
+  const rd = buildRoads(geo, roads, h, onRoad, junctions, region.footpaths);
   lap('roads');
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);
-  const routeGrid = new PointGrid(region.corridorM);
-  densify(routeXZ, 40).forEach(([x, z]) => routeGrid.add(x, z));
-  const nearRoute = (x: number, z: number) => routeGrid.near(x, z, region.corridorM);
   const footprints = new PolygonIndex<true>(40);
   const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints);
   lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
-  const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions);
+  let forest: { buildings: PointGrid } | undefined;
+  if (region.forest) {
+    const buildings = new PointGrid(40);
+    for (const wy of blds.ways) if (wy.tags?.building) { const nd = blds.nodes.get(wy.nodes[0]); if (nd) buildings.add(nd.x, nd.z); }
+    forest = { buildings };
+  }
+  const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions, forest);
   lap('trees');
   console.log(`      ${trees} trees, ${geo.chunks.size} chunks`);
 
@@ -157,6 +168,61 @@ async function main() {
   const keep = new Set(['manifest.json', routeFile, lanesFile, ...chunks.flatMap(c => c.lods)]);
   for (const f of before) if (!keep.has(f)) rmSync(join(out, f));
   console.log(`Done in ${((Date.now() - t0) / 1000).toFixed(0)} s: ${chunks.length} chunks, ${(total / 1e6).toFixed(1)} MB of GLB`);
+}
+
+/**
+ * OSM splits one road into many ways (at bridges, junctions, tag changes). For grading, join
+ * consecutive pieces of the same named road into one chain, so a short piece between two bridges
+ * can't follow the stream bed while its neighbours don't. Points carry bridge flags.
+ */
+function gradingChains(roads: Indexed): GradedRoad[] {
+  const ways = roads.ways.filter(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway) && !isElevated(wy, roads));
+  const key = (wy: OsmWay) => `${roadRank(wy.tags!.highway)}|${wy.tags!.name ?? wy.tags!.ref ?? wy.id}`;
+  const groups = new Map<string, OsmWay[]>();
+  for (const wy of ways) { const k = key(wy); if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(wy); }
+  const chains: GradedRoad[] = [];
+  for (const group of groups.values()) {
+    const left = new Set(group);
+    while (left.size) {
+      const first = left.values().next().value as OsmWay;
+      left.delete(first);
+      const bridge = (wy: OsmWay) => !!wy.tags!.bridge && wy.tags!.bridge !== 'no';
+      let seq: Array<{ id: number; br: boolean }> = first.nodes.map(id => ({ id, br: bridge(first) }));
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const wy of left) {
+          const n = wy.nodes, a = n[0], b = n[n.length - 1], br = bridge(wy);
+          const tail = seq[seq.length - 1].id, head = seq[0].id;
+          const add = (ids: number[], atEnd: boolean) => {
+            const part = ids.map(id => ({ id, br }));
+            seq = atEnd ? [...seq, ...part.slice(1)] : [...part.slice(0, -1), ...seq];
+          };
+          if (a === tail) add(n, true);
+          else if (b === tail) add([...n].reverse(), true);
+          else if (b === head) add(n, false);
+          else if (a === head) add([...n].reverse(), false);
+          else continue;
+          left.delete(wy);
+          grew = true;
+        }
+      }
+      // Densify to ~8 m, remembering where each OSM node lands so junctions can be matched.
+      const nds = seq.filter(q => roads.nodes.has(q.id));
+      const pts: [number, number][] = [], bridgeAt: boolean[] = [], nodes: Array<{ id: number; at: number }> = [];
+      nds.forEach((q, i) => {
+        const nd = roads.nodes.get(q.id)!;
+        if (i > 0) {
+          const pv = roads.nodes.get(nds[i - 1].id)!, n = Math.max(1, Math.ceil(Math.hypot(nd.x - pv.x, nd.z - pv.z) / 8));
+          for (let k = 1; k < n; k++) { pts.push([pv.x + ((nd.x - pv.x) * k) / n, pv.z + ((nd.z - pv.z) * k) / n]); bridgeAt.push(q.br); }
+        }
+        nodes.push({ id: q.id, at: pts.length });
+        pts.push([nd.x, nd.z]);
+        bridgeAt.push(q.br && (i === 0 || nds[i - 1].br));
+      });
+      chains.push({ pts, half: roadWidth(first.tags!) / 2, rank: roadRank(first.tags!.highway), nodes, bridgeAt });
+    }
+  }
+  return chains;
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

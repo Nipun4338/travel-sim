@@ -95,18 +95,23 @@ export function landuseIndex(idx: Indexed): PolygonIndex<Ground> {
 }
 
 // ---------- terrain ----------
-export function buildTerrain(geo: ChunkGeometry, h: HeightSampler, ground: PolygonIndex<Ground>, xMin: number, xMax: number, zMin: number, zMax: number): void {
-  const spacing = [20, 50, 100];
+export function buildTerrain(
+  geo: ChunkGeometry, h: HeightSampler, ground: PolygonIndex<Ground>, xMin: number, xMax: number, zMin: number, zMax: number,
+  spacing: { near: number; far: number; lod1: number; lod2: number }, nearRoute: (x: number, z: number) => boolean, defaultGround: number,
+): void {
+  const base = color(defaultGround);
   const cx0 = Math.floor(xMin / CHUNK_SIZE), cx1 = Math.floor(xMax / CHUNK_SIZE);
   const cz0 = Math.floor(zMin / CHUNK_SIZE), cz1 = Math.floor(zMax / CHUNK_SIZE);
   for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) {
-    spacing.forEach((s, lod) => {
+    // Finer LOD 0 only in chunks the Route corridor touches.
+    const corridor = [0.1, 0.5, 0.9].some(fx => [0.1, 0.5, 0.9].some(fz => nearRoute((cx + fx) * CHUNK_SIZE, (cz + fz) * CHUNK_SIZE)));
+    [corridor ? spacing.near : spacing.far, spacing.lod1, spacing.lod2].forEach((s, lod) => {
       const n = CHUNK_SIZE / s;
       for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
         const x0 = cx * CHUNK_SIZE + i * s, z0 = cz * CHUNK_SIZE + j * s;
         const v = (x: number, z: number): V3 => [x, h(x, z), z];
         const kind = ground.at(x0 + s / 2, z0 + s / 2);
-        const c = kind ? C[kind] : C.ground;
+        const c = kind ? C[kind] : base;
         geo.quad(v(x0, z0), v(x0, z0 + s), v(x0 + s, z0 + s), v(x0 + s, z0), c, 'terrain', [lod]);
       }
     });
@@ -152,6 +157,7 @@ function dashes(pts: [number, number][], dash: number, space: number): [number, 
 
 export function buildRoads(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, onRoad: (x: number, z: number) => boolean, junctions: PointGrid,
+  footpaths = true,
 ): { pillars: number; skipped: number; crossings: number; footbridges: number } {
   let pillars = 0, skipped = 0, crossings = 0, footbridges = 0;
   const lift = (rank: number) => 0.12 + rank * 0.01; // major roads draw over minor ones at junctions
@@ -220,7 +226,7 @@ export function buildRoads(
       if (rank >= 4) { mark(-width / 2 + 0.3, C.white, false); mark(width / 2 - 0.3, C.white, false); }
       // Raised footpaths both sides; on dual carriageways the inner one reads as the median kerb.
       const fw = rank >= 4 ? 2.5 : 1.8;
-      for (const side of [-1, 1]) geo.ribbon(at(offsetLine(run, side * (width / 2 + fw / 2)), 0.3), fw, C.kerb, 'kerb', [0, 1], 0.18, C.kerbSide);
+      if (footpaths) for (const side of [-1, 1]) geo.ribbon(at(offsetLine(run, side * (width / 2 + fw / 2)), 0.3), fw, C.kerb, 'kerb', [0, 1], 0.18, C.kerbSide);
     }
   }
 
@@ -345,6 +351,7 @@ export function buildBuildings(
 export function buildTrees(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean, allRoads: SegmentIndex,
   footprints: PolygonIndex<true>, ground: PolygonIndex<Ground>, junctions: PointGrid,
+  forest?: { buildings: PointGrid },
 ): number {
   const canopy = new THREE.IcosahedronGeometry(2.4, 0);
   let n = 0;
@@ -371,7 +378,11 @@ export function buildTrees(
   for (const nd of idx.nodes.values()) { x0 = Math.min(x0, nd.x); x1 = Math.max(x1, nd.x); z0 = Math.min(z0, nd.z); z1 = Math.max(z1, nd.z); }
   for (let x = x0; x < x1; x += STEP) for (let z = z0; z < z1; z += STEP) {
     const kind = ground.at(x, z);
-    if ((kind === 'green' || kind === 'leafy') && hash01(x * 0.37 + z * 0.11) < 0.45) plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z));
+    // Hill forest: unmapped ground away from town buildings is wooded (OSM rarely maps it).
+    const wooded = forest && !kind && !forest.buildings.near(x, z, 35);
+    if ((kind === 'green' || kind === 'leafy' || wooded) && hash01(x * 0.37 + z * 0.11) < (wooded ? 0.6 : 0.45)) {
+      plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z));
+    }
   }
   return n;
 }

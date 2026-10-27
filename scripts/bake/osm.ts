@@ -30,10 +30,14 @@ const RANK: Record<string, number> = { motorway: 6, trunk: 5, primary: 4, second
 export const baseType = (hw: string) => hw.replace(/_link$/, '');
 export const roadRank = (hw: string) => RANK[baseType(hw)] ?? 0;
 
+let widthOverrides: Record<string, number> = {};
+/** Per-Region carriageway widths for highway types without a lanes tag (e.g. Bandarban's narrow hill roads). */
+export function setWidthOverrides(widths: Record<string, number> | undefined): void { widthOverrides = widths ?? {}; }
+
 export function roadWidth(tags: Record<string, string>): number {
   const lanes = parseInt(tags.lanes ?? '', 10);
   if (lanes > 0) return lanes * 3.2;
-  const w = DEFAULT_WIDTH[baseType(tags.highway)] ?? 5;
+  const w = widthOverrides[baseType(tags.highway)] ?? DEFAULT_WIDTH[baseType(tags.highway)] ?? 5;
   return tags.highway.endsWith('_link') ? Math.min(w, 6) : w;
 }
 
@@ -155,7 +159,7 @@ export function cutUturnLoops(idx: Indexed, path: number[], joinM = 45, minLoopM
  * correct carriageway of each dual carriageway instead of U-turning.
  */
 export function routeThroughStops(
-  idx: Indexed, g: Map<number, Edge[]>, stops: { x: number; z: number }[], candidates = 8, radius = 90,
+  idx: Indexed, g: Map<number, Edge[]>, stops: { x: number; z: number; radius?: number }[], candidates = 8, radius = 90,
 ): { path: number[]; stopNodes: number[] } {
   const major = new Set<number>();
   for (const w of idx.ways) {
@@ -165,8 +169,8 @@ export function routeThroughStops(
   const cands = stops.map((s, i) => {
     const near = [...major]
       .map(id => { const n = idx.nodes.get(id)!; return { id, d: Math.hypot(n.x - s.x, n.z - s.z) }; })
-      .filter(c => c.d < radius).sort((a, b) => a.d - b.d).slice(0, candidates);
-    if (!near.length) throw new Error(`Stop ${i} has no major-road node within ${radius} m`);
+      .filter(c => c.d < (s.radius ?? radius)).sort((a, b) => a.d - b.d).slice(0, candidates);
+    if (!near.length) throw new Error(`Stop ${i} has no major-road node within ${s.radius ?? radius} m`);
     return near;
   });
   // DP over candidate choices; cost = road distance + snapping distance.

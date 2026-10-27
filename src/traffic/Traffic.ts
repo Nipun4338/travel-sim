@@ -10,10 +10,21 @@ import { LaneNetwork, type Path } from './network';
 export type QualityTier = 'low' | 'medium' | 'high';
 export const TRAFFIC_CAP: Record<QualityTier, number> = { low: 25, medium: 45, high: 80 };
 
-const SIM_RADIUS = 400, DESPAWN_RADIUS = 480, SPAWN_MIN = 140;
+const SPAWN_MIN = 140;
 const MIN_GAP = 2.0;
-const DHAKA_MIX: Array<[VehicleType, number]> = [['bus', 0.2], ['cng', 0.3], ['car', 0.25], ['motorbike', 0.15], ['truck', 0.1]];
 const RICKSHAW_ZONE_M = 700;   // rickshaws only in the kerb lane around Farmgate (SPEC §7)
+
+/** Per-Region traffic (SPEC §7): Dhaka runs dense; Bandarban has ~1 vehicle per km, mostly jeeps. */
+export interface TrafficStyle {
+  mix: Array<[VehicleType, number]>;
+  radius: number;              // vehicles are simulated within this distance of the bus
+  maxVehicles?: number;        // further cap on top of the quality tier
+  hillRoad: boolean;           // hairpins: take the middle; meeting the bus head-on: pull in and slow
+}
+export const TRAFFIC_STYLES: Record<string, TrafficStyle> = {
+  dhaka: { mix: [['bus', 0.2], ['cng', 0.3], ['car', 0.25], ['motorbike', 0.15], ['truck', 0.1]], radius: 400, hillRoad: false },
+  bandarban: { mix: [['jeep', 0.55], ['truck', 0.15], ['cng', 0.15], ['motorbike', 0.15]], radius: 900, maxVehicles: 9, hillRoad: true },
+};
 
 interface Vehicle {
   type: VehicleType;
@@ -39,14 +50,16 @@ export class Traffic {
   private meshes = new Map<VehicleType, THREE.InstancedMesh>();
   private byCollider = new Map<number, Vehicle>();
   private time = 0;
+  private cap: number;
   private rnd: () => number;
   /** Event hook: a vehicle sounds its horn (audio arrives in M9). */
   onHonk: (type: VehicleType) => void = () => {};
 
   constructor(
     lanes: LaneData, scene: THREE.Scene, private world: RAPIER.World, private junctions: Junctions,
-    private cap: number, private rickshawCentre: { x: number; z: number } | null, seed = 7,
+    cap: number, private rickshawCentre: { x: number; z: number } | null, private style: TrafficStyle = TRAFFIC_STYLES.dhaka, seed = 7,
   ) {
+    this.cap = Math.min(cap, style.maxVehicles ?? cap);
     this.network = new LaneNetwork(lanes);
     let s = seed;
     this.rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
@@ -82,7 +95,7 @@ export class Traffic {
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
       this.network.sample(v.path, v.s, tmp);
-      if (Math.hypot(tmp.x - bus.x, tmp.z - bus.z) > DESPAWN_RADIUS) this.remove(i);
+      if (Math.hypot(tmp.x - bus.x, tmp.z - bus.z) > this.style.radius * 1.2) this.remove(i);
     }
     for (let tries = 0; tries < 6 && this.vehicles.length < this.cap; tries++) this.trySpawn(bus);
     for (const v of this.vehicles) this.drive(v, dt, bus);
@@ -142,8 +155,23 @@ export class Traffic {
         if (!blocked) v.lane = target;
       }
     }
-    const want = this.network.laneOffset(v.path, v.lane);
+    let want = this.network.laneOffset(v.path, v.lane);
+    if (this.style.hillRoad && v.path.way.dir === 0) {
+      // Meeting the bus head-on: pull in to the kerb and crawl past (the "squeeze past", SPEC §7).
+      const oncoming = along > 0 && along < 60 && bus.hx * hx + bus.hz * hz < -0.5 && lat < 6;
+      if (oncoming) { want -= 0.9; v.v = Math.min(v.v, 12 / 3.6); }
+      // Otherwise hug the middle of the road on hairpins.
+      else if (this.bendAhead(v) > 0.9) want *= 0.15;
+    }
     v.lateral += Math.max(-1.2 * dt, Math.min(1.2 * dt, want - v.lateral));
+  }
+
+  /** Heading change over the next ~30 m of the path, radians. */
+  private bendAhead(v: Vehicle): number {
+    const a = { x: 0, y: 0, z: 0, hx: 1, hz: 0 }, b = { x: 0, y: 0, z: 0, hx: 1, hz: 0 };
+    this.network.sample(v.path, v.s, a);
+    this.network.sample(v.path, Math.min(v.path.length, v.s + 30), b);
+    return Math.abs(Math.atan2(a.hx * b.hz - a.hz * b.hx, a.hx * b.hx + a.hz * b.hz));
   }
 
   private trySpawn(bus: BusObstacle): void {
@@ -152,15 +180,15 @@ export class Traffic {
     const s = this.rnd() * p.length;
     this.network.sample(p, s, tmp);
     const d = Math.hypot(tmp.x - bus.x, tmp.z - bus.z);
-    if (d < SPAWN_MIN || d > SIM_RADIUS) return;
+    if (d < SPAWN_MIN || d > this.style.radius) return;
     const lane = Math.floor(this.rnd() * p.lanes);
     const lateral = this.network.laneOffset(p, lane);
     if (this.vehicles.some(o => o.path === p && Math.abs(o.s - s) < 18 && Math.abs(o.lateral - lateral) < 1.6)) return;
 
-    let type: VehicleType = DHAKA_MIX[0][0];
+    let type: VehicleType = this.style.mix[0][0];
     const r = this.rnd();
     let acc = 0;
-    for (const [t, w] of DHAKA_MIX) { acc += w; if (r < acc) { type = t; break; } }
+    for (const [t, w] of this.style.mix) { acc += w; if (r < acc) { type = t; break; } }
     const rc = this.rickshawCentre;
     if (rc && lane === 0 && Math.hypot(tmp.x - rc.x, tmp.z - rc.z) < RICKSHAW_ZONE_M && this.rnd() < 0.2) type = 'rickshaw';
 

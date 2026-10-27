@@ -17,3 +17,4 @@ Milestones for building v1 from [SPEC.md](../SPEC.md). Each one ends with someth
 | M10 | **Landmarks** | 7 hero and 18 simple scripted low-poly models, placed | §10 |
 | M11 | **PWA, caching and deploy** | Workbox shell and Region caching, offline download, Cloudflare Pages deploy | §16, §17 |
 | M12 | **Verification pass** | the "Verify during the build" list in SPEC §18, including the minimum-phone 30 fps check | §18 |
+| M13 | **Dhaka Metro Rail simulator** (requested 2026-10-27, the project's final milestone) | a third mode: drive MRT Line 6 trains as realistically as possible. Real alignment, stations and platforms from OSM; the viaduct; train controls (master controller, brakes, doors); station dwell and timetable; signalling; the cab view and Bangla announcements. Its own decision round first (scope, realism level, data sources) | new SPEC section |
