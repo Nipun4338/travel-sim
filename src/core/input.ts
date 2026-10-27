@@ -7,12 +7,12 @@ export interface BusInput {
 }
 
 export type BusAction =
-  | 'doors' | 'horn' | 'camera' | 'reset' | 'leg1' | 'leg2' | 'leg3'
+  | 'doors' | 'horn' | 'camera' | 'reset'
   | 'lights' | 'highBeam' | 'indicatorLeft' | 'indicatorRight' | 'hazard' | 'language' | 'details' | 'map';
 
 // Light keys follow truck-sim conventions: L headlights, K high beam, Q/E indicators, X hazards.
 const ACTION_KEYS: Record<string, BusAction> = {
-  KeyF: 'doors', KeyH: 'horn', KeyV: 'camera', KeyR: 'reset', Digit1: 'leg1', Digit2: 'leg2', Digit3: 'leg3',
+  KeyF: 'doors', KeyH: 'horn', KeyV: 'camera', KeyR: 'reset',
   KeyL: 'lights', KeyK: 'highBeam', KeyQ: 'indicatorLeft', KeyE: 'indicatorRight', KeyX: 'hazard',
   Backquote: 'language', Tab: 'details', KeyM: 'map',
 };

@@ -11,6 +11,8 @@ export interface FlightHudState {
   goal?: string;               // e.g. "Ring 3/7 · 1.2 km"
   warn?: string;               // e.g. above the ceiling
   scored: boolean;
+  /** Metres above (+) or below (−) the glide path on a landing Challenge's final. */
+  glideM?: number;
 }
 
 const dist = (m: number) => (m < 1000 ? `${num(Math.round(m / 10) * 10)} ${t('m')}` : `${num((m / 1000).toFixed(1))} ${t('km')}`);
@@ -23,6 +25,9 @@ export class FlightHud {
   private details = document.createElement('div');
   private toastEl = document.createElement('div');
   private card = document.createElement('div');
+  private hdg = document.createElement('div');
+  private thr = document.createElement('div');
+  private glide = document.createElement('div');
   private toastTimer = 0;
   showDetails = false;
 
@@ -34,7 +39,10 @@ export class FlightHud {
     this.toastEl.className = 'toast';
     this.card.className = 'results';
     this.card.hidden = true;
-    document.body.append(this.strip, this.left, this.right, this.details, this.toastEl, this.card);
+    this.hdg.className = 'hud-corner tc';
+    this.thr.className = 'hud-corner bl';
+    this.glide.className = 'hud-corner br glide';
+    document.body.append(this.strip, this.left, this.right, this.details, this.toastEl, this.card, this.hdg, this.thr, this.glide);
   }
 
   toast(msg: string, ms = 2200): void {
@@ -53,7 +61,17 @@ export class FlightHud {
     if (s.stall) parts.push(`<span class="stall">${t('stall')}</span>`);
     this.strip.innerHTML = parts.join('<span class="sep"></span>');
     const chase = !s.inCockpit;
-    this.left.hidden = this.right.hidden = !chase;
+    this.left.hidden = this.right.hidden = this.hdg.hidden = this.thr.hidden = !chase;
+    // The glide-path cue helps in both views, on final only.
+    this.glide.hidden = s.glideM === undefined;
+    if (s.glideM !== undefined) {
+      const d = Math.round(s.glideM);
+      this.glide.innerHTML = `<label>${t('glidePath')}</label><b>${Math.abs(d) <= 5 ? t('glideOn') : d > 0 ? t('glideHigh', { m: d }) : t('glideLow', { m: -d })}</b>`;
+    }
+    if (chase) {
+      this.hdg.innerHTML = `${num(String(Math.round(s.headingDeg) % 360).padStart(3, '0'))}°`;
+      this.thr.innerHTML = `<label>${t('throttle')}</label><span class="bar" style="width:120px"><i style="width:${Math.round(s.throttle * 100)}%"></i></span>`;
+    }
     if (chase) {
       this.left.innerHTML = `<b>${num(Math.round(s.kmh))}</b> ${t('kmh')}`;
       this.right.innerHTML = `<b>${num(Math.round(s.altM))}</b> ${t('mAsl')}<br><span>${s.vsMs >= 0 ? '▲' : '▼'} ${num(Math.abs(s.vsMs).toFixed(1))} ${t('vsUnit')}</span>`;

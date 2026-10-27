@@ -3,6 +3,8 @@
 // default: a crash just puts you back at the start. `?mode=scored` adds Taka, stars and failing.
 import { OUTSIDE_ZONE_FAIL_S } from '../config/flight';
 import { startLoop } from '../core/loop';
+import { challengeUnlocked, landmarksFound, loadProgress, recordChallenge, recordLanding, saveLandmarks } from '../core/progress';
+import { effectiveQuality, loadSettings } from '../core/settings';
 import { getLang, num, place, setLang, t } from '../i18n/i18n';
 import { Atmosphere } from '../render/atmosphere';
 import { setMaterialConditions } from '../render/materials';
@@ -11,6 +13,7 @@ import { createStage } from '../render/stage';
 import type { ChallengeData, Spawn } from '../shared/zone';
 import { distText, FlightHud } from '../ui/flightHud';
 import { Minimap, type MapSeg } from '../ui/minimap';
+import { backToMenu, PauseMenu } from '../ui/pause';
 import { FlightCamera } from './camera';
 import { Challenge, gradeFor } from './challenge';
 import { FlightModel, runwayFrame, type FlightEvent } from './FlightModel';
@@ -21,9 +24,11 @@ import { ZoneWorld, type ZoneQuality } from './zone';
 import { conditionsMultiplier, pickConditions } from '../world/conditions';
 
 const params = new URLSearchParams(location.search);
-const scored = params.get('mode') === 'scored';
+// The menu's settings, unless the URL overrides them (handy for tests).
+const settings = loadSettings();
+const scored = params.has('mode') ? params.get('mode') === 'scored' : settings.scored;
 const zoneId = params.get('world') ?? 'dhaka';
-const quality = (params.get('quality') ?? 'medium') as ZoneQuality;
+const quality = (params.get('quality') ?? effectiveQuality(settings.quality)) as ZoneQuality;
 const FOG: Record<ZoneQuality, number> = { low: 9000, medium: 14000, high: 20000 };
 
 const { renderer, scene, camera, sun, hemi } = createStage({ far: FOG[quality] * 1.3, logDepth: true });
@@ -47,6 +52,7 @@ plane.turbulence = atmosphere.rainy ? 1 : 0;
 const view = new PlaneView(scene);
 const cam = new FlightCamera(camera, COCKPIT_EYE, renderer.domElement);
 const controls = new FlightControls();
+if (!params.has('invert')) controls.invert = settings.invertPitch;
 const rings = new RingView(scene);
 
 // Map: the zone's main roads and runways, at a 3 km radius.
@@ -58,11 +64,9 @@ for (const r of m.runways) roads.push([r.a.x, r.a.z, r.b.x, r.b.z, 60, false]);
 if (atmosphere.night || atmosphere.rainy || atmosphere.foggy) scene.add(...runwayLights(m.runways, (x, z) => zone.height(x, z)));
 if (atmosphere.night && zoneId === 'dhaka') scene.add(roadLights(mapData, (x, z) => zone.height(x, z)));
 
-// ---------- progress: landmarks found and Challenges done (localStorage until M11 saves) ----------
-const load = (key: string): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')); } catch { return new Set(); } };
-const save = (key: string, s: Set<string>) => { try { localStorage.setItem(key, JSON.stringify([...s])); } catch { /* storage blocked */ } };
-const LANDMARKS_KEY = 'travel-sim.landmarks', DONE_KEY = 'travel-sim.flight.done';
-const found = load(LANDMARKS_KEY), done = load(DONE_KEY);
+// ---------- progress: landmarks found (SPEC §15) ----------
+const found = landmarksFound();
+const ids = m.challenges.map(c => c.id);
 
 // ---------- session ----------
 let challenge: Challenge | null = null;
@@ -94,7 +98,7 @@ async function start(which: number | 'free'): Promise<void> {
     const data = m.challenges[which];
     if (!data) return;
     const prev = m.challenges[which - 1];
-    if (prev && !done.has(prev.id)) { hud.toast(t('locked', { prev: t(`ch.${prev.id}`) })); return; }
+    if (prev && !challengeUnlocked(loadProgress(), ids, which)) { hud.toast(t('locked', { prev: t(`ch.${prev.id}`) })); return; }
     current = data;
     challenge = new Challenge(data, scored, conditionsMultiplier(conditions));
     rings.set(data.rings);
@@ -110,6 +114,19 @@ async function start(which: number | 'free'): Promise<void> {
 }
 
 function restart(): void { void start(current ? m.challenges.indexOf(current) : 'free'); }
+const pauseMenu = new PauseMenu({ restart, onChange: p => { paused = p; } });
+
+/** Height above (+) or below (−) a 3° glide path to the landing runway, while on final. */
+function glideDeviation(): number | undefined {
+  if (!current || current.kind !== 'landing' || plane.onGround) return undefined;
+  const r = m.runways.find(rw => rw.ends.includes(current!.landOn ?? ''));
+  if (!r) return undefined;
+  const fromA = r.ends[0] === current.landOn, th = fromA ? r.a : r.b, end = fromA ? r.b : r.a;
+  const len = Math.hypot(end.x - th.x, end.z - th.z), ux = (end.x - th.x) / len, uz = (end.z - th.z) / len;
+  const out = -((plane.pos.x - th.x) * ux + (plane.pos.z - th.z) * uz);
+  if (out < 0 || out > 9000) return undefined;
+  return plane.pos.y - (r.y + out * Math.tan((3 * Math.PI) / 180) + 1.4);
+}
 
 function showEnd(data: ChallengeData, failedKey: string | null, result: Parameters<FlightHud['showResults']>[1]): void {
   paused = true;
@@ -117,6 +134,7 @@ function showEnd(data: ChallengeData, failedKey: string | null, result: Paramete
   const actions = [
     { label: t('flyAgain'), run: () => { paused = false; void start(idx); } },
     { label: t('freeFlight'), run: () => { paused = false; void start('free'); } },
+    { label: t('menu'), run: backToMenu },
   ];
   if (!failedKey && m.challenges[idx + 1]) actions.unshift({ label: t('nextChallenge'), run: () => { paused = false; void start(idx + 1); } });
   hud.showResults(t(`ch.${data.id}`), result, failedKey, actions);
@@ -130,10 +148,6 @@ controls.onAction((a: FlightAction) => {
     case 'details': hud.showDetails = !hud.showDetails; break;
     case 'map': hud.toast(t(minimap.toggle() ? 'mapOn' : 'mapOff')); break;
     case 'language': setLang(getLang() === 'bn' ? 'en' : 'bn'); hud.toast(t('language')); break;
-    case 'free': void start('free'); break;
-    case 'challenge1': void start(0); break;
-    case 'challenge2': void start(1); break;
-    case 'challenge3': void start(2); break;
   }
 });
 
@@ -143,6 +157,7 @@ function onEvent(e: FlightEvent): void {
     const g = gradeFor(e.touchdown.sinkMs);
     hud.toast(`${t('landed', { grade: t(`grade.${g}`) })} · ${num(e.touchdown.sinkMs.toFixed(1))} ${t('vsUnit')}${e.touchdown.runway ? '' : ' · ' + t('offField')}`, 3000);
     challenge?.touchdown(e.touchdown);
+    recordLanding(e.touchdown.sinkMs);
   }
   if (e.type === 'crash') {
     crashReason = `crash.${e.reason}`;
@@ -176,9 +191,9 @@ function step(dt: number): void {
     for (const ev of challenge.update(dt, { x: plane.pos.x, y: plane.pos.y, z: plane.pos.z, agl: plane.agl, onGround: plane.onGround, kmh: plane.kmh, offCentreM })) {
       if (ev.type === 'ring') hud.toast(ev.hit ? t('ring', { n: ev.n, of: ev.of }) : t('ringMissed', { n: ev.n }));
       if (ev.type === 'done') {
-        done.add(current.id);
-        save(DONE_KEY, done);
-        showEnd(current, null, ev.result);
+        const r = ev.result;
+        recordChallenge(current.id, { done: true, stars: scored ? r.stars : undefined, taka: scored ? r.taka : undefined, grade: r.landing?.onTarget ? r.landing.grade : undefined });
+        showEnd(current, null, r);
       }
     }
   } else {
@@ -186,7 +201,7 @@ function step(dt: number): void {
     for (const l of m.landmarks) {
       if (found.has(l.name) || Math.hypot(plane.pos.x - l.x, plane.pos.z - l.z) > l.radiusM || plane.agl > 1500) continue;
       found.add(l.name);
-      save(LANDMARKS_KEY, found);
+      saveLandmarks(found);
       minimap.setDone(found);
       const n = m.landmarks.filter(x => found.has(x.name)).length;
       hud.toast(t('landmarkFound', { name: place(l.name), n, of: m.landmarks.length }), 3500);
@@ -237,10 +252,10 @@ startLoop(step, frameDt => {
   renderer.render(scene, camera);
   if ((hudTimer += frameDt) > 0.1) {
     hudTimer = 0;
-    hud.render({ ...state, agl: plane.agl, inCockpit, outside: outsideS > 0, scored, ...goalText() });
+    hud.render({ ...state, agl: plane.agl, inCockpit, outside: outsideS > 0, scored, glideM: glideDeviation(), ...goalText() });
   }
 });
 
 if (import.meta.env.DEV) {
-  Object.assign(window, { __flight: { plane, zone, view, cam, controls, hud, renderer, start, step, get challenge() { return challenge; }, get current() { return current; }, setPaused: (p: boolean) => { paused = p; } } });
+  Object.assign(window, { __flight: { plane, zone, view, cam, controls, hud, renderer, start, step, pauseMenu, get challenge() { return challenge; }, get current() { return current; }, setPaused: (p: boolean) => { paused = p; } } });
 }

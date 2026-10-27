@@ -4,13 +4,10 @@
 import { onLangChange, t } from '../i18n/i18n';
 import type { FlightInput } from './FlightModel';
 
-export type FlightAction =
-  | 'camera' | 'reset' | 'landingLight' | 'details' | 'map' | 'language'
-  | 'free' | 'challenge1' | 'challenge2' | 'challenge3';
+export type FlightAction = 'camera' | 'reset' | 'landingLight' | 'details' | 'map' | 'language';
 
 const ACTION_KEYS: Record<string, FlightAction> = {
   KeyV: 'camera', KeyR: 'reset', KeyL: 'landingLight', Tab: 'details', KeyM: 'map', Backquote: 'language',
-  Digit0: 'free', Digit1: 'challenge1', Digit2: 'challenge2', Digit3: 'challenge3',
 };
 
 export class FlightControls {

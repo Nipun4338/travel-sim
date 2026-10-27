@@ -1,5 +1,8 @@
-// Picks the mode: Flight Mode with ?play=flight, Bus Mode otherwise (a mode-select screen arrives in M8).
-if (new URLSearchParams(location.search).get('play') === 'flight') await import('./flight/main');
-else await import('./main');
+// Picks the screen: the menus (SPEC §13) by default; ?play=bus|flight starts a trip with the
+// choices the menu put in the URL.
+const play = new URLSearchParams(location.search).get('play');
+if (play === 'flight') await import('./flight/main');
+else if (play === 'bus') await import('./main');
+else await (await import('./ui/menu')).showMenu();
 
 export {};

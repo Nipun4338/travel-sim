@@ -6,8 +6,10 @@ import { RouteProgress } from './bus/run/progress';
 import { Run, type RunEvent } from './bus/run/Run';
 import { DWELL_ALLOWANCE_S, RAIN_TIMETABLE_FACTOR, TARGET_KMH } from './config/scoring';
 import { Input, type BusInput } from './core/input';
+import { legUnlocked, loadProgress, recordLeg } from './core/progress';
+import { effectiveQuality, loadSettings } from './core/settings';
 import { startLoop } from './core/loop';
-import { getLang, place, setLang, t } from './i18n/i18n';
+import { getLang, legTitle, place, setLang, t } from './i18n/i18n';
 import { BusView, CAB_EYE } from './render/BusView';
 import { Atmosphere, type Tier } from './render/atmosphere';
 import { setMaterialConditions } from './render/materials';
@@ -16,6 +18,7 @@ import { Junctions } from './traffic/junctions';
 import { RAIN_TRAFFIC_FACTOR, TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from './traffic/Traffic';
 import { BusHud } from './ui/hud';
 import { Minimap } from './ui/minimap';
+import { backToMenu, PauseMenu } from './ui/pause';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
 import { RegionWorld } from './world/region';
@@ -37,10 +40,12 @@ const results = new ResultsScreen();
 // A relaxing drive by default; ?mode=scored turns on Taka, Fines, stars and failing Runs (a
 // setting in M8).
 const params = new URLSearchParams(location.search);
-const scored = params.get('mode') === 'scored';
+// The menu's settings, unless the URL overrides them (handy for tests).
+const settings = loadSettings();
+const scored = params.has('mode') ? params.get('mode') === 'scored' : settings.scored;
 
 // Time of day and weather (SPEC §9), fixed for the session; chunk materials must know before loading.
-const tier = (params.get('quality') ?? 'medium') as Tier;
+const tier = (params.get('quality') ?? effectiveQuality(settings.quality)) as Tier;
 const conditions = pickConditions(params.get('world') ?? 'dhaka', params);
 setMaterialConditions({ night: conditions.time === 'night', wet: conditions.weather === 'rain', sheen: tier !== 'low' });
 const atmosphere = new Atmosphere(scene, camera, conditions, { sun, hemi }, { tier, dayFar: 1500 });
@@ -62,15 +67,22 @@ if (!region) {
   testSpawns = [track.spawns.city, track.spawns.hill];
 }
 
+// A trip is a Leg (index 0..n−1) or the Full Route (index n), chosen in the menu's Run setup.
+const tripStops = (i: number) => {
+  const legs = region!.route.legs;
+  return i < legs.length ? { ...legs[i], full: false } : { from: legs[0].from, to: legs[legs.length - 1].to, full: true };
+};
+const legParam = params.get('leg');
+const initialTrip = region ? (legParam === 'full' ? region.route.legs.length : Math.max(0, Math.min(region.route.legs.length - 1, (parseInt(legParam ?? '1', 10) || 1) - 1))) : 0;
 const legPose = (leg: number): Pose => {
   if (!region) return testSpawns[Math.min(leg, testSpawns.length - 1)];
-  const from = region.route.legs[leg].from;
+  const from = tripStops(leg).from;
   return region.poseAt(region.route.stops.find(s => s.name === from)!.index);
 };
-if (region) await region.prime(legPose(0).position);
+if (region) await region.prime(legPose(initialTrip).position);
 
 // AI traffic and junction phases (SPEC §7); the quality tier picks the vehicle cap until M8 adds settings.
-const quality = (params.get('quality') ?? 'medium') as QualityTier;
+const quality = tier as QualityTier;
 let junctions: Junctions | null = null;
 let traffic: Traffic | null = null;
 let roadMask: RoadMask | null = null;
@@ -93,7 +105,7 @@ if (region) {
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
 document.getElementById('loading')?.remove();
 
-const bus = new Bus(world, legPose(0));
+const bus = new Bus(world, legPose(initialTrip));
 bus.wet = atmosphere.rainy;
 const busView = new BusView(scene);
 busView.setBeamStyle(tier !== 'low', atmosphere.night, atmosphere.rainy || atmosphere.foggy);
@@ -104,24 +116,21 @@ const input = new Input();
 mountBusTouchControls(input);
 
 // ---------- Runs (Bus Mode, SPEC §6); only on a baked Region ----------
-let legIndex = 0;
+let legIndex = initialTrip;
 let run: Run | null = null;
 let progress: RouteProgress | null = null;
-const busPos = legPose(0).position.clone();
+const busPos = legPose(initialTrip).position.clone();
 let paused = false; // dev hook for scripted tests
 let impact: { startKmh: number; steps: number } | null = null; // speed lost over a few steps after a hit
 let jerkySeen = 0;
 let lastJunction: string | null = null; // junction the bus is inside, so each entry is judged once
 
-const currentLeg = () => {
-  const l = region!.route.legs[legIndex];
-  return { n: legIndex + 1, from: l.from, to: l.to };
-};
+const currentLeg = () => ({ n: legIndex + 1, ...tripStops(legIndex) });
 
 async function startLeg(leg: number): Promise<void> {
   results.hide();
   const legs = region?.route.legs;
-  legIndex = legs ? Math.max(0, Math.min(leg, legs.length - 1)) : Math.min(leg, testSpawns.length - 1);
+  legIndex = legs ? Math.max(0, Math.min(leg, legs.length)) : Math.min(leg, testSpawns.length - 1);
   const pose = legPose(legIndex);
   // Load the destination first, and move the streaming centre with the bus, so a long jump
   // can't unload the colliders it lands on.
@@ -133,11 +142,11 @@ async function startLeg(leg: number): Promise<void> {
   traffic?.clear();
   lastJunction = null;
   if (region && legs) {
-    const { from, to } = legs[legIndex];
+    const { from, to } = tripStops(legIndex);
     const targetKmh = (TARGET_KMH[regionId] ?? 22) * (atmosphere.rainy ? RAIN_TIMETABLE_FACTOR : 1);
     run = new Run(region.route, from, to, targetKmh, legIndex + 1, scored, conditionsMultiplier(conditions));
     progress = new RouteProgress(region.route, region.route.stops.find(s => s.name === from)!.index);
-    hud.toast(t('boardHint', { n: legIndex + 1, from: place(from), to: place(to) }), 4000);
+    hud.toast(`${legTitle(currentLeg())}. ${t('boardHintShort')}`, 4000);
   }
 }
 
@@ -146,9 +155,6 @@ input.onAction(action => {
     case 'doors': hud.toast(!bus.toggleDoors() ? t('stopFirst') : bus.doorsOpen ? t('doorsOpen') : t('doorsClosed')); break;
     case 'camera': cam.toggle(); break;
     case 'reset': void startLeg(legIndex); break;
-    case 'leg1': void startLeg(0); break;
-    case 'leg2': void startLeg(1); break;
-    case 'leg3': void startLeg(2); break;
     case 'lights':
       lights.cycleHeadlights();
       hud.toast(t(lights.headlights === 'off' ? 'lightsOff' : lights.headlights === 'parking' ? 'lightsParking' : 'lightsLow'));
@@ -185,10 +191,22 @@ function handle(evs: RunEvent[]): void {
   for (const e of evs) {
     hud.toast(eventText(e));
     if ((e.type === 'finished' || e.type === 'failed') && run && region) {
-      const hasNext = legIndex < region.route.legs.length - 1;
-      results.show(currentLeg(), run.result(), {
-        retry: () => void startLeg(legIndex),
-        next: hasNext ? () => void startLeg(legIndex + 1) : undefined,
+      const r = run.result(), legs = region.route.legs.length;
+      const key = legIndex < legs ? legIndex + 1 : 'full';
+      if (r.status === 'finished') {
+        recordLeg(regionId, key, {
+          done: true, stars: scored ? Math.round((r.stars.punctuality + r.stars.comfort + r.stars.safety) / 3) : undefined,
+          taka: scored ? r.takaEarned : undefined, km: r.km, passengers: r.passengersCarried, stops: r.stopsServed,
+        });
+      }
+      // Next: the following Leg, then the Full Route once every Leg is done.
+      const nextTrip = legIndex + 1;
+      const hasNext = nextTrip < legs || (nextTrip === legs && legUnlocked(loadProgress(), regionId, 'full', legs));
+      paused = true;
+      results.show(currentLeg(), r, {
+        retry: () => { paused = false; void startLeg(legIndex); },
+        next: hasNext ? () => { paused = false; void startLeg(nextTrip); } : undefined,
+        menu: backToMenu,
       });
     }
   }
@@ -284,7 +302,8 @@ startLoop(
   },
 );
 
-void startLeg(0);
+void startLeg(initialTrip);
+const pauseMenu = new PauseMenu({ restart: () => void startLeg(legIndex), onChange: p => { paused = p; } });
 // After the boarding hint: today's conditions, and a reminder about headlights after dark.
 setTimeout(() => {
   const line = t('conditionsLine', { time: t(`time.${conditions.time}`), weather: t(`weather.${conditions.weather}`) });
@@ -294,7 +313,7 @@ setTimeout(() => {
 if (import.meta.env.DEV) {
   Object.assign(window, {
     __game: {
-      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView,
+      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView, pauseMenu,
       get run() { return run; }, get progress() { return progress; },
       startLeg, step, setPaused: (p: boolean) => { paused = p; },
       setInput: (fn: typeof readInput | null) => { readInput = fn ?? (() => input.read()); },

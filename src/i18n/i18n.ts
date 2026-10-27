@@ -59,7 +59,7 @@ const EN: Dict = {
   passengers: 'Passengers {n}/{cap} ({s} standing)', doorsOpen: 'Doors open', doorsClosed: 'Doors closed',
   stopFirst: 'Stop first', comfort: 'Comfort', jerky: 'jerky {n}', leg: 'Leg {n}: {from} → {to}',
   junction: '{name} junction {d} m', junctionStop: 'STOP', junctionGo: 'GO', details: 'Tab: details',
-  keys: 'W/S gas·brake · A/D steer · F doors · H horn · L lights · K high beam · Q/E indicators · X hazards · M map · V view · Tab details · ` language · R restart · 1/2/3 Leg',
+  keys: 'W/S gas·brake · A/D steer · F doors · H horn · L lights · K high beam · Q/E indicators · X hazards · M map · V view · Tab details · ` language · R restart · Esc pause',
   boardHint: 'Leg {n}: {from} → {to}. Open the doors (F) to board.',
   onTime: '{stop}: on time', arrLate: '{stop}: {s} s late', arrEarly: '{stop}: {s} s early', leftEarly: 'Left {stop} {s} s early!',
   missed: 'Missed {stop}!', leftBehind: '{n} left behind at {stop}', complaint: '"Drive carefully!" ({n} standing)',
@@ -90,11 +90,23 @@ const EN: Dict = {
   landingInfo: '{grade} · {sink} m/s · {off} m off the centreline · {past} m past the threshold', wrongRunway: 'Not on runway {r}',
   flyAgain: 'Fly again', nextChallenge: 'Next Challenge', mAsl: 'm', vsUnit: 'm/s', throttle: 'THR', landingLightShort: 'LDG LT',
   landingLightOn: 'Landing light on', landingLightOff: 'Landing light off', touchStick: 'drag = stick',
-  flightKeys: 'W/S pitch (W nose down) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · L landing light · V view · M map · Tab details · ` language · R restart · 0 free flight · 1/2/3 Challenge',
+  flightKeys: 'W/S pitch (W nose down) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · L landing light · V view · M map · Tab details · ` language · R restart · Esc pause',
   alt: 'Alt {m} m', agl: '{m} m above ground', vs: '{v} m/s', hdg: '{d}°', centreline: '{m} m off the centreline',
   'time.morning': 'Morning', 'time.midday': 'Midday', 'time.golden': 'Golden hour', 'time.night': 'Night',
   'weather.clear': 'Clear', 'weather.rain': 'Monsoon rain', 'weather.fog': 'Hill fog', 'ledger.conditions': 'Conditions bonus',
   nightHint: 'It is dark: headlights on (L)', conditionsLine: '{time} · {weather}',
+  // Menus (M8)
+  appTitle: 'Travel Sim', tagline: 'Dhaka and Bandarban by bus and by plane', busMode: 'Bus', flightMode: 'Plane',
+  busBlurb: 'Drive the real Routes and serve every Stop.', flightBlurb: 'Free flight and Challenges over the city and the hills.',
+  'region.dhaka': 'Dhaka', 'region.bandarban': 'Bandarban', drive: 'Drive', fly: 'Fly', career: 'Career',
+  careerKm: '{n} km driven', careerPax: '{n} passengers', careerStops: '{n} Stops served', careerLandings: '{n} landings',
+  careerBest: 'Best landing {v} m/s', careerTaka: '৳ {n} earned', settings: 'Settings', licences: 'Licences', back: 'Back', start: 'Start',
+  fullRoute: 'Full Route', lockedLeg: 'Finish Leg {n} first', lockedFull: 'Finish every Leg first', notPlayed: 'not played yet',
+  conditionsTitle: 'Time and weather', timeLabel: 'Time', weatherLabel: 'Weather', random: 'Random', takaBonus: 'Taka bonus ×{x}',
+  quality: 'Quality', 'q.auto': 'Auto', 'q.low': 'Low', 'q.medium': 'Medium', 'q.high': 'High', invertPitch: 'Invert pitch',
+  on: 'On', off: 'Off', languageLabel: 'Language', playStyle: 'Play style', relaxed: 'Relaxed', scoredStyle: 'Scored (Taka and stars)',
+  controls: 'Controls', notBakedShort: 'Not baked yet', paused: 'Paused', resume: 'Resume', restart: 'Restart', menu: 'Menu',
+  chooseRoute: 'Choose a trip', chooseFlight: 'Choose a flight', km1: '{n} km', bestTk: 'best ৳ {n}', mapLabel: 'Map', legN: 'Leg {n}', speedLabel: 'Speed', altitudeLabel: 'Altitude', airspeedLabel: 'Airspeed', glidePath: 'Glide path', glideHigh: '▼ high {m} m', glideLow: '▲ low {m} m', glideOn: '● on the path', boardHintShort: 'Open the doors (F) to board.', ringsCount: '{n} Rings',
   zoneNotBaked: 'Flight Zone "{id}" is not baked: run npm run bake:flight -- {id}', offField: 'off-field',
 };
 const BN: Dict = {
@@ -102,7 +114,7 @@ const BN: Dict = {
   passengers: 'যাত্রী {n}/{cap} ({s} জন দাঁড়িয়ে)', doorsOpen: 'দরজা খোলা', doorsClosed: 'দরজা বন্ধ',
   stopFirst: 'আগে থামুন', comfort: 'আরাম', jerky: 'ঝাঁকুনি {n}', leg: 'লেগ {n}: {from} → {to}',
   junction: '{name} মোড় {d} মি', junctionStop: 'থামুন', junctionGo: 'চলুন', details: 'Tab: বিস্তারিত',
-  keys: 'W/S গ্যাস·ব্রেক · A/D স্টিয়ারিং · F দরজা · H হর্ন · L বাতি · K হাই বিম · Q/E ইন্ডিকেটর · X হ্যাজার্ড · M মানচিত্র · V দৃশ্য · Tab বিস্তারিত · ` ভাষা · R আবার · 1/2/3 লেগ',
+  keys: 'W/S গ্যাস·ব্রেক · A/D স্টিয়ারিং · F দরজা · H হর্ন · L বাতি · K হাই বিম · Q/E ইন্ডিকেটর · X হ্যাজার্ড · M মানচিত্র · V দৃশ্য · Tab বিস্তারিত · ` ভাষা · R আবার · Esc বিরতি',
   boardHint: 'লেগ {n}: {from} → {to}। যাত্রী তুলতে দরজা খুলুন (F)।',
   onTime: '{stop}: সময়মতো', arrLate: '{stop}: {s} সেকেন্ড দেরি', arrEarly: '{stop}: {s} সেকেন্ড আগে', leftEarly: '{stop} থেকে {s} সেকেন্ড আগে ছেড়েছেন!',
   missed: '{stop} বাদ পড়েছে!', leftBehind: '{stop}-এ {n} জন রয়ে গেল', complaint: '"আস্তে চালান!" ({n} জন দাঁড়িয়ে)',
@@ -132,13 +144,33 @@ const BN: Dict = {
   landingInfo: '{grade} · {sink} মি/সে · মধ্যরেখা থেকে {off} মি · থ্রেশহোল্ড পেরিয়ে {past} মি', wrongRunway: 'রানওয়ে {r}-এ নয়',
   flyAgain: 'আবার উড়ুন', nextChallenge: 'পরের চ্যালেঞ্জ', mAsl: 'মি', vsUnit: 'মি/সে', throttle: 'থ্রটল', landingLightShort: 'ল্যান্ডিং লাইট',
   landingLightOn: 'ল্যান্ডিং লাইট চালু', landingLightOff: 'ল্যান্ডিং লাইট বন্ধ', touchStick: 'টানুন = স্টিক',
-  flightKeys: 'W/S নাক ওঠানো-নামানো (W = নাক নিচে) · A/D কাত · Q/E রাডার · Shift/Z থ্রটল · B ব্রেক · L ল্যান্ডিং লাইট · V দৃশ্য · M মানচিত্র · Tab বিস্তারিত · ` ভাষা · R আবার · 0 মুক্ত উড্ডয়ন · 1/2/3 চ্যালেঞ্জ',
+  flightKeys: 'W/S নাক ওঠানো-নামানো (W = নাক নিচে) · A/D কাত · Q/E রাডার · Shift/Z থ্রটল · B ব্রেক · L ল্যান্ডিং লাইট · V দৃশ্য · M মানচিত্র · Tab বিস্তারিত · ` ভাষা · R আবার · Esc বিরতি',
   alt: 'উচ্চতা {m} মি', agl: 'মাটি থেকে {m} মি', vs: '{v} মি/সে', hdg: '{d}°', centreline: 'মধ্যরেখা থেকে {m} মি',
   'time.morning': 'সকাল', 'time.midday': 'দুপুর', 'time.golden': 'বিকেল', 'time.night': 'রাত',
   'weather.clear': 'পরিষ্কার আকাশ', 'weather.rain': 'বর্ষার বৃষ্টি', 'weather.fog': 'পাহাড়ি কুয়াশা', 'ledger.conditions': 'আবহাওয়া বোনাস',
   nightHint: 'অন্ধকার: হেডলাইট জ্বালান (L)', conditionsLine: '{time} · {weather}',
+  // মেনু (M8)
+  appTitle: 'ট্রাভেল সিম', tagline: 'বাস আর বিমানে ঢাকা ও বান্দরবান', busMode: 'বাস', flightMode: 'বিমান',
+  busBlurb: 'আসল রুটে বাস চালান, প্রতিটি স্টপে যাত্রী তুলুন।', flightBlurb: 'শহর আর পাহাড়ের ওপর মুক্ত উড্ডয়ন ও চ্যালেঞ্জ।',
+  'region.dhaka': 'ঢাকা', 'region.bandarban': 'বান্দরবান', drive: 'চালান', fly: 'উড়ুন', career: 'ক্যারিয়ার',
+  careerKm: '{n} কিমি চালানো', careerPax: '{n} জন যাত্রী', careerStops: '{n}টি স্টপে থামা', careerLandings: '{n}টি অবতরণ',
+  careerBest: 'সেরা অবতরণ {v} মি/সে', careerTaka: '৳ {n} আয়', settings: 'সেটিংস', licences: 'লাইসেন্স', back: 'ফিরে যান', start: 'শুরু',
+  fullRoute: 'পুরো রুট', lockedLeg: 'আগে লেগ {n} শেষ করুন', lockedFull: 'আগে সব লেগ শেষ করুন', notPlayed: 'এখনও খেলা হয়নি',
+  conditionsTitle: 'সময় ও আবহাওয়া', timeLabel: 'সময়', weatherLabel: 'আবহাওয়া', random: 'যেকোনো', takaBonus: 'আয় বোনাস ×{x}',
+  quality: 'গ্রাফিক্সের মান', 'q.auto': 'স্বয়ংক্রিয়', 'q.low': 'কম', 'q.medium': 'মাঝারি', 'q.high': 'উচ্চ', invertPitch: 'পিচ উল্টো',
+  on: 'চালু', off: 'বন্ধ', languageLabel: 'ভাষা', playStyle: 'খেলার ধরন', relaxed: 'আরামে', scoredStyle: 'পয়েন্টসহ (টাকা ও তারা)',
+  controls: 'নিয়ন্ত্রণ', notBakedShort: 'এখনও তৈরি হয়নি', paused: 'বিরতি', resume: 'চালিয়ে যান', restart: 'আবার শুরু', menu: 'মেনু',
+  chooseRoute: 'যাত্রা বেছে নিন', chooseFlight: 'ফ্লাইট বেছে নিন', km1: '{n} কিমি', bestTk: 'সেরা ৳ {n}', mapLabel: 'মানচিত্র', legN: 'লেগ {n}', speedLabel: 'গতি', altitudeLabel: 'উচ্চতা', airspeedLabel: 'গতি', glidePath: 'অবতরণ পথ', glideHigh: '▼ {m} মি উঁচুতে', glideLow: '▲ {m} মি নিচুতে', glideOn: '● ঠিক পথে', boardHintShort: 'যাত্রী তুলতে দরজা খুলুন (F)।', ringsCount: '{n}টি রিং',
   zoneNotBaked: '"{id}" ফ্লাইট এলাকা তৈরি হয়নি: npm run bake:flight -- {id} চালান', offField: 'রানওয়ের বাইরে',
 };
+
+/** "Leg 2: Mohakhali → Kuril", or "Full Route: …" for the whole Route. */
+export function legTitle(l: { n: number; from: string; to: string; full?: boolean }): string {
+  return l.full ? `${t('fullRoute')}: ${place(l.from)} → ${place(l.to)}` : t('leg', { n: l.n, from: place(l.from), to: place(l.to) });
+}
+
+/** A label in the other language, shown small beside the main one (bus-art menus are bilingual). */
+export function tAlt(key: string): string { return (lang === 'bn' ? EN : BN)[key] ?? EN[key] ?? key; }
 
 /** Translated text with {placeholders}. Numbers passed as params are shown in the current digits. */
 export function t(key: string, params: Record<string, string | number> = {}): string {

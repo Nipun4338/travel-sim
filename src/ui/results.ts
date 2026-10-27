@@ -1,12 +1,12 @@
 // End-of-Leg screen. Relaxed (default): a calm trip summary. Scored mode adds the Taka breakdown
 // and stars (SPEC §6). Plain styling for now; the bus-art look comes in M8.
 import type { LedgerKind, RunResult } from '../bus/run/Run';
-import { amount, clock, num, place, t } from '../i18n/i18n';
+import { amount, clock, legTitle, num, t } from '../i18n/i18n';
 
 const tk = (n: number) => `${n < 0 ? '−' : ''}৳ ${amount(Math.abs(n))}`;
 const starText = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
-export interface ResultsActions { retry: () => void; next?: () => void; }
+export interface ResultsActions { retry: () => void; next?: () => void; menu: () => void; }
 
 export class ResultsScreen {
   private el = document.createElement('div');
@@ -19,8 +19,8 @@ export class ResultsScreen {
 
   get visible(): boolean { return !this.el.hidden; }
 
-  show(leg: { n: number; from: string; to: string }, r: RunResult, actions: ResultsActions): void {
-    const title = t('leg', { n: leg.n, from: place(leg.from), to: place(leg.to) });
+  show(leg: { n: number; from: string; to: string; full?: boolean }, r: RunResult, actions: ResultsActions): void {
+    const title = legTitle(leg);
     const time = clock(r.seconds);
     let body: string;
     if (!r.scored) {
@@ -44,7 +44,9 @@ export class ResultsScreen {
       <div class="buttons">
         ${actions.next && r.status === 'finished' ? `<button data-a="next">${t('nextLeg')}</button>` : ''}
         <button data-a="retry">${t('retry')}</button>
+        <button data-a="menu">${t('menu')}</button>
       </div></div>`;
+    this.el.querySelector('[data-a="menu"]')!.addEventListener('click', actions.menu);
     this.el.querySelector('[data-a="retry"]')!.addEventListener('click', () => { this.hide(); actions.retry(); });
     this.el.querySelector('[data-a="next"]')?.addEventListener('click', () => { this.hide(); actions.next!(); });
     this.el.hidden = false;

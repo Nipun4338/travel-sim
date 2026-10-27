@@ -87,3 +87,95 @@ canvas { display: block; touch-action: none; }
 .wipers i:first-child { right: 52%; }
 .wipers i:last-child { right: 14%; animation-delay: .05s; }
 @keyframes wipe { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(-160deg); } }
+
+/* ===================== M8: "Bus art" (SPEC §13) =====================
+   Dhaka bus and rickshaw-art palette, chunky rounded type, patterned borders. These rules come
+   last so they restyle the earlier HUD pieces. */
+:root {
+  --maroon: #7b1e3a; --plum: #2e1a47; --yellow: #f7c600; --cream: #ffe9a8; --teal: #16a085; --red: #e74c3c; --blue: #2e86c1;
+  --art-border: repeating-linear-gradient(90deg, var(--yellow) 0 14px, var(--teal) 14px 28px, var(--red) 28px 42px, var(--blue) 42px 56px);
+  --art-font: "Baloo Da 2", "Noto Sans Bengali", system-ui, sans-serif;
+}
+.hud-strip, .toast, .results, .menu-screen, .pause, .hud-corner, .flight-read, .hud-details { font-family: var(--art-font); }
+
+/* Next-Stop banner: teal with a yellow rim. */
+.hud-strip { background: var(--teal); border: 3px solid var(--yellow); border-radius: 16px; padding: 3px 16px; font-size: 16px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+.hud-strip b { color: #fff; }
+.hud-strip .sep { background: rgba(255,233,168,.6); }
+.hud-strip .stop { color: #fff; background: var(--red); padding: 0 6px; border-radius: 6px; }
+.hud-strip .go { color: var(--plum); background: var(--yellow); padding: 0 6px; border-radius: 6px; }
+.toast { top: 56px; background: rgba(123,30,58,.88); border: 2px solid var(--yellow); }
+.hud-details { background: rgba(46,26,71,.9); color: #fff; border: 2px solid var(--yellow); }
+.hud-details .keys, .hud-details .leg { color: var(--cream); }
+.flight-read { background: rgba(123,30,58,.82); border: 2px solid var(--yellow); }
+.flight-read b { color: var(--yellow); }
+
+/* Corner widgets (scored mode, and flight extras in the chase view). */
+.hud-corner { position: fixed; background: rgba(123,30,58,.85); color: #fff; border: 2px solid var(--yellow); border-radius: 12px; padding: 6px 10px; font-size: 13px; pointer-events: none; }
+.hud-corner[hidden] { display: none; }
+.hud-corner label { display: block; font-size: 11px; color: var(--cream); }
+.hud-corner .num { font-size: 26px; font-weight: 800; color: var(--yellow); line-height: 1; }
+.hud-corner.tr { top: 12px; right: 12px; min-width: 150px; }
+.hud-corner.bl { left: 12px; bottom: 12px; }
+.hud-corner.br { right: 12px; bottom: 12px; }
+.hud-corner.tc { top: 50px; left: 50%; transform: translateX(-50%); padding: 2px 12px; }
+.hud-corner .bar { display: block; height: 7px; background: rgba(255,255,255,.25); border-radius: 4px; overflow: hidden; margin-top: 3px; }
+.hud-corner .bar i { display: block; height: 100%; background: var(--yellow); }
+.hud-corner .bar i.low { background: var(--red); }
+.pause-btn { position: fixed; right: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 12px; border: 2px solid var(--yellow); background: rgba(123,30,58,.85); color: var(--yellow); font: 800 18px var(--art-font); cursor: pointer; }
+@media (pointer: coarse) { .pause-btn { right: auto; left: 50%; top: 8px; bottom: auto; transform: translateX(150px); width: 36px; height: 36px; } .hud-corner.bl, .hud-corner.br { display: none; } }
+
+/* Minimap: top-left in both modes (SPEC §13); on touch it stays top-left, smaller. */
+.minimap { right: auto; bottom: auto; left: 12px; top: 12px; border: 3px solid var(--yellow); }
+
+/* Results and pause cards. */
+.results, .pause { background: rgba(46,26,71,.55); }
+.results .panel, .pause .panel { background: linear-gradient(160deg, var(--maroon), var(--plum)); color: #fff; border: 3px solid var(--yellow); border-radius: 18px; }
+.results h2, .pause h2 { color: var(--yellow); }
+.results .sub { color: var(--cream); }
+.results td.neg { color: #ff8f80; }
+.results tr.total td { border-top-color: var(--yellow); }
+.results .stars, .results .stars b { color: var(--yellow); }
+.results button, .pause button { font: 800 15px var(--art-font); border: 2px solid var(--yellow); background: transparent; color: var(--yellow); border-radius: 12px; }
+.results button:first-child, .pause button:first-child { background: var(--yellow); color: var(--maroon); }
+.pause { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20; }
+.pause[hidden] { display: none; }
+.pause .panel { padding: 16px 22px; min-width: 260px; text-align: center; }
+.pause .buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pause button { padding: 8px 16px; cursor: pointer; }
+
+/* Menus: rickshaw-art background, tile cards. */
+.menu-screen { position: fixed; inset: 0; overflow: auto; color: #fff; padding: 16px; box-sizing: border-box;
+  background: radial-gradient(circle at 12% 18%, var(--yellow) 0 4%, transparent 4.5%), radial-gradient(circle at 88% 26%, var(--red) 0 3.5%, transparent 4%),
+    radial-gradient(circle at 78% 86%, var(--teal) 0 5%, transparent 5.5%), linear-gradient(135deg, var(--maroon), var(--plum)); }
+.menu-top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; border-bottom: 6px solid transparent; border-image: var(--art-border) 6; padding-bottom: 8px; margin-bottom: 16px; }
+.menu-top h1 { margin: 0; font-size: 34px; font-weight: 800; color: var(--yellow); }
+.menu-top span { color: var(--cream); font-size: 15px; }
+.menu-top .lang { margin-left: auto; }
+.menu-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+.menu-screen .panel { background: rgba(0,0,0,.35); border: 3px solid var(--yellow); border-radius: 18px; padding: 12px 16px; min-width: 260px; max-width: 520px; flex: 1 1 280px; }
+.menu-screen h2 { margin: 0 0 6px; color: var(--yellow); font-size: 22px; font-weight: 800; }
+.menu-screen h2 small { display: block; font-size: 12px; color: var(--cream); font-weight: 500; }
+.menu-screen .card.bus { background: rgba(22,160,133,.85); }
+.menu-screen .card.flight { background: rgba(46,134,193,.85); }
+.menu-screen .btn { display: inline-block; font: 800 16px var(--art-font); background: var(--yellow); color: var(--maroon); border: 0; border-radius: 12px; padding: 6px 14px; margin: 4px 6px 0 0; cursor: pointer; }
+.menu-screen .btn.alt { background: transparent; color: var(--yellow); border: 2px solid var(--yellow); }
+.menu-screen .chip { font: 600 14px var(--art-font); border: 2px solid var(--cream); background: transparent; color: #fff; border-radius: 10px; padding: 1px 10px; margin: 2px; cursor: pointer; }
+.menu-screen .chip.on { background: var(--red); border-color: var(--yellow); }
+.menu-screen .chips { margin: 6px 0; }
+.menu-screen .chips b { display: inline-block; min-width: 90px; color: var(--cream); }
+.menu-screen .links { margin-top: 10px; }
+.menu-screen .bonus { color: var(--yellow); font-weight: 800; margin-top: 6px; }
+.menu-screen .trip { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; padding: 6px 10px; border: 2px solid transparent; border-radius: 12px; cursor: pointer; }
+.menu-screen .trip.on { border-color: var(--yellow); background: rgba(247,198,0,.12); }
+.menu-screen .trip.locked { opacity: .5; cursor: default; }
+.menu-screen .trip .res { grid-column: 2; font-size: 12px; color: var(--cream); }
+.menu-screen .stars { color: var(--yellow); letter-spacing: 2px; }
+.menu-screen .licences p { font-size: 12px; color: var(--cream); }
+.menu-screen .keys p { font-size: 13px; color: var(--cream); }
+.hud-corner.br { bottom: 64px; }
+.hud-corner.glide b { color: var(--yellow); font-size: 16px; }
+/* On phones the bottom corners are the touch controls: the glide cue moves under the heading. */
+@media (pointer: coarse) { .hud-corner.glide { display: block; bottom: auto; right: auto; top: 86px; left: 50%; transform: translateX(-50%); } .hud-corner.glide[hidden] { display: none; } }
+/* Toasts sit below the banner and the flight heading badge. */
+.toast { top: 92px; }

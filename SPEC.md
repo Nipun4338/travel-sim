@@ -325,6 +325,11 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
   - results;
   - settings: quality, invert pitch, language, storage per Region with Delete, export/import save code;
   - licences.
+- **As built (M8):**
+  - The game opens on the mode select; starting a trip loads it with its choices in the URL (`?play=bus|flight&world=…&leg=1..3|full` or `&challenge=1..3`, `&time=`, `&weather=`), and Menu returns there. Pause is Esc or the ❚❚ button: resume, restart, menu.
+  - Driving view first: in relaxed mode the HUD is the next-Stop banner, the minimap (top-left), speed bottom-left in the chase view, and pause. Taka, passengers and comfort appear top-right only in scored mode; details stay behind Tab.
+  - Flight adds heading top-centre, airspeed and altitude at the sides and throttle bottom-left in the chase view, and a glide-path cue (bottom-right, under the heading on phones) on the landing Challenge's final.
+  - Settings: language, quality (Auto picks Low on phones), play style (relaxed or scored), invert pitch, and the controls list. Storage per Region and the save code arrive with M11 and M9; progress and career stats are kept in localStorage until M9.
 - **Language (revised 2026-10-27):** **বাংলা by default**, English optional. That covers Bangla text and Stop names, Bangla numerals (৳ ১,২৪০, ৩৫ কিমি/ঘণ্টা) and the Noto Sans Bengali font. The choice is remembered on the device.
 
 ## 14. Audio
