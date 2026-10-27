@@ -19,12 +19,12 @@ async function getIO(): Promise<NodeIO> {
 }
 
 /** One GLB per chunk LOD; each layer becomes a named node so the game can pick collider layers. */
-export async function encodeChunk(layers: Map<ChunkLayer, { pos: number[]; col: number[] }>): Promise<Uint8Array> {
+export async function encodeChunk(layers: Map<ChunkLayer, { pos: number[]; col: number[]; uv?: number[] }>): Promise<Uint8Array> {
   const doc = new Document();
   const buffer = doc.createBuffer();
   const scene = doc.createScene();
   const material = doc.createMaterial('flat').setBaseColorFactor([1, 1, 1, 1]).setRoughnessFactor(1).setMetallicFactor(0);
-  for (const [name, { pos, col }] of layers) {
+  for (const [name, { pos, col, uv }] of layers) {
     if (!pos.length) continue;
     const n = pos.length / 3;
     const prim = doc.createPrimitive()
@@ -32,6 +32,7 @@ export async function encodeChunk(layers: Map<ChunkLayer, { pos: number[]; col: 
       .setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(new Float32Array(col)).setBuffer(buffer))
       .setIndices(doc.createAccessor().setType('SCALAR').setArray(Uint32Array.from({ length: n }, (_, i) => i)).setBuffer(buffer))
       .setMaterial(material);
+    if (uv) prim.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(new Float32Array(uv)).setBuffer(buffer));
     scene.addChild(doc.createNode(name).setMesh(doc.createMesh(name).addPrimitive(prim)));
   }
   await doc.transform(weld(), reorder({ encoder: MeshoptEncoder }), quantize());

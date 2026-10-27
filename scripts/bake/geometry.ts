@@ -3,8 +3,9 @@ import * as THREE from 'three';
 import { CHUNK_SIZE, LOD_COUNT, type ChunkLayer } from '../../src/shared/region';
 
 export type V3 = [number, number, number];
+export type UV = [number, number];
 
-interface LayerBuf { pos: number[]; col: number[]; }
+interface LayerBuf { pos: number[]; col: number[]; uv?: number[]; }
 type ChunkBufs = Map<ChunkLayer, LayerBuf>;
 
 export class ChunkGeometry {
@@ -24,19 +25,33 @@ export class ChunkGeometry {
     return b;
   }
 
-  /** Adds a triangle to every LOD in `lods`, in the chunk containing its centroid. */
-  tri(a: V3, b: V3, c: V3, color: THREE.Color, layer: ChunkLayer, lods: number[]): void {
+  /**
+   * Adds a triangle to every LOD in `lods`, in the chunk containing its centroid. Layers that use
+   * texture coordinates (walls) must pass `uv` for every triangle.
+   */
+  tri(a: V3, b: V3, c: V3, color: THREE.Color, layer: ChunkLayer, lods: number[], uv?: [UV, UV, UV]): void {
     const [cx, cz] = this.chunkOf((a[0] + b[0] + c[0]) / 3, (a[2] + b[2] + c[2]) / 3);
     for (const lod of lods) {
       const buf = this.buf(cx, cz, lod, layer);
       buf.pos.push(...a, ...b, ...c);
       for (let i = 0; i < 3; i++) buf.col.push(color.r, color.g, color.b);
+      if (uv) (buf.uv ??= []).push(...uv[0], ...uv[1], ...uv[2]);
     }
   }
 
-  quad(a: V3, b: V3, c: V3, d: V3, color: THREE.Color, layer: ChunkLayer, lods: number[]): void {
-    this.tri(a, b, c, color, layer, lods);
-    this.tri(a, c, d, color, layer, lods);
+  quad(a: V3, b: V3, c: V3, d: V3, color: THREE.Color, layer: ChunkLayer, lods: number[], uv?: [UV, UV, UV, UV]): void {
+    this.tri(a, b, c, color, layer, lods, uv && [uv[0], uv[1], uv[2]]);
+    this.tri(a, c, d, color, layer, lods, uv && [uv[0], uv[2], uv[3]]);
+  }
+
+  /** Adds a non-indexed THREE geometry (e.g. a low-poly canopy), translated, in one colour. */
+  mesh(geom: THREE.BufferGeometry, x: number, y: number, z: number, color: THREE.Color, layer: ChunkLayer, lods: number[]): void {
+    const g = geom.index ? geom.toNonIndexed() : geom;
+    const p = g.getAttribute('position');
+    for (let i = 0; i < p.count; i += 3) {
+      const v = (k: number): V3 => [p.getX(k) + x, p.getY(k) + y, p.getZ(k) + z];
+      this.tri(v(i), v(i + 1), v(i + 2), color, layer, lods);
+    }
   }
 
   /** A box from y0 to y1 centred on (x, z), axis-aligned. */

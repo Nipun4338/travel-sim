@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { materialFor } from '../render/materials';
 import { COLLIDER_LAYERS, type ChunkEntry, type ChunkLayer, type RegionManifest, type RouteData } from '../shared/region';
 
 // Distances are from the bus to the nearest edge of a chunk, so the chunk under the bus and its
@@ -18,8 +19,6 @@ interface LoadedChunk {
   colliders: RAPIER.Collider[];
   lod0: THREE.Group | null; // kept while colliders exist
 }
-
-const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
 export class RegionWorld {
   manifest!: RegionManifest;
@@ -81,7 +80,7 @@ export class RegionWorld {
       if (c.loading !== lod) return;
       c.loading = -1;
       const group = gltf.scene;
-      group.traverse(o => { if (o instanceof THREE.Mesh) o.material = material; });
+      group.traverse(o => { if (o instanceof THREE.Mesh) o.material = materialFor(o.name as ChunkLayer); });
       group.updateMatrixWorld(true);
       if (lod === 0) c.lod0 = group;
       this.show(c, group, lod);

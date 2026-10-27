@@ -3,12 +3,13 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LOD_COUNT, type ChunkEntry, type LaneData, type RegionManifest, type RouteData } from '../../src/shared/region';
-import { buildBuildings, buildRoads, buildTerrain, buildWater, majorRoadMask } from './build';
+import { buildBuildings, buildRoads, buildTerrain, buildTrees, buildWater, junctionGrid, landuseIndex, roadIndex } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
 import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, routeThroughStops } from './osm';
 import { REGIONS, projection } from './regions';
+import { PointGrid, PolygonIndex } from './spatial';
 import { groundSampler } from './terrain';
 
 const CREDITS = [
@@ -56,6 +57,12 @@ async function main() {
   );
   const blds = indexOsm(bldRaw, proj);
   console.log(`      ${blds.ways.length} ways`);
+  const luRaw = await overpass(
+    `[out:json][timeout:200];(way["landuse"](around:${region.corridorM + 300},${around});way["leisure"](around:${region.corridorM + 300},${around});way["natural"~"^(wood|scrub|grassland|sand)$"](around:${region.corridorM + 300},${around});way["amenity"~"^(parking|fuel|bus_station)$"](around:${region.corridorM + 300},${around});way["aeroway"~"^(apron|taxiway|runway)$"](around:${region.corridorM + 300},${around}););(._;>;);out body;`,
+    join(raw, 'landuse.json'),
+  );
+  const landuse = indexOsm(luRaw, proj);
+  console.log(`      ${landuse.ways.length} land-use ways`);
 
   console.log('[4/6] Reading the GLO-30 ground window');
   const dem = await copernicusWindow(region.bbox, join(raw, 'glo30.json'));
@@ -64,19 +71,22 @@ async function main() {
   console.log('[5/6] Building geometry');
   const geo = new ChunkGeometry();
   const [xMin, zMax] = proj.toXZ(s, w), [xMax, zMin] = proj.toXZ(n, e);
-  buildTerrain(geo, h, xMin, xMax, zMin, zMax);
-  const onRoad = majorRoadMask(roads);
-  const pil = buildRoads(geo, roads, h, onRoad);
-  console.log(`      ${pil.pillars} pillars (${pil.skipped} skipped for standing in a carriageway)`);
+  const ground = landuseIndex(landuse);
+  buildTerrain(geo, h, ground, xMin, xMax, zMin, zMax);
+  const majorRoads = roadIndex(roads, 2), allRoads = roadIndex(roads, 0);
+  const onRoad = (x: number, z: number) => majorRoads.onRoad(x, z);
+  const junctions = junctionGrid(roads);
+  const rd = buildRoads(geo, roads, h, onRoad, junctions);
+  console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);
-  const dense = densify(routeXZ, 40);
-  const nearRoute = (x: number, z: number) => {
-    const r2 = region.corridorM * region.corridorM;
-    for (const [px, pz] of dense) if ((px - x) ** 2 + (pz - z) ** 2 < r2) return true;
-    return false;
-  };
-  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad);
-  console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${geo.chunks.size} chunks`);
+  const routeGrid = new PointGrid(region.corridorM);
+  densify(routeXZ, 40).forEach(([x, z]) => routeGrid.add(x, z));
+  const nearRoute = (x: number, z: number) => routeGrid.near(x, z, region.corridorM);
+  const footprints = new PolygonIndex<true>(40);
+  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints);
+  console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
+  const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions);
+  console.log(`      ${trees} trees, ${geo.chunks.size} chunks`);
 
   // Route data: ground-level path through the chosen Stop nodes, graded like the road ribbons.
   const routePts = densify(routeXZ, 5);
