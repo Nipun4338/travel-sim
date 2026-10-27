@@ -1,6 +1,8 @@
 // Data contract between the flight bake (scripts/bake/flight.ts) and Flight Mode (src/flight).
 // Coordinates are local metres from the zone origin: +x east, +z south, +y up.
 
+import type { PlacedLandmark } from './landmarks';
+
 export const ZONE_CHUNK = 2000;
 
 export interface Runway {
@@ -68,6 +70,8 @@ export interface ZoneManifest {
   spawn: Spawn;
   challenges: ChallengeData[];
   landmarks: Landmark[];
+  /** Landmark models (SPEC §10), separate from the free-flight checklist points. */
+  models?: PlacedLandmark[];
   /** Simplified road centrelines for the map: flat [x0, z0, x1, z1, …] per road. */
   map: string;
   credits: string[];

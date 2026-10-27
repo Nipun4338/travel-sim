@@ -28,6 +28,7 @@ import { RoadMask } from './world/roadMask';
 import { conditionsMultiplier, pickConditions } from './world/conditions';
 import { streetLamps } from './world/streetLamps';
 import { buildTestTrack } from './world/testTrack';
+import { placeLandmarks } from './landmarks/place';
 
 await RAPIER.init();
 
@@ -92,6 +93,7 @@ if (region) {
   const lanes = await region.loadLanes();
   roadMask = new RoadMask(lanes);
   minimap.setRegion(region.route, lanes);
+  placeLandmarks(scene, region.manifest.landmarks);
   junctions = new Junctions(lanes, region.route, scene);
   const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
   traffic = new Traffic(

@@ -8,6 +8,7 @@ import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmWay } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
 import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, roadRank, roadWidth, routeThroughStops, setWidthOverrides, type Indexed } from './osm';
+import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
@@ -93,7 +94,13 @@ async function main() {
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);
   const footprints = new PolygonIndex<true>(40);
-  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints);
+  // Landmarks (SPEC §10) replace the OSM buildings on their footprints.
+  const placed = landmarksFor(`${id}-route` as LandmarkPlace).map(l => {
+    const [x, z] = proj.toXZ(l.lat, l.lon);
+    return { def: l, x, z };
+  });
+  const cleared = (x: number, z: number) => placed.some(p => p.def.footprintM && Math.hypot(x - p.x, z - p.z) < p.def.footprintM);
+  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared);
   lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
   let forest: { buildings: PointGrid } | undefined;
@@ -162,7 +169,8 @@ async function main() {
   lap('chunks');
   const routeFile = writeHashed(out, 'route', 'json', JSON.stringify(route));
   const lanesFile = writeHashed(out, 'lanes', 'json', JSON.stringify(lanes));
-  const body = { region: id, origin: region.origin, chunkSize: 1000, chunks, route: routeFile, lanes: lanesFile, credits: CREDITS };
+  const landmarks = placed.map(p => ({ id: p.def.id, x: Math.round(p.x * 10) / 10, y: Math.round(h(p.x, p.z) * 100) / 100, z: Math.round(p.z * 10) / 10, headingDeg: p.def.headingDeg }));
+  const body = { region: id, origin: region.origin, chunkSize: 1000, chunks, route: routeFile, lanes: lanesFile, landmarks, credits: CREDITS };
   const manifest: RegionManifest = { ...body, version: shortHash(JSON.stringify(body)) };
   writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
   const keep = new Set(['manifest.json', routeFile, lanesFile, ...chunks.flatMap(c => c.lods)]);

@@ -270,6 +270,7 @@ export function buildingHeight(id: number, tags: Record<string, string>): number
 export function buildBuildings(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean,
   onRoad: (x: number, z: number) => boolean, majorRoads: SegmentIndex, footprints?: PolygonIndex<true>,
+  cleared: (x: number, z: number) => boolean = () => false,
 ): { built: number; droppedOnRoad: number; signs: number; billboards: number } {
   let count = 0, dropped = 0, signs = 0, billboards = 0;
   for (const w of idx.ways) {
@@ -278,7 +279,7 @@ export function buildBuildings(
     const ring = w.nodes.slice(0, -1).map(id => idx.nodes.get(id)).filter(Boolean).map(n => new THREE.Vector2(n!.x, n!.z));
     if (ring.length < 3) continue;
     const cx = ring.reduce((s, p) => s + p.x, 0) / ring.length, cz = ring.reduce((s, p) => s + p.y, 0) / ring.length;
-    if (!near(cx, cz)) continue;
+    if (!near(cx, cz) || cleared(cx, cz)) continue;
     if (onRoad(cx, cz) || ring.some(p => onRoad(p.x, p.y))) { dropped++; continue; }
     if (THREE.ShapeUtils.isClockWise(ring)) ring.reverse();
     footprints?.add(ring.map(p => ({ x: p.x, y: p.y })), true);

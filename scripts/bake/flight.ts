@@ -13,6 +13,7 @@ import {
 import { buildingHeight, pickWall } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmData } from './fetch';
+import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
 import { pbfBuildings } from './pbf';
 import { ChunkGeometry, color, densify, hash01, type V3 } from './geometry';
 import { roadRank, roadWidth } from './osm';
@@ -252,10 +253,13 @@ async function main() {
     const px = x - r.a.x, pz = z - r.a.z, along = px * ux + pz * uz;
     return Math.abs(-px * uz + pz * ux) < r.width / 2 + 60 && along > -100 && along < len + 100;
   });
+  // Landmarks (SPEC §10) replace the OSM buildings on their footprints.
+  const models = landmarksFor(`${id}-zone` as LandmarkPlace).map(l => { const [x, z] = proj.toXZ(l.lat, l.lon); return { def: l, x, z }; });
+  const clearedByLandmark = (x: number, z: number) => models.some(p => p.def.footprintM && Math.hypot(x - p.x, z - p.z) < p.def.footprintM);
   let packed = 0;
   blds.forEach((w, k) => {
     const [cx, cz] = centres[k];
-    if (Math.abs(cx) >= H || Math.abs(cz) >= H || onRunway(cx, cz)) return;
+    if (Math.abs(cx) >= H || Math.abs(cz) >= H || onRunway(cx, cz) || clearedByLandmark(cx, cz)) return;
     const rect = minAreaRect(w.geometry!.map(xz));
     if (!rect || rect.w < 2 || rect.d < 2) return;
     const tags = w.tags ?? {};
@@ -368,6 +372,7 @@ async function main() {
     height: { file: heightFile, gridM: zone.gridM, n, min, step: STEP }, chunks, runways,
     spawn: 'runway' in zone.spawn ? spawnFor(zone.spawn) : { ...spawnFor(zone.spawn), x: spawnX, z: spawnZ },
     challenges, landmarks, map: mapFile, credits: CREDITS,
+    models: models.map(p => ({ id: p.def.id, x: Math.round(p.x * 10) / 10, y: Math.round(h(p.x, p.z) * 100) / 100, z: Math.round(p.z * 10) / 10, headingDeg: p.def.headingDeg })),
   };
   const manifest: ZoneManifest = { ...body, version: shortHash(JSON.stringify(body)) };
   writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));

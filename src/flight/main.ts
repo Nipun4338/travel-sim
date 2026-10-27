@@ -24,6 +24,7 @@ import { RingView } from './rings';
 import { ZoneWorld, type ZoneQuality } from './zone';
 import { conditionsMultiplier, pickConditions } from '../world/conditions';
 import { PlaneSounds } from '../audio/planeSounds';
+import { placeLandmarks } from '../landmarks/place';
 
 const params = new URLSearchParams(location.search);
 // The menu's settings, unless the URL overrides them (handy for tests).
@@ -57,6 +58,7 @@ const controls = new FlightControls();
 if (!params.has('invert')) controls.invert = settings.invertPitch;
 const rings = new RingView(scene);
 const sounds = new PlaneSounds(conditions);
+zone.landmarkSolids = placeLandmarks(scene, m.models);
 
 // Map: the zone's main roads and runways, at a 3 km radius.
 const roads: MapSeg[] = [];

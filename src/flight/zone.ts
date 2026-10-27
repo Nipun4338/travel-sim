@@ -9,6 +9,7 @@ import { materialFor } from '../render/materials';
 import type { ChunkLayer } from '../shared/region';
 import { BUILDING_STRIDE, type Runway, type ZoneChunk, type ZoneManifest } from '../shared/zone';
 import type { FlightGround } from './FlightModel';
+import type { LandmarkSolid } from '../landmarks/place';
 
 export type ZoneQuality = 'low' | 'medium' | 'high';
 
@@ -45,6 +46,8 @@ export class ZoneWorld implements FlightGround {
   private pending = new Set<Promise<void>>();
   /** At night (Dhaka), every third building shows a lit window: a city of points from the air. */
   cityLights = false;
+  /** Landmark models are solid too (rough boxes), set by Flight Mode after placing them. */
+  landmarkSolids: LandmarkSolid[] = [];
 
   constructor(private baseUrl: string, scene: THREE.Scene, private quality: ZoneQuality = 'medium') {
     scene.add(this.root);
@@ -79,6 +82,11 @@ export class ZoneWorld implements FlightGround {
 
   /** True inside a building box in a loaded chunk. */
   solidAt(x: number, y: number, z: number): boolean {
+    for (const b of this.landmarkSolids) {
+      if (y > b.y1 || y < b.y0) continue;
+      const dx = x - b.x, dz = z - b.z;
+      if (Math.abs(dx * b.c + dz * b.s) < b.hw && Math.abs(-dx * b.s + dz * b.c) < b.hd) return true;
+    }
     const c = this.chunkAt(x, z);
     if (!c?.boxes || !c.cells) return false;
     const H = this.manifest.halfM, size = this.manifest.chunkSize;

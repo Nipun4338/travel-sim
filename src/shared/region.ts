@@ -1,5 +1,6 @@
 // Data contract between the bake script (scripts/bake) and the game (src/world/region.ts).
 // Coordinates are local metres from the Region origin: +x east, +z south, +y up.
+import type { PlacedLandmark } from './landmarks';
 
 export const CHUNK_SIZE = 1000;
 export const LOD_COUNT = 3;
@@ -27,6 +28,7 @@ export interface RegionManifest {
   chunks: ChunkEntry[];
   route: string;       // file name of RouteData
   lanes: string;       // file name of LaneData
+  landmarks?: PlacedLandmark[];
   credits: string[];
 }
 

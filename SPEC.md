@@ -280,6 +280,7 @@ A **hero** landmark is ≤ 8k triangles and recognisable at a glance. A **simple
 | Bandarban Flight Zone | Buddha Dhatu Jadi | Nilgiri · Nilachal · Meghla hanging bridge · Sangu river boats |
 
 - **Making them:** the agent builds landmarks as **scripted low-poly models from photo references**, for the user to review. The user touches up hero landmarks in Blender only if they need it.
+- **As built (M10):** 22 scripted models in `src/landmarks/models.ts` (100–940 triangles each, far under budget), placed from `src/shared/landmarks.ts`; the bakes clear OSM buildings off each footprint and record ground heights, and in Flight Mode each landmark is solid. Route landmarks also appear in their Flight Zone. Not modelled: the Mohakhali and Kuril flyovers (baked from OSM as elevated decks) and the Banani/Kakoli skyline (it comes with the building-heights work). Jahangir Gate spans the cantonment road beside the Route, as in OSM, so the bus passes it rather than under it. The generic CC bridge, boat and waterfall models were not needed.
 - **Free models:** none exist for the landmarks themselves. Generic CC models are used for the Meghla bridge, Sangu boats and Shoilo Propat waterfall.
 - **Names and placement:** local names throughout. Landmarks that OSM doesn't name are hand-placed at the research coordinates.
 
