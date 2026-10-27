@@ -7,7 +7,7 @@ import { buildBuildings, buildRoads, buildTerrain, buildTrees, buildWater, junct
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
-import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, routeThroughStops } from './osm';
+import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, roadRank, roadWidth, routeThroughStops } from './osm';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex } from './spatial';
 import { groundSampler } from './terrain';
@@ -25,6 +25,8 @@ async function main() {
   const proj = projection(region.origin);
   const [s, w, n, e] = region.bbox;
   const t0 = Date.now();
+  let tLast = Date.now();
+  const lap = (label: string) => { console.log(`      (${label}: ${((Date.now() - tLast) / 1000).toFixed(1)} s)`); tLast = Date.now(); };
 
   console.log(`[1/6] Fetching roads, rail and bus stops (${region.bbox.join(', ')})`);
   const roadsRaw = await overpass(
@@ -72,11 +74,14 @@ async function main() {
   const geo = new ChunkGeometry();
   const [xMin, zMax] = proj.toXZ(s, w), [xMax, zMin] = proj.toXZ(n, e);
   const ground = landuseIndex(landuse);
+  lap('setup');
   buildTerrain(geo, h, ground, xMin, xMax, zMin, zMax);
+  lap('terrain');
   const majorRoads = roadIndex(roads, 2), allRoads = roadIndex(roads, 0);
   const onRoad = (x: number, z: number) => majorRoads.onRoad(x, z);
   const junctions = junctionGrid(roads);
   const rd = buildRoads(geo, roads, h, onRoad, junctions);
+  lap('roads');
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);
   const routeGrid = new PointGrid(region.corridorM);
@@ -84,8 +89,10 @@ async function main() {
   const nearRoute = (x: number, z: number) => routeGrid.near(x, z, region.corridorM);
   const footprints = new PolygonIndex<true>(40);
   const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints);
+  lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
   const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions);
+  lap('trees');
   console.log(`      ${trees} trees, ${geo.chunks.size} chunks`);
 
   // Route data: ground-level path through the chosen Stop nodes, graded like the road ribbons.
@@ -106,8 +113,21 @@ async function main() {
   const lanes: LaneData = {
     ways: roads.ways.filter(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway)).map(wy => {
       const t = wy.tags!;
-      const pts = wy.nodes.map(nid => roads.nodes.get(nid)).filter(Boolean).map(nd => [nd!.x, h(nd!.x, nd!.z) + 0.13, nd!.z] as [number, number, number]);
-      return { id: wy.id, highway: t.highway, lanes: parseInt(t.lanes ?? '', 10) || (isOneway(t) ? 2 : 1), oneway: isOneway(t) !== 0, elevated: isElevated(wy, roads), nodes: wy.nodes, points: pts };
+      const nodes = wy.nodes.filter(nid => roads.nodes.has(nid));
+      const lift = 0.12 + roadRank(t.highway) * 0.01; // same as the road ribbon
+      const points: [number, number, number][] = [], nodeAt: number[] = [];
+      nodes.forEach((nid, i) => {
+        const nd = roads.nodes.get(nid)!;
+        if (i > 0) {
+          const pv = roads.nodes.get(nodes[i - 1])!, n = Math.max(1, Math.ceil(Math.hypot(nd.x - pv.x, nd.z - pv.z) / 10));
+          for (let k = 1; k < n; k++) { const x = pv.x + ((nd.x - pv.x) * k) / n, z = pv.z + ((nd.z - pv.z) * k) / n; points.push([x, h(x, z) + lift, z]); }
+        }
+        nodeAt.push(points.length);
+        points.push([nd.x, h(nd.x, nd.z) + lift, nd.z]);
+      });
+      const width = roadWidth(t);
+      const lanes = parseInt(t.lanes ?? '', 10) || Math.max(1, Math.round(width / 3.2));
+      return { id: wy.id, highway: t.highway, lanes, width, dir: isOneway(t), elevated: isElevated(wy, roads), nodes, nodeAt, points };
     }),
   };
 
@@ -128,6 +148,7 @@ async function main() {
     }
     chunks.push(entry);
   }
+  lap('chunks');
   const routeFile = writeHashed(out, 'route', 'json', JSON.stringify(route));
   const lanesFile = writeHashed(out, 'lanes', 'json', JSON.stringify(lanes));
   const body = { region: id, origin: region.origin, chunkSize: 1000, chunks, route: routeFile, lanes: lanesFile, credits: CREDITS };

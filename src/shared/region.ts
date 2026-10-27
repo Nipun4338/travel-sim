@@ -50,11 +50,13 @@ export interface RouteData {
 export interface LaneWay {
   id: number;
   highway: string;
-  lanes: number;
-  oneway: boolean;
+  lanes: number;         // total across both directions
+  width: number;         // carriageway width, m
+  dir: 1 | -1 | 0;       // 1 = one-way in node order, -1 = one-way against it, 0 = two-way
   elevated: boolean;
-  nodes: number[];
-  points: [number, number, number][];
+  nodes: number[];       // OSM node ids
+  nodeAt: number[];      // index into `points` of each node
+  points: [number, number, number][]; // graded road surface, about every 10 m
 }
 
 export interface LaneData { ways: LaneWay[]; }

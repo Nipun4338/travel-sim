@@ -22,7 +22,7 @@ export interface RunStop {
   leftEarly?: boolean;
 }
 
-export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision';
+export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision' | 'junction';
 export interface LedgerEntry { kind: LedgerKind; tk: number; label: string; }
 
 export type RunEvent =
@@ -33,6 +33,7 @@ export type RunEvent =
   | { type: 'leftBehind'; stop: string; count: number }
   | { type: 'complaint'; standing: number }
   | { type: 'collision'; impactKmh: number; tk: number }
+  | { type: 'junction'; name: string; tk: number }
   | { type: 'finished' }
   | { type: 'failed'; reason: string };
 
@@ -223,6 +224,13 @@ export class Run {
     const ev: RunEvent[] = [{ type: 'collision', impactKmh, tk }];
     if (impactKmh > ACCIDENT_KMH) return this.fail(`Accident at ${Math.round(impactKmh)} km/h`, ev);
     return ev;
+  }
+
+  /** Driving into a junction while its police are holding this direction (SPEC §7). */
+  junction(name: string): RunEvent[] {
+    if (this.status !== 'running') return [];
+    this.add('junction', -TK.junction, `Ran the junction at ${name}`);
+    return [{ type: 'junction', name, tk: TK.junction }];
   }
 
   private fail(reason: string, ev: RunEvent[]): RunEvent[] {

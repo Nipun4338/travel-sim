@@ -11,6 +11,8 @@ import { createStage, VehicleCamera } from './render/stage';
 import { BusHud } from './ui/hud';
 import { ResultsScreen } from './ui/results';
 import { mountBusTouchControls } from './ui/touchControls';
+import { Junctions } from './traffic/junctions';
+import { TRAFFIC_CAP, Traffic, type QualityTier } from './traffic/Traffic';
 import { RegionWorld } from './world/region';
 import { buildTestTrack } from './world/testTrack';
 
@@ -46,6 +48,17 @@ const legPose = (leg: number): Pose => {
   return region.poseAt(region.route.stops.find(s => s.name === from)!.index);
 };
 if (region) await region.prime(legPose(0).position);
+
+// AI traffic and junction phases (SPEC §7); the quality tier picks the vehicle cap until M8 adds settings.
+const quality = (params.get('quality') ?? 'medium') as QualityTier;
+let junctions: Junctions | null = null;
+let traffic: Traffic | null = null;
+if (region) {
+  const lanes = await region.loadLanes();
+  junctions = new Junctions(lanes, region.route, scene);
+  const farmgate = region.route.stops.find(s => s.name === 'Farmgate');
+  traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[quality] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null);
+}
 document.getElementById('loading')?.remove();
 
 const bus = new Bus(world, legPose(0));
@@ -74,6 +87,8 @@ async function startLeg(leg: number): Promise<void> {
   bus.spawn(pose);
   comfort.reset();
   jerkySeen = 0;
+  traffic?.clear();
+  lastJunction = null;
   if (region && legs) {
     const { from, to } = legs[legIndex];
     run = new Run(region.route, from, to, TARGET_KMH[regionId] ?? 22, legIndex + 1);
@@ -102,6 +117,7 @@ const EVENT_TEXT: Partial<Record<RunEvent['type'], (e: never) => string>> = {
   leftBehind: (e: Extract<RunEvent, { type: 'leftBehind' }>) => `${e.count} passengers left behind at ${e.stop}`,
   complaint: (e: Extract<RunEvent, { type: 'complaint' }>) => (e.standing ? `"Drive carefully!" (${e.standing} standing)` : ''),
   collision: (e: Extract<RunEvent, { type: 'collision' }>) => `Collision! −৳ ${e.tk}`,
+  junction: (e: Extract<RunEvent, { type: 'junction' }>) => `Ran the ${e.name} junction! −৳ ${e.tk}`,
 };
 
 function handle(evs: RunEvent[]): void {
@@ -122,6 +138,7 @@ function handle(evs: RunEvent[]): void {
 // Collisions: measure the speed lost over the few steps after the chassis hits a building or pillar.
 let impact: { startKmh: number; steps: number } | null = null;
 let jerkySeen = 0;
+let lastJunction: string | null = null; // junction the bus is inside, so each entry is judged once
 
 function onRoad(): boolean {
   if (!region) return true;
@@ -140,6 +157,8 @@ function step(dt: number): void {
     if (results.visible || (region && !region.hasCollidersAt(busPos))) return;
     const kmhBefore = Math.abs(bus.kmh);
     bus.update(readInput(), dt);
+    junctions?.update(dt);
+    traffic?.update(dt, { x: busPos.x, z: busPos.z, hx: bus.forward.x, hz: bus.forward.z, speed: bus.speed });
     world.step(events);
     comfort.update(bus.body.linvel(), bus.forward, bus.right, dt);
     const p = bus.body.translation();
@@ -149,7 +168,9 @@ function step(dt: number): void {
       if (!started || !region || impact) return;
       const other = h1 === bus.chassis.handle ? h2 : h2 === bus.chassis.handle ? h1 : -1;
       const layer = other >= 0 ? region.layerOf(other) : undefined;
-      if (layer === 'building' || layer === 'pillar') impact = { startKmh: kmhBefore, steps: 0 };
+      const vehicle = other >= 0 && !!traffic?.isVehicle(other);
+      if (vehicle) { traffic!.hit(other); hud.toast('Honk! Honk!'); }
+      if (vehicle || layer === 'building' || layer === 'wall' || layer === 'pillar') impact = { startKmh: kmhBefore, steps: 0 };
     });
 
     if (run && progress) {
@@ -158,6 +179,10 @@ function step(dt: number): void {
         impact = null;
       }
       if (comfort.jerkyMoments > jerkySeen) { jerkySeen = comfort.jerkyMoments; handle(run.jerky()); }
+      // Entering a junction while the police hold the bus's direction is a Fine (SPEC §7).
+      const inJ = junctions?.inside(p.x, p.z) ?? null;
+      if (inJ && inJ.name !== lastJunction && junctions!.stateFor(inJ, bus.forward.x, bus.forward.z).stop) handle(run.junction(inJ.name));
+      lastJunction = inJ?.name ?? null;
       progress.update(p.x, p.z);
       handle(run.update(dt, {
         routeIndex: progress.index, lateralM: progress.lateralM, kmh: bus.kmh, doorsOpen: bus.doorsOpen, onRoad: onRoad(),
@@ -188,18 +213,27 @@ startLoop(
           departing: next === run.stops[0],
           onboard: run.onboard.length, capacity: run.capacity, standing: run.standing,
           taka: run.takaEarned, clockS: run.time,
+          junction: junctionAhead(),
         } : undefined,
       });
     }
   },
 );
 
+function junctionAhead() {
+  if (!junctions) return undefined;
+  const a = junctions.ahead(busPos.x, busPos.z, bus.forward.x, bus.forward.z, 150);
+  if (!a) return undefined;
+  const st = junctions.stateFor(a.j, bus.forward.x, bus.forward.z);
+  return { name: a.j.name, stop: st.stop, secondsLeft: st.secondsLeft, distM: Math.max(0, a.dist) };
+}
+
 void startLeg(0);
 
 if (import.meta.env.DEV) {
   Object.assign(window, {
     __game: {
-      bus, world, input, comfort, region, results,
+      bus, world, input, comfort, region, results, traffic, junctions,
       get run() { return run; }, get progress() { return progress; },
       startLeg, step, setPaused: (p: boolean) => { paused = p; },
       setInput: (fn: typeof readInput | null) => { readInput = fn ?? (() => input.read()); },

@@ -3,7 +3,7 @@ import type { LedgerKind, RunResult } from '../bus/run/Run';
 
 const LABELS: Record<LedgerKind, string> = {
   fare: 'Fares', onTime: 'On-time bonus', late: 'Late arrivals', early: 'Early departures', missed: 'Missed Stops',
-  leftBehind: 'Passengers left behind', jerky: 'Rough driving', collision: 'Collisions',
+  leftBehind: 'Passengers left behind', jerky: 'Rough driving', collision: 'Collisions', junction: 'Junctions run',
 };
 const tk = (n: number) => `${n < 0 ? '−' : ''}৳ ${Math.abs(Math.round(n)).toLocaleString('en-IN')}`;
 const starText = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);

@@ -38,3 +38,6 @@ canvas { display: block; touch-action: none; }
 .results .buttons { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
 .results button { font: 600 14px system-ui; padding: 6px 14px; border-radius: 8px; border: 1px solid #333; background: #fff; cursor: pointer; }
 .results button:first-child { background: #222; color: #fff; }
+.hud .junction { margin: 2px 0; }
+.hud .junction.stop b { color: #fff; background: #c0392b; padding: 0 5px; border-radius: 4px; }
+.hud .junction.go b { color: #fff; background: #2a9d4b; padding: 0 5px; border-radius: 4px; }

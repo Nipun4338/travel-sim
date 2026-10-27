@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { materialFor } from '../render/materials';
-import { COLLIDER_LAYERS, type ChunkEntry, type ChunkLayer, type RegionManifest, type RouteData } from '../shared/region';
+import { COLLIDER_LAYERS, type ChunkEntry, type ChunkLayer, type LaneData, type RegionManifest, type RouteData } from '../shared/region';
 
 // Distances are from the bus to the nearest edge of a chunk, so the chunk under the bus and its
 // neighbours always qualify.
@@ -118,6 +118,11 @@ export class RegionWorld {
     c.colliders.forEach(col => { this.layers.delete(col.handle); this.world.removeCollider(col, false); });
     c.colliders = [];
     if (c.lod !== 0) c.lod0 = null;
+  }
+
+  /** The lane graph for AI traffic (SPEC §7). */
+  async loadLanes(): Promise<LaneData> {
+    return (await fetch(`${this.baseUrl}/${this.manifest.lanes}`)).json();
   }
 
   /** The chunk layer a collider was built from, if it belongs to this Region. */

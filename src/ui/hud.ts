@@ -11,6 +11,7 @@ export interface RunHudState {
   standing: number;
   taka: number;
   clockS: number;
+  junction?: { name: string; stop: boolean; secondsLeft: number; distM: number };
 }
 
 export interface BusHudState {
@@ -43,6 +44,7 @@ export class BusHud {
       <div class="next"><b>${r.nextStop}</b> · ${r.distanceM < 1000 ? `${Math.round(r.distanceM)} m` : `${(r.distanceM / 1000).toFixed(1)} km`}</div>
       <div>${r.departing ? `departs in ${mmss(Math.max(0, r.dueInS))}` : r.dueInS >= 0 ? `due in ${mmss(r.dueInS)}` : `<span class="late">${mmss(r.dueInS)} late</span>`} · clock ${mmss(r.clockS)}</div>
       <div>Passengers ${r.onboard}/${r.capacity} (${r.standing} standing)</div>
+      ${r.junction ? `<div class="junction ${r.junction.stop ? 'stop' : 'go'}">${r.junction.name} junction ${Math.round(r.junction.distM)} m: <b>${r.junction.stop ? 'STOP' : 'GO'}</b> ${mmss(r.junction.secondsLeft)}</div>` : ''}
       <div class="taka">৳ ${Math.round(r.taka).toLocaleString('en-IN')}</div>
       <div class="leg">${r.leg}</div>` : '';
     this.el.innerHTML = `
