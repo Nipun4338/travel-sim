@@ -2,6 +2,7 @@
 // and stars (SPEC §6). Plain styling for now; the bus-art look comes in M8.
 import type { LedgerKind, RunResult } from '../bus/run/Run';
 import { amount, clock, legTitle, num, t } from '../i18n/i18n';
+import { audio } from '../audio/audio';
 
 const tk = (n: number) => `${n < 0 ? '−' : ''}৳ ${amount(Math.abs(n))}`;
 const starText = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
@@ -50,6 +51,7 @@ export class ResultsScreen {
     this.el.querySelector('[data-a="retry"]')!.addEventListener('click', () => { this.hide(); actions.retry(); });
     this.el.querySelector('[data-a="next"]')?.addEventListener('click', () => { this.hide(); actions.next!(); });
     this.el.hidden = false;
+    audio.play('jingle', { gain: 0.6 });
   }
 
   hide(): void { this.el.hidden = true; }

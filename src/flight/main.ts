@@ -23,6 +23,7 @@ import { roadLights, runwayLights } from './lights';
 import { RingView } from './rings';
 import { ZoneWorld, type ZoneQuality } from './zone';
 import { conditionsMultiplier, pickConditions } from '../world/conditions';
+import { PlaneSounds } from '../audio/planeSounds';
 
 const params = new URLSearchParams(location.search);
 // The menu's settings, unless the URL overrides them (handy for tests).
@@ -55,6 +56,7 @@ const cam = new FlightCamera(camera, COCKPIT_EYE, renderer.domElement);
 const controls = new FlightControls();
 if (!params.has('invert')) controls.invert = settings.invertPitch;
 const rings = new RingView(scene);
+const sounds = new PlaneSounds(conditions);
 
 // Map: the zone's main roads and runways, at a 3 km radius.
 const roads: MapSeg[] = [];
@@ -159,6 +161,7 @@ function onEvent(e: FlightEvent): void {
     hud.toast(`${t('landed', { grade: t(`grade.${g}`) })} · ${num(e.touchdown.sinkMs.toFixed(1))} ${t('vsUnit')}${e.touchdown.runway ? '' : ' · ' + t('offField')}`, 3000);
     challenge?.touchdown(e.touchdown);
     recordLanding(e.touchdown.sinkMs);
+    sounds.touchdown(e.touchdown.sinkMs);
   }
   if (e.type === 'crash') {
     crashReason = `crash.${e.reason}`;
@@ -242,6 +245,7 @@ startLoop(step, frameDt => {
   const inCockpit = cam.mode === 'cockpit' && crashTimer <= 0;
   const inp = controls.read();
   view.update(frameDt, { pos: plane.pos, q: plane.q, throttle: plane.throttle, pitchInput: inp.pitch, rollInput: inp.roll, landingLight });
+  sounds.update({ throttle: plane.throttle, kmh: plane.kmh, stall: plane.stallWarning, inCockpit, crashed: crashTimer > 0 || paused });
   view.setCockpitVisible(inCockpit);
   cam.update(view.group, crashTimer > 0, frameDt);
   rings.update(frameDt, challenge?.next ?? 0);

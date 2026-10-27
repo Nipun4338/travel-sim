@@ -17,3 +17,5 @@ data/raw/
 # baked Region output
 public/regions/
 public/zones/
+# source audio downloads (cut and converted at build time)
+data/audio-src/

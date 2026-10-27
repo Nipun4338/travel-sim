@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "preview": "vite preview",
     "bake": "tsx scripts/bake/index.ts",
-    "bake:flight": "tsx scripts/bake/flight.ts"
+    "bake:flight": "tsx scripts/bake/flight.ts",
+    "audio": "tsx scripts/audio/build.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { Conditions } from '../world/conditions';
 import { WindscreenRain } from './windscreen';
+import { audio } from '../audio/audio';
 
 export type Tier = 'low' | 'medium' | 'high';
 
@@ -104,7 +105,10 @@ export class Atmosphere {
 
   /** Drops on the bus windscreen and wipers that clear them, in rain, in the cab view only. */
   enableWipers(): void {
-    if (this.rainy && !this.windscreen) this.windscreen = new WindscreenRain();
+    if (this.rainy && !this.windscreen) {
+      this.windscreen = new WindscreenRain();
+      this.windscreen.onSweep = () => audio.play('wipe', { gain: 0.45 });
+    }
   }
 
   update(dt: number, inCab: boolean, kmh = 0): void {

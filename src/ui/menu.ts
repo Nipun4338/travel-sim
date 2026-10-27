@@ -11,6 +11,8 @@ import type { PlaneLivery } from '../render/PlaneView';
 import type { RegionManifest, RouteData } from '../shared/region';
 import type { ZoneManifest } from '../shared/zone';
 import { conditionsMultiplier, fogAllowed, type TimeOfDay, type Weather } from '../world/conditions';
+import { audio } from '../audio/audio';
+import { SOUND_CREDITS } from '../audio/credits';
 
 type Mode = 'bus' | 'flight';
 const REGIONS = ['dhaka', 'bandarban'] as const;
@@ -59,6 +61,8 @@ const dual = (key: string) => `${t(key)}<small>${tAlt(key)}</small>`;
 const stars = (n = 0) => `<span class="stars">${'★'.repeat(n)}${'☆'.repeat(3 - n)}</span>`;
 
 export async function showMenu(): Promise<void> {
+  // Menu music, quietly, once the player first taps or presses a key (autoplay rules).
+  audio.loop('music', 'music', 0.55);
   const root = document.createElement('div');
   root.className = 'menu-screen';
   document.body.appendChild(root);
@@ -91,6 +95,7 @@ export async function showMenu(): Promise<void> {
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
       <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}`;
     root.querySelector('[data-lang]')!.addEventListener('click', () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); void render(); });
+    root.querySelectorAll<HTMLElement>('button, [data-go]').forEach(el => el.addEventListener('click', () => audio.play('click', { gain: 0.5 })));
     root.querySelectorAll<HTMLElement>('[data-go]').forEach(el => el.addEventListener('click', () => {
       if (el.classList.contains('locked')) return;
       const patch = JSON.parse(el.dataset.go!) as Partial<State> & { start?: boolean };
@@ -106,6 +111,11 @@ export async function showMenu(): Promise<void> {
       if (k === 'livery') { const [kind, id] = v.split(':'); chooseLivery(kind as 'bus' | 'plane', id); }
       else saveSettings(settings);
       void render();
+    }));
+    root.querySelectorAll<HTMLInputElement>('[data-vol]').forEach(el => el.addEventListener('input', () => {
+      settings[el.dataset.vol as 'volMaster'] = parseFloat(el.value);
+      saveSettings(settings);
+      audio.applyVolumes();
     }));
     // Save code: show it to copy, or paste one in to replace this device's save.
     root.querySelector('[data-export]')?.addEventListener('click', async () => {
@@ -228,6 +238,8 @@ function settingsScreen(s: Settings): string {
       <div class="chips"><b>${t('quality')}</b>${qs.map(q => chip('quality', q, t(`q.${q}`), s.quality === q)).join('')}</div>
       <div class="chips"><b>${t('playStyle')}</b>${chip('scored', '0', t('relaxed'), !s.scored)}${chip('scored', '1', t('scoredStyle'), s.scored)}</div>
       <div class="chips"><b>${t('invertPitch')}</b>${chip('invert', '0', t('off'), !s.invertPitch)}${chip('invert', '1', t('on'), s.invertPitch)}</div>
+      ${(['volMaster', 'volMusic', 'volSfx', 'volVoice'] as const).map(k => `<label class="vol"><b>${t(k)}</b>
+        <input type="range" min="0" max="1" step="0.05" value="${s[k]}" data-vol="${k}"></label>`).join('')}
       <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
     </div>
     <div class="panel">
@@ -276,6 +288,7 @@ function licencesScreen(): string {
     ...credits,
     'Three.js © three.js authors, MIT · Rapier © Dimforge, Apache 2.0 · meshoptimizer © Arseny Kapoulkine, MIT · glTF Transform © Don McCurdy, MIT',
     'Noto Sans Bengali and Baloo Da 2: SIL Open Font License 1.1',
+    ...SOUND_CREDITS,
   ];
   return `<div class="menu-row"><div class="panel licences">
     <h2>${dual('licences')}</h2>${lines.map(l => `<p>${l}</p>`).join('')}

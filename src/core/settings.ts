@@ -9,9 +9,14 @@ export interface Settings {
   invertPitch: boolean;
   /** Scored mode: Taka, Fines, stars and failing. Off by default: it's a relaxing game. */
   scored: boolean;
+  /** Volume levels 0..1 (SPEC §14). */
+  volMaster: number;
+  volMusic: number;
+  volSfx: number;
+  volVoice: number;
 }
 
-const DEFAULTS: Settings = { quality: 'auto', invertPitch: false, scored: false };
+const DEFAULTS: Settings = { quality: 'auto', invertPitch: false, scored: false, volMaster: 0.8, volMusic: 0.5, volSfx: 0.9, volVoice: 1 };
 
 export function loadSettings(): Settings { return { ...DEFAULTS, ...readSave().settings }; }
 

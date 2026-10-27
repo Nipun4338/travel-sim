@@ -13,6 +13,9 @@ export class WindscreenRain {
   private sprite = document.createElement('canvas');
   private drops: Drop[] = [];
   private t = 0;
+  private cycle = -1;
+  /** Called as each sweep starts (the wiper sound). */
+  onSweep: () => void = () => {};
   private lastAngles: number[] = [];
   private w = 0;
   private h = 0;
@@ -63,6 +66,8 @@ export class WindscreenRain {
       this.drops = [];
     }
     this.t += dt;
+    const cycle = Math.floor(this.t / (WIPE_PERIOD + PARK_S));
+    if (cycle !== this.cycle) { this.cycle = cycle; this.onSweep(); }
     // New drops: steady rain, more when driving into it.
     const rate = (60 + Math.min(80, Math.abs(kmh) * 1.5)) * (this.w * this.glassBottom) / 1e6 * 4;
     for (let n = Math.floor(rate * dt + Math.random()); n > 0; n--) {

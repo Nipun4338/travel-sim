@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import { BusSounds } from './audio/busSounds';
 import { Bus, type Pose } from './bus/Bus';
 import { ComfortMeter } from './bus/comfort';
 import { BusLights } from './bus/lights';
@@ -110,6 +111,10 @@ const bus = new Bus(world, legPose(initialTrip));
 bus.wet = atmosphere.rainy;
 const busView = new BusView(scene, currentLivery<BusLivery>('bus'));
 busView.setBeamStyle(tier !== 'low', atmosphere.night, atmosphere.rainy || atmosphere.foggy);
+// Sound (SPEC §14): engine, cab, doors, horn, traffic and the Region's ambience.
+const sounds = new BusSounds(regionId, conditions);
+if (traffic) traffic.onHonk = type => sounds.honk(type);
+let soundTimer = 0;
 const lights = new BusLights();
 const comfort = new ComfortMeter();
 const cam = new VehicleCamera(camera, CAB_EYE, renderer.domElement);
@@ -153,7 +158,10 @@ async function startLeg(leg: number): Promise<void> {
 
 input.onAction(action => {
   switch (action) {
-    case 'doors': hud.toast(!bus.toggleDoors() ? t('stopFirst') : bus.doorsOpen ? t('doorsOpen') : t('doorsClosed')); break;
+    case 'doors':
+      if (!bus.toggleDoors()) hud.toast(t('stopFirst'));
+      else { sounds.doors(); hud.toast(bus.doorsOpen ? t('doorsOpen') : t('doorsClosed')); }
+      break;
     case 'camera': cam.toggle(); break;
     case 'reset': void startLeg(legIndex); break;
     case 'lights':
@@ -167,7 +175,7 @@ input.onAction(action => {
     case 'language': setLang(getLang() === 'bn' ? 'en' : 'bn'); hud.toast(t('language')); break;
     case 'details': hud.showDetails = !hud.showDetails; break;
     case 'map': hud.toast(t(minimap.toggle() ? 'mapOn' : 'mapOff')); break;
-    case 'horn': break; // audio arrives in M9
+    case 'horn': sounds.horn(); break;
   }
 });
 
@@ -227,6 +235,11 @@ function step(dt: number): void {
   const kmhBefore = Math.abs(bus.kmh);
   const inp = readInput();
   bus.update(inp, dt);
+  if ((soundTimer += dt) >= 0.05) {
+    const j = junctionAhead();
+    sounds.update(soundTimer, { kmh: bus.kmh, gas: inp.gas, brake: inp.brake, junctionStop: j && j.distM < 80 ? j.stop : undefined, trafficNear: (traffic?.count ?? 0) > 0 });
+    soundTimer = 0;
+  }
   lights.update(dt, { brake: inp.brake, speed: bus.speed, gear: bus.gear, steerDeg: bus.steerDeg });
   junctions?.update(dt);
   traffic?.update(dt, { x: busPos.x, z: busPos.z, hx: bus.forward.x, hz: bus.forward.z, speed: bus.speed });

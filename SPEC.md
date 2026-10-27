@@ -349,6 +349,7 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
 - **Format:** AAC `.m4a`, mono, 64–96 kbps.
 - **Budget:** ≤ 5 MB in the shell and ≤ 4 MB per Region, inside the overall budgets.
 - **Settings:** volume sliders for master, music, effects and voice; audio mutes when the tab is hidden.
+- **As built (M9):** 22 Freesound clips (16 CC0, 6 CC BY 4.0, credited on the Licences screen) taken from Freesound's public HQ previews, which carry the same licence and don't need an account. `npm run audio` cuts, loops, loudness-normalises and encodes them from `data/audio-src/` into `public/audio/` (2.55 MB in all). Engines and the propeller are pitched loops; the stall horn and CNG/car horns are synthesised in Web Audio; the wiper sound is timed to each on-screen sweep. Dhaka traffic honks every few seconds (rickshaw bells, CNG beeps, bus horns), the hill road hardly ever; a police whistle marks phase changes at the junction ahead. The Helper call-outs wait for the recordings ([script](docs/audio/helper-callouts.md)).
 
 ## 15. Progression and saves
 [020](docs/wayfinder/tickets/020-define-progression-and-saves.md)

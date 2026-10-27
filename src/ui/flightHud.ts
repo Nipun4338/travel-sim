@@ -3,6 +3,7 @@
 // cockpit), Tab details, toasts and the end-of-Challenge card. The full M8 layout comes later.
 import type { ChallengeResult } from '../flight/challenge';
 import { clock, num, place, t } from '../i18n/i18n';
+import { audio } from '../audio/audio';
 
 export interface FlightHudState {
   kmh: number; altM: number; agl: number; vsMs: number; headingDeg: number; throttle: number;
@@ -119,6 +120,7 @@ export class FlightHud {
       box.appendChild(b);
     }
     this.card.hidden = false;
+    audio.play('jingle', { gain: 0.6 });
   }
 }
 
