@@ -2,6 +2,7 @@
 // with its rivers and divisions, a pin for each playable Region (and dimmed coming-soon pins), the
 // routes you've driven lit up, and the landmarks you've found. It stays mounted while the menu
 // redraws, so choosing a Region can glide the view in and back out.
+import { place } from '../../i18n/i18n';
 import { LANDMARKS } from '../../shared/landmarks';
 import { BD_DIVISIONS, BD_ISLANDS, BD_LAND, BD_RIVERS, BD_VIEWBOX, bdXY } from './bdMap';
 
@@ -22,7 +23,7 @@ const SOON: Array<{ key: string; lat: number; lon: number }> = [
 ];
 /** How far to zoom on a Region: its centre and the width of view (km). */
 const FOCUS: Record<MapRegion, { lat: number; lon: number; km: number }> = {
-  dhaka: { lat: 23.79, lon: 90.39, km: 42 },
+  dhaka: { lat: 23.778, lon: 90.398, km: 19 },
   bandarban: { lat: 22.12, lon: 92.24, km: 46 },
 };
 
@@ -45,6 +46,11 @@ export class MenuMap {
     const [vx, vy, vw, vh] = BD_VIEWBOX;
     const routes = progress.routes.map(r => `<path class="route ${r.kind} ${r.done ? 'done' : ''}" d="${pathOf(r.latLon)}"/>`).join('');
     const found = LANDMARKS.filter(l => progress.found.has(l.name)).map(l => { const [x, y] = bdXY(l.lat, l.lon); return `<circle class="found" cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="0.9"><title>${l.name}</title></circle>`; }).join('');
+    // Each Region's landmarks, labelled, shown only while that Region is zoomed in: found ones in gold.
+    const labels = PINS.map(r => `<g class="lm lm-${r.id}">${LANDMARKS.filter(l => l.places.some(pl => pl.startsWith(r.id))).map(l => {
+      const [x, y] = bdXY(l.lat, l.lon), got = progress.found.has(l.name);
+      return `<g class="lm-mark ${got ? 'got' : ''} ${l.tier}" transform="translate(${x.toFixed(2)},${y.toFixed(2)})"><circle/><text>${got ? '★ ' : ''}${place(l.name)}</text></g>`;
+    }).join('')}</g>`).join('');
     const pin = (x: number, y: number, cls: string, text: string, id?: string) => `
       <g class="pin ${cls}" transform="translate(${x.toFixed(2)},${y.toFixed(2)})" ${id ? `data-pin="${id}" tabindex="0" role="button" aria-label="${text}"` : ''}>
         <circle class="pulse" r="10"/><circle class="dot" r="6"/><text y="-11">${text}</text></g>`;
@@ -57,7 +63,7 @@ export class MenuMap {
         <g filter="url(#landShadow)"><path class="land" d="${BD_LAND}"/>${BD_ISLANDS.map(d => `<path class="land" d="${d}"/>`).join('')}</g>
         ${BD_DIVISIONS.map(d => `<path class="division" d="${d}"/>`).join('')}
         ${BD_RIVERS.map(r => `<path class="river" d="${r.d}"><title>${r.name}</title></path>`).join('')}
-        ${routes}${found}
+        ${routes}${found}${labels}
         ${SOON.map(p => { const [x, y] = bdXY(p.lat, p.lon); return pin(x, y, 'soon', this.label(p.key)); }).join('')}
         ${PINS.map(p => { const [x, y] = bdXY(p.lat, p.lon); return pin(x, y, `live ${p.id}`, this.label(`region.${p.id}`), p.id); }).join('')}
       </g></svg>`;
@@ -75,6 +81,7 @@ export class MenuMap {
     if (r === this.focusRegion) return;
     this.focusRegion = r;
     this.el.classList.toggle('focused', !!r);
+    this.el.dataset.focus = r ?? '';
     this.applyView();
   }
 
@@ -102,7 +109,7 @@ export class MenuMap {
       target = [cx - vw * (wide ? free / 2 : 0.5), cy - vh * (wide ? 0.5 : 0.22), vw, vh];
     }
     cancelAnimationFrame(this.anim);
-    if (instant) { this.view = target; this.svg.setAttribute('viewBox', target.join(' ')); return; }
+    if (instant) { this.view = target; this.svg.setAttribute('viewBox', target.join(' ')); this.scaleLabels(); this.declutter(); return; }
     const from = [...this.view], t0 = performance.now(), DUR = 900;
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const step = (now: number) => {
@@ -113,8 +120,34 @@ export class MenuMap {
       const x = from[0] + (target[0] - from[0]) * k, y = from[1] + (target[1] - from[1]) * k;
       this.view = [x, y, w, h];
       this.svg.setAttribute('viewBox', this.view.map(v => v.toFixed(2)).join(' '));
+      this.scaleLabels();
       if (k < 1) this.anim = requestAnimationFrame(step);
+      else this.declutter();
     };
     this.anim = requestAnimationFrame(step);
+  }
+
+  /** Landmark labels stay the same size on screen at any zoom: their sizes are set in screen pixels. */
+  private scaleLabels(): void {
+    const u = this.view[2] / (this.el.clientWidth || innerWidth);   // map units per screen pixel
+    this.svg.style.setProperty('--lm-font', `${(11 * u).toFixed(4)}px`);
+    this.svg.style.setProperty('--lm-r', `${(3 * u).toFixed(4)}px`);
+    this.svg.style.setProperty('--lm-dx', `${(6 * u).toFixed(4)}px`);
+    this.svg.style.setProperty('--lm-stroke', `${(2.5 * u).toFixed(4)}px`);
+  }
+
+  /** Hides labels that would overlap one already placed (found and hero landmarks go first). */
+  private declutter(): void {
+    if (!this.focusRegion) return;
+    const marks = [...this.el.querySelectorAll<SVGGElement>(`.lm-${this.focusRegion} .lm-mark`)];
+    marks.sort((a, b) => Number(b.classList.contains('got')) - Number(a.classList.contains('got')) || Number(b.classList.contains('hero')) - Number(a.classList.contains('hero')));
+    const placed: DOMRect[] = [];
+    for (const m of marks) {
+      const text = m.querySelector('text')!;
+      text.style.display = '';
+      const r = text.getBoundingClientRect();
+      const hit = placed.some(p => r.left < p.right + 4 && r.right + 4 > p.left && r.top < p.bottom + 2 && r.bottom + 2 > p.top);
+      if (hit) text.style.display = 'none'; else placed.push(r);
+    }
   }
 }

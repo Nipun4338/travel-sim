@@ -210,18 +210,40 @@ async function mapProgress(): Promise<MapProgress> {
   return out;
 }
 
-/** The map home: a hint, the Regions as big buttons too, Continue, the career line and the links. */
+/** The map home: a hint, the Regions as big buttons too, Continue, the passport and the links. */
 function mapHome(p: Progress): string {
-  const c = p.career, last = readSave().lastTrip;
+  const last = readSave().lastTrip;
   return `<div class="map-home">
     <p class="map-hint">${t('mapHint')}</p>
     <div class="map-regions">${(['dhaka', 'bandarban'] as const).map(r => `<button class="btn" data-pick="${r}">📍 ${t(`region.${r}`)}</button>`).join('')}</div>
     ${last ? `<button class="btn continue" data-continue>▶ ${t('continueTrip')}<small>${last.label}</small></button>` : ''}
-    <div class="map-career">৳ ${amount(c.taka)} · ${t('careerKm', { n: num(c.km.toFixed(1)) })} · ${t('careerPax', { n: amount(c.passengers) })}</div>
+    ${passport(p)}
     <div class="links"><button class="btn alt" data-go='{"screen":"liveries"}'>${t('liveries')}</button>
       <button class="btn alt" data-go='{"screen":"settings"}'>${t('settings')}</button>
       <button class="btn alt" data-go='{"screen":"licences"}'>${t('licences')}</button>
       <button class="btn alt" data-go='{"screen":"history"}'>${t('versionHistory')}</button></div>
+  </div>`;
+}
+
+/**
+ * The career as a passport: the totals, and a stamp for each place and mode where a trip has been
+ * finished (any Leg for bus and metro, any Challenge for the plane).
+ */
+function passport(p: Progress): string {
+  const c = p.career;
+  const leg = (r: string) => Object.entries(p.legs).some(([k, v]) => k.startsWith(`${r}:`) && v?.done);
+  const ch = (r: string) => Object.entries(p.challenges).some(([k, v]) => k.startsWith(`${r}-`) && v?.done);
+  const stamps = [
+    { icon: '🚌', place: 'region.dhaka', done: leg('dhaka') },
+    { icon: '✈️', place: 'region.dhaka', done: ch('dhaka') },
+    { icon: '🚇', place: 'region.line6', done: leg('line6') },
+    { icon: '🚌', place: 'region.bandarban', done: leg('bandarban') },
+    { icon: '✈️', place: 'region.bandarban', done: ch('bandarban') },
+  ];
+  return `<div class="passport">
+    <div class="passport-head"><span class="bd-flag" aria-hidden="true"></span>${t('passport')}<span>${stamps.filter(s => s.done).length}/${stamps.length}</span></div>
+    <div class="passport-stats">৳ ${amount(c.taka)} · ${t('careerKm', { n: num(c.km.toFixed(1)) })} · ${t('careerPax', { n: amount(c.passengers) })} · ${t('careerLandings', { n: c.flightsLanded })} · ${t('landmarks', { n: landmarksFound().size, of: 15 })}</div>
+    <div class="stamps">${stamps.map((s, i) => `<span class="stamp ${s.done ? 'on' : ''}" style="--tilt:${[-8, 6, -4, 9, -6][i]}deg" title="${t(s.place)}">${s.icon}<small>${t(s.place)}</small></span>`).join('')}</div>
   </div>`;
 }
 

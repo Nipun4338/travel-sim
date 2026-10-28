@@ -359,3 +359,26 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 
 /* Landscape phones are short: drop the destination picture so the trips show straight away. */
 @media (max-height: 420px) { .dest-card .dest-hero { display: none; } .dest-card { top: 64px; } }
+
+/* The passport career card on the map home: totals, and a stamp per place and mode played. */
+.passport { width: 100%; box-sizing: border-box; padding: 8px 12px 10px; border-radius: 12px; background: linear-gradient(160deg, #6a1630, #4a0f22); border: 2px solid #c9a227; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+.passport-head { display: flex; justify-content: space-between; align-items: baseline; color: #e9c46a; font: 800 15px var(--art-font); letter-spacing: .04em; }
+.passport-head span { font-size: 12px; color: var(--cream); }
+.passport-stats { margin: 4px 0 8px; font-size: 12px; color: var(--cream); line-height: 1.4; }
+.stamps { display: flex; gap: 6px; flex-wrap: wrap; }
+.stamp { width: 54px; height: 54px; border-radius: 50%; border: 2px dashed rgba(233,196,106,.45); display: grid; place-items: center; align-content: center; font-size: 18px; color: rgba(255,255,255,.35); filter: grayscale(1) opacity(.5); transform: rotate(var(--tilt)); }
+.stamp small { font: 700 8px var(--art-font); max-width: 50px; text-align: center; line-height: 1.1; }
+.stamp.on { border: 3px double #e05a47; color: #ffdfd8; filter: none; background: rgba(224,90,71,.18); }
+
+/* Landmark labels on the zoomed map: only the focused Region's, found ones in gold. */
+.menu-map .lm { display: none; }
+.menu-map[data-focus="dhaka"] .lm-dhaka, .menu-map[data-focus="bandarban"] .lm-bandarban { display: inline; }
+.menu-map .lm-mark circle { r: var(--lm-r); fill: #fff; stroke: var(--plum); stroke-width: 1px; vector-effect: non-scaling-stroke; opacity: .75; }
+.menu-map .lm-mark text { font-family: var(--art-font); font-weight: 700; font-size: var(--lm-font); transform: translate(var(--lm-dx), calc(var(--lm-font) * .35)); fill: rgba(255,255,255,.8); paint-order: stroke; stroke: rgba(46,26,71,.9); stroke-width: var(--lm-stroke); }
+.menu-map .lm-mark.got circle { fill: var(--yellow); opacity: 1; }
+.menu-map .lm-mark.got text { fill: var(--yellow); }
+/* Bangladesh's flag, drawn (Windows shows the flag emoji as the letters BD). */
+.bd-flag { display: inline-block; width: 20px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; background: radial-gradient(circle at 45% 50%, #f42a41 0 3.6px, #006a4e 3.9px); }
+.passport-head > span:last-child { margin-left: auto; }
+.passport-head { justify-content: flex-start; }
+

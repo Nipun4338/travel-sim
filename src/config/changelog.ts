@@ -11,6 +11,21 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.2.1',
+    date: '2026-10-28',
+    image: '1.2.1.jpg',
+    bn: [
+      'গেমপ্যাডে মেট্রো চালান: ডান স্টিক মাস্টার কন্ট্রোলার, B জরুরি ব্রেক, LB/RB দরজা খোলা, A বন্ধ, Y ক্যামেরা।',
+      'নতুন পাসপোর্ট কার্ড: আপনার মোট হিসাব আর প্রতিটি জায়গা ও মোডের স্ট্যাম্প।',
+      'মানচিত্রে জুম করলে দর্শনীয় স্থানের নাম দেখা যায়; খুঁজে পাওয়াগুলো সোনালি তারায়।',
+    ],
+    en: [
+      'Drive the metro with a gamepad: right stick master controller, B emergency brake, LB/RB open doors, A closes them, Y camera.',
+      'A new passport card: your career totals and a stamp for every place and mode played.',
+      'Zoomed into a place, the map names its landmarks; the ones you have found get a gold star.',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-10-28',
     image: '1.2.0.jpg',

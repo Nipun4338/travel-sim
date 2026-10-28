@@ -20,6 +20,7 @@ import { audio } from '../audio/audio';
 import { Atp } from './atp';
 import { NOTCH_MAX, NOTCH_MIN, Train } from './Train';
 import { mountMetroTouch } from './touch';
+import { MetroGamepad } from './gamepad';
 import { TrainSounds } from './sounds';
 import { Passengers } from './passengers';
 import { onTrack, StationView } from './stations';
@@ -232,6 +233,7 @@ addEventListener('keydown', e => {
   else if (e.code === 'KeyM') minimap.toggle();
 });
 mountMetroTouch(train, { doors: openDoors, close: closeDoors, camera: nextCamera, map: () => minimap.toggle() });
+const pad = new MetroGamepad(train, { doors: openDoors, close: closeDoors, camera: nextCamera, map: () => minimap.toggle() });
 const pauseMenu = new PauseMenu({ restart: () => location.reload(), onChange: p => { paused = p; } });
 
 const eye = new THREE.Vector3(), look = new THREE.Vector3(), fwd = new THREE.Vector3(), chasePos = new THREE.Vector3();
@@ -370,6 +372,7 @@ startLoop(
     stepStation(dt);
   },
   (frameDt, ahead) => {
+    if (!paused) pad.poll();
     view.sync(paused ? 0 : ahead);
     for (const gv of ghostViews) gv.sync();
     view.setCabVisible(camMode === 'cab');

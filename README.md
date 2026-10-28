@@ -106,14 +106,14 @@ Touch controls work like a mobile driving sim: a steering wheel you turn with yo
 
 **Metro**
 
-| Action | Keyboard |
-|---|---|
-| Master controller: more power / more brake (one notch) | `W` / `S` or `↑` / `↓` |
-| Emergency brake | `Space` |
-| Open doors left / right | `Q` / `E` |
-| Close doors | `C` |
-| Camera (7 views) / map | `V` / `M` |
-| Pause | `Esc` |
+| Action | Keyboard | Gamepad |
+|---|---|---|
+| Master controller: more power / more brake | `W` / `S` or `↑` / `↓` (one notch) | right stick up / down |
+| Emergency brake | `Space` | B |
+| Open doors left / right | `Q` / `E` | LB / RB |
+| Close doors | `C` | A |
+| Camera (7 views) / map | `V` / `M` | Y / View |
+| Pause | `Esc` | Menu |
 
 Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readout.
 
@@ -124,13 +124,13 @@ Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readou
 | ![The menu: an illustrated map of Bangladesh with Dhaka and Bandarban pins](docs/images/menu-map.jpg) | ![Dhaka chosen: the map zooms in and a card offers Bus, Plane and Metro](docs/images/menu-destination.jpg) |
 | *The game opens on Bangladesh; coming-soon places are dimmed* | *Choose a place: the map zooms in, the card has every mode, its trips, and time and weather* |
 
-The routes you've driven light up on the map, and a **Continue** button restarts your last trip in one tap. Prefer lists? The **List** button brings back the classic menu cards. After an update, a **What's new** card shows the changes once, and the **Version history** (tap the version in the corner) has every release with its picture.
+The routes you've driven light up on the map, zoomed-in places name their landmarks (the ones you've found get a gold star), a **passport** card collects a stamp for every place and mode you've played, and a **Continue** button restarts your last trip in one tap. Prefer lists? The **List** button brings back the classic menu cards. After an update, a **What's new** card shows the changes once, and the **Version history** (tap the version in the corner) has every release with its picture.
 
 | | |
 |:-:|:-:|
 | ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
 
-**Current version: 1.2.0**, with the map menu. 1.1.0 added Metro Mode on MRT Line 6.
+**Current version: 1.2.1**: gamepad control for the metro, the passport card and landmark names on the map. 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 
