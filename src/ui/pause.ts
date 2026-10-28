@@ -1,5 +1,6 @@
 // Pause (Esc or the ❚❚ button, SPEC §13 bottom-right): resume, restart, or back to the menu.
 import { onLangChange, t } from '../i18n/i18n';
+import { versionLabel } from './whatsNew';
 
 export const backToMenu = () => { location.href = location.pathname; };
 
@@ -22,7 +23,7 @@ export class PauseMenu {
 
   private draw(): void {
     this.el.innerHTML = `<div class="panel"><h2>${t('paused')}</h2><div class="buttons">
-      <button data-a="resume">${t('resume')}</button><button data-a="restart">${t('restart')}</button><button data-a="menu">${t('menu')}</button></div></div>`;
+      <button data-a="resume">${t('resume')}</button><button data-a="restart">${t('restart')}</button><button data-a="menu">${t('menu')}</button></div></div>${versionLabel()}`;
     this.el.querySelector('[data-a="resume"]')!.addEventListener('click', () => this.set(false));
     this.el.querySelector('[data-a="restart"]')!.addEventListener('click', () => { this.set(false); this.actions.restart(); });
     this.el.querySelector('[data-a="menu"]')!.addEventListener('click', backToMenu);

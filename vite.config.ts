@@ -1,11 +1,16 @@
 // Vite + the installable shell (SPEC §16): Workbox precaches the game shell and sounds; baked
 // Regions and Flight Zones stream in and are cached as you play (CacheFirst: their files are
 // content-hashed and never change), while their manifests are checked first so updates arrive.
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { REGION_CACHE } from './src/shared/cache';
 
+const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+
 export default defineConfig({
+  // The game's version (package.json), shown in a corner and used for the What's new popup.
+  define: { __APP_VERSION__: JSON.stringify(version) },
   build: { target: 'es2022', chunkSizeWarningLimit: 2500 },
   plugins: [
     VitePWA({

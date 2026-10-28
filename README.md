@@ -93,9 +93,14 @@ Touch controls work like a mobile driving sim: a steering wheel you turn with yo
 
 Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readout.
 
-## Menus
+## Menus and updates
 
-![The main menu in Bangla: Bus, Plane and Career](docs/images/menu.jpg)
+| | |
+|:-:|:-:|
+| ![The main menu in Bangla: Bus, Plane and Career](docs/images/menu.jpg) | ![The What's new card shown after an update](docs/images/whats-new.jpg) |
+| *The main menu; tap the version in the corner for the full version history* | *After an update, a What's new card lists the changes once* |
+
+**Current version: 1.0.0.** Coming next in **1.1.0**: drive a six-car Dhaka Metro train along the whole of MRT Line 6, Uttara North to Motijheel.
 
 ## Build it yourself
 
@@ -114,6 +119,8 @@ npm run bake -- bandarban
 npm run bake:flight -- dhaka     # Flight Zones (public/zones); needs data/raw/osm/bangladesh-latest.osm.pbf
 npm run bake:flight -- bandarban
 ```
+
+To release, bump the version in `package.json` and add an entry to [src/config/changelog.ts](src/config/changelog.ts); players see it once in the What's new card.
 
 ```bash
 npm run build        # typecheck and production build

@@ -11,6 +11,8 @@ export interface SaveData {
   landmarks?: string[];
   liveries?: { bus: string; plane: string };
   lang?: 'bn' | 'en';
+  /** The last game version whose What's new the player has seen. */
+  seenVersion?: string;
 }
 
 const DB = 'travel-sim', STORE = 'save', KEY = 'main';

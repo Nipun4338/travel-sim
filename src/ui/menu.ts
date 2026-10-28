@@ -14,13 +14,15 @@ import type { ZoneManifest } from '../shared/zone';
 import { conditionsMultiplier, fogAllowed, type TimeOfDay, type Weather } from '../world/conditions';
 import { audio } from '../audio/audio';
 import { SOUND_CREDITS } from '../audio/credits';
+import { CHANGELOG } from '../config/changelog';
+import { APP_VERSION, showWhatsNew, versionLabel } from './whatsNew';
 
 type Mode = 'bus' | 'flight';
 const REGIONS = ['dhaka', 'bandarban'] as const;
 type Region = (typeof REGIONS)[number];
 
 interface State {
-  screen: 'mode' | 'setup' | 'settings' | 'licences' | 'liveries';
+  screen: 'mode' | 'setup' | 'settings' | 'licences' | 'liveries' | 'history';
   mode: Mode;
   region: Region;
   trip: number | 'full' | 'free';
@@ -89,6 +91,7 @@ export async function showMenu(): Promise<void> {
     if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : await flightSetup(p, st, settings);
     if (st.screen === 'settings') html = settingsScreen(settings, await storagePanel());
     if (st.screen === 'liveries') html = liveriesScreen();
+    if (st.screen === 'history') html = historyScreen();
     if (st.screen === 'licences') {
       await Promise.all(REGIONS.flatMap(r => [loadRoute(r), loadZone(r)]));
       html = licencesScreen();
@@ -96,7 +99,7 @@ export async function showMenu(): Promise<void> {
     if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode, st.region));
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
       <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}
-      <div class="osm-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">${t('osmCredit')}</a></div>`;
+      <div class="osm-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">${t('osmCredit')}</a></div>${versionLabel(true)}`;
     // Offline: download a Region-mode with progress, or delete one from Settings.
     root.querySelector<HTMLButtonElement>('[data-download]')?.addEventListener('click', async e => {
       const btn = e.currentTarget as HTMLButtonElement, [mode, region] = btn.dataset.download!.split(':') as [RegionMode, string];
@@ -157,6 +160,7 @@ export async function showMenu(): Promise<void> {
   }
 
   await render();
+  showWhatsNew();
 }
 
 function modeScreen(p: Progress): string {
@@ -180,7 +184,8 @@ function modeScreen(p: Progress): string {
       <div>${t('landmarks', { n: landmarksFound().size, of: landmarkTotal })}</div>
       <div class="links"><button class="btn alt" data-go='{"screen":"liveries"}'>${t('liveries')}</button>
       <button class="btn alt" data-go='{"screen":"settings"}'>${t('settings')}</button>
-      <button class="btn alt" data-go='{"screen":"licences"}'>${t('licences')}</button></div>
+      <button class="btn alt" data-go='{"screen":"licences"}'>${t('licences')}</button>
+      <button class="btn alt" data-go='{"screen":"history"}'>${t('versionHistory')}</button></div>
     </div></div>`;
 }
 
@@ -330,6 +335,19 @@ function currentId(kind: 'bus' | 'plane'): string {
   const list = kind === 'bus' ? BUS_LIVERIES : PLANE_LIVERIES;
   const id = readSave().liveries?.[kind];
   return list.find(l => l.id === id && l.unlockTk <= careerTaka())?.id ?? list[0].id;
+}
+
+/** Every release, newest first, from the changelog (SPEC §13). */
+function historyScreen(): string {
+  const lang = getLang();
+  const date = (d: string) => new Intl.DateTimeFormat(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T00:00:00`));
+  return `<div class="menu-row"><div class="panel history">
+    <h2>${dual('versionHistory')}</h2>
+    ${CHANGELOG.map(r => `<section${r.version === APP_VERSION ? ' class="current"' : ''}>
+      <h3>v${r.version} <span>${date(r.date)}</span>${r.version === APP_VERSION ? `<em>${t('currentVersion')}</em>` : ''}</h3>
+      <ul>${r[lang].map(item => `<li>${item}</li>`).join('')}</ul></section>`).join('')}
+    <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
+  </div></div>`;
 }
 
 function licencesScreen(): string {
