@@ -6,6 +6,7 @@ import type { LaneData } from '../shared/region';
 import type { Junctions } from './junctions';
 import { SPECS, vehicleGeometry, vehicleMaterial, type VehicleType } from './models';
 import { LaneNetwork, type Path } from './network';
+import { BUS_LIVERIES, busSignGeometry, busSignMaterial, truckSignGeometry, truckSignMaterial } from './signs';
 
 export type QualityTier = 'low' | 'medium' | 'high';
 export const TRAFFIC_CAP: Record<QualityTier, number> = { low: 25, medium: 45, high: 80 };
@@ -37,12 +38,14 @@ interface Vehicle {
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
   color: THREE.Color;
+  livery: number;        // buses: index into BUS_LIVERIES
+  yaw: number | null;    // drawn heading, eased so turns don't snap at road vertices
 }
 
 export interface BusObstacle { x: number; z: number; hx: number; hz: number; speed: number; }
 
-const tmp = { x: 0, y: 0, z: 0, hx: 1, hz: 0 };
-const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+const tmp = { x: 0, y: 0, z: 0, hx: 1, hz: 0 }, back = { ...tmp }, front = { ...tmp };
+const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qp = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3(0, 0, 1), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
 
 /** AI traffic speed in monsoon rain. */
 export const RAIN_TRAFFIC_FACTOR = 0.85;
@@ -51,6 +54,9 @@ export class Traffic {
   readonly network: LaneNetwork;
   private vehicles: Vehicle[] = [];
   private meshes = new Map<VehicleType, THREE.InstancedMesh>();
+  /** Lettering drawn over the bodies: one mesh per bus company, one for trucks. */
+  private busSigns: THREE.InstancedMesh[];
+  private truckSigns: THREE.InstancedMesh;
   private byCollider = new Map<number, Vehicle>();
   private time = 0;
   private cap: number;
@@ -76,10 +82,21 @@ export class Traffic {
       const mesh = new THREE.InstancedMesh(vehicleGeometry(type), vehicleMaterial, cap);
       mesh.count = 0;
       mesh.frustumCulled = false;
+      mesh.castShadow = true;
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       scene.add(mesh);
       this.meshes.set(type, mesh);
     }
+    const signs = (geo: THREE.BufferGeometry, mat: THREE.Material) => {
+      const mesh = new THREE.InstancedMesh(geo, mat, cap);
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      return mesh;
+    };
+    const busGeo = busSignGeometry();
+    this.busSigns = BUS_LIVERIES.map(l => signs(busGeo, busSignMaterial(l)));
+    this.truckSigns = signs(truckSignGeometry(), truckSignMaterial());
   }
 
   get count(): number { return this.vehicles.length; }
@@ -116,10 +133,10 @@ export class Traffic {
         v.s -= v.path.length;
         v.path = next;
         v.lane = Math.min(v.lane, next.lanes - 1);
-        v.lateral = this.network.laneOffset(next, v.lane);
+        // v.lateral eases to the new lane in drive(), so a change in lane count doesn't jump sideways.
       }
     }
-    this.syncVisuals();
+    this.syncBodies();
   }
 
   private drive(v: Vehicle, dt: number, bus: BusObstacle): void {
@@ -209,8 +226,9 @@ export class Traffic {
     const spec = SPECS[type];
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(tmp.x, tmp.y + spec.height / 2, tmp.z));
     const collider = this.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.length / 2, spec.height / 2, spec.width / 2), body);
-    const color = new THREE.Color(spec.tints[Math.floor(this.rnd() * spec.tints.length)]);
-    const vehicle: Vehicle = { type, path: p, s, lane, lateral, v: (spec.speedKmh / 3.6) * 0.7, heldUntil: 0, body, collider, color };
+    const livery = Math.floor(this.rnd() * BUS_LIVERIES.length);
+    const color = new THREE.Color(type === 'bus' ? BUS_LIVERIES[livery].body : spec.tints[Math.floor(this.rnd() * spec.tints.length)]);
+    const vehicle: Vehicle = { type, path: p, s, lane, lateral, v: (spec.speedKmh / 3.6) * 0.7, heldUntil: 0, body, collider, color, livery, yaw: null };
     this.vehicles.push(vehicle);
     this.byCollider.set(collider.handle, vehicle);
   }
@@ -222,25 +240,59 @@ export class Traffic {
     this.vehicles.splice(i, 1);
   }
 
-  private syncVisuals(): void {
-    const counts = new Map<VehicleType, number>();
+  /** Moves the physics bodies to where the vehicles are at this step. */
+  private syncBodies(): void {
     for (const v of this.vehicles) {
       this.network.sample(v.path, v.s, tmp);
       const x = tmp.x - tmp.hz * v.lateral, z = tmp.z + tmp.hx * v.lateral; // + lateral = right of travel
-      const yaw = Math.atan2(-tmp.hz, tmp.hx);
-      q.setFromAxisAngle(up, yaw);
+      q.setFromAxisAngle(up, Math.atan2(-tmp.hz, tmp.hx));
       v.body.setNextKinematicTranslation({ x, y: tmp.y + SPECS[v.type].height / 2, z });
       v.body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+    }
+  }
+
+  /**
+   * Draws the vehicles `ahead` seconds past the last step. Heading and pitch come from the road 3 m
+   * behind and ahead (the path is a polyline of ~10 m segments, so its own heading jumps at every
+   * vertex), and the heading is eased so a turn onto the next road sweeps round instead of snapping.
+   */
+  draw(ahead: number, frameDt: number): void {
+    const counts = new Map<VehicleType, number>(), signCounts = new Map<THREE.InstancedMesh, number>();
+    const ease = 1 - Math.exp(-frameDt * 10);
+    for (const v of this.vehicles) {
+      const s = Math.min(v.path.length, v.s + v.v * ahead);
+      this.network.sample(v.path, s, tmp);
+      this.network.sample(v.path, Math.max(0, s - 3), back);
+      this.network.sample(v.path, Math.min(v.path.length, s + 3), front);
+      let dx = front.x - back.x, dz = front.z - back.z;
+      const run = Math.hypot(dx, dz) || 1;
+      dx /= run; dz /= run;
+      const target = Math.atan2(-dz, dx);
+      if (v.yaw === null) v.yaw = target;
+      else v.yaw += Math.atan2(Math.sin(target - v.yaw), Math.cos(target - v.yaw)) * ease;
+      const pitch = Math.atan2(front.y - back.y, run);
+      const x = tmp.x - dz * v.lateral, z = tmp.z + dx * v.lateral; // + lateral = right of travel
+      q.setFromAxisAngle(up, v.yaw).multiply(qp.setFromAxisAngle(side, pitch));
       const mesh = this.meshes.get(v.type)!, n = counts.get(v.type) ?? 0;
       m4.compose(pos.set(x, tmp.y, z), q, one);
       mesh.setMatrixAt(n, m4);
       mesh.setColorAt(n, v.color);
       counts.set(v.type, n + 1);
+      const signs = v.type === 'bus' ? this.busSigns[v.livery] : v.type === 'truck' ? this.truckSigns : null;
+      if (signs) {
+        const k = signCounts.get(signs) ?? 0;
+        signs.setMatrixAt(k, m4);
+        signCounts.set(signs, k + 1);
+      }
     }
     for (const [type, mesh] of this.meshes) {
       mesh.count = counts.get(type) ?? 0;
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+    for (const signs of [...this.busSigns, this.truckSigns]) {
+      signs.count = signCounts.get(signs) ?? 0;
+      signs.instanceMatrix.needsUpdate = true;
     }
   }
 }

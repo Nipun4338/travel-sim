@@ -141,6 +141,9 @@ export class BusView {
     this.attachCabCanvases();
     g.add(this.cab);
     scene.add(g);
+    // The body throws a sun shadow (the cab inside and the see-through beam cones don't).
+    g.traverse(o => { if (o instanceof THREE.Mesh && !(o.material as THREE.Material).transparent) o.castShadow = true; });
+    this.cab.traverse(o => { o.castShadow = false; });
   }
 
   private makeCanvas(w: number, h: number) {
@@ -222,9 +225,10 @@ export class BusView {
 
   setCabVisible(v: boolean): void { this.cab.visible = v; }
 
-  sync(bus: Bus): void {
-    const p = bus.body.translation(), r = bus.body.rotation();
-    this.group.position.set(p.x, p.y, p.z);
+  /** Draws the bus `ahead` seconds past its last physics step, so it moves smoothly at any frame rate. */
+  sync(bus: Bus, ahead = 0): void {
+    const p = bus.body.translation(), r = bus.body.rotation(), v = bus.body.linvel();
+    this.group.position.set(p.x + v.x * ahead, p.y + v.y * ahead, p.z + v.z * ahead);
     this.group.quaternion.set(r.x, r.y, r.z, r.w);
     this.wheels.forEach((w, i) => {
       w.pivot.position.y = BUS_WHEELS[i][1] - (bus.vehicle.wheelSuspensionLength(i) ?? SUSPENSION_REST);
