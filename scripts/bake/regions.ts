@@ -1,6 +1,6 @@
 // Region definitions for the bake (SPEC §5).
 
-export interface StopDef { name: string; osmNode?: number; lat: number; lon: number; }
+export interface StopDef { name: string; nameBn?: string; osmNode?: number; lat: number; lon: number; }
 
 export interface RegionDef {
   id: string;
@@ -26,6 +26,10 @@ export interface RegionDef {
   gradeRoads: boolean;
   /** Raised footpaths along main roads (city Regions; hill roads have none). */
   footpaths: boolean;
+  /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
+  metro?: boolean;
+  /** Read OSM from the local Geofabrik extract instead of Overpass (big city areas). */
+  fromExtract?: boolean;
 }
 
 export const DHAKA: RegionDef = {
@@ -77,7 +81,43 @@ export const BANDARBAN: RegionDef = {
   footpaths: false,
 };
 
-export const REGIONS: Record<string, RegionDef> = { dhaka: DHAKA, bandarban: BANDARBAN };
+/** MRT Line 6, Uttara North → Motijheel (SPEC §20; stations are OSM's, north to south). */
+export const LINE6: RegionDef = {
+  id: 'line6',
+  routeName: 'MRT Line 6: Uttara North → Motijheel',
+  origin: { lat: 23.7986, lon: 90.3911 },
+  bbox: [23.7195, 90.352, 23.8795, 90.4285],
+  corridorM: 350,
+  stops: [
+    { name: 'Uttara North',           nameBn: 'উত্তরা উত্তর',          lat: 23.86911, lon: 90.36753 },
+    { name: 'Uttara Center',          nameBn: 'উত্তরা মধ্য',           lat: 23.85972, lon: 90.36518 },
+    { name: 'Uttara South',           nameBn: 'উত্তরা দক্ষিণ',          lat: 23.84590, lon: 90.36315 },
+    { name: 'Pallabi',                nameBn: 'পল্লবী',               lat: 23.82616, lon: 90.36419 },
+    { name: 'Mirpur 11',              nameBn: 'মিরপুর ১১',             lat: 23.81910, lon: 90.36528 },
+    { name: 'Mirpur 10',              nameBn: 'মিরপুর ১০',             lat: 23.80836, lon: 90.36826 },
+    { name: 'Kazipara',               nameBn: 'কাজীপাড়া',             lat: 23.79924, lon: 90.37199 },
+    { name: 'Shewrapara',             nameBn: 'শেওড়াপাড়া',            lat: 23.79096, lon: 90.37551 },
+    { name: 'Agargaon',               nameBn: 'আগারগাঁও',             lat: 23.77843, lon: 90.38005 },
+    { name: 'Bijoy Sarani',           nameBn: 'বিজয় সরণি',            lat: 23.76639, lon: 90.38310 },
+    { name: 'Farmgate',               nameBn: 'ফার্মগেট',              lat: 23.75904, lon: 90.38711 },
+    { name: 'Karwan Bazar',           nameBn: 'কারওয়ান বাজার',         lat: 23.75127, lon: 90.39278 },
+    { name: 'Shahbag',                nameBn: 'শাহবাগ',               lat: 23.73946, lon: 90.39598 },
+    { name: 'Dhaka University',       nameBn: 'ঢাকা বিশ্ববিদ্যালয়',      lat: 23.73168, lon: 90.39682 },
+    { name: 'Bangladesh Secretariat', nameBn: 'বাংলাদেশ সচিবালয়',       lat: 23.73001, lon: 90.40748 },
+    { name: 'Motijheel',              nameBn: 'মতিঝিল',               lat: 23.72806, lon: 90.41906 },
+  ],
+  legEnds: ['Uttara North', 'Agargaon', 'Motijheel'],
+  terrainFilter: { minPx: 3, blurPx: 4 },
+  terrainSpacing: { near: 20, far: 25, lod1: 50, lod2: 100 },
+  defaultGround: 0xa39b8a,
+  forest: false,
+  gradeRoads: false,
+  footpaths: true,
+  metro: true,
+  fromExtract: true,
+};
+
+export const REGIONS: Record<string, RegionDef> = { dhaka: DHAKA, bandarban: BANDARBAN, line6: LINE6 };
 
 export function projection(origin: { lat: number; lon: number }) {
   const kx = Math.cos((origin.lat * Math.PI) / 180) * 111320;

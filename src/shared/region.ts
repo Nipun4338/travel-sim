@@ -29,6 +29,7 @@ export interface RegionManifest {
   route: string;       // file name of RouteData
   lanes: string;       // file name of LaneData
   rails?: string;      // file name of RailData
+  line?: string;       // file name of LineData (metro Regions)
   landmarks?: PlacedLandmark[];
   credits: string[];
 }
@@ -68,3 +69,30 @@ export interface LaneData { ways: LaneWay[]; }
 export interface RailLine { kind: 'rail' | 'metro'; points: [number, number, number][]; }
 export interface LevelCrossing { x: number; y: number; z: number; railHeadingDeg: number; roadHeadingDeg: number; roadWidth: number; }
 export interface RailData { lines: RailLine[]; crossings: LevelCrossing[]; }
+
+/**
+ * A metro line for Metro Mode (SPEC §20): one track per direction as a 1-D line the train runs on.
+ * Distances `s` are metres along that track from its start; heights are rail-top level.
+ */
+export interface LineStation { name: string; nameBn: string; x: number; z: number; }
+export interface LineStop {
+  station: number;       // index into LineData.stations
+  s: number;             // the station's centre along this track
+  stopS: number;         // where the train's front stops (the platform's far end mark)
+  side: 'left' | 'right'; // platform side, relative to the direction of travel
+}
+export interface LineTrack {
+  dir: 'south' | 'north';
+  points: [number, number, number][];   // every ~5 m
+  cum: number[];                        // s at each point
+  stops: LineStop[];                    // in running order
+  limits: Array<[number, number, number]>; // [from s, to s, km/h] civil speed limits
+}
+export interface LineData {
+  name: string;
+  stations: LineStation[];              // north to south
+  tracks: LineTrack[];                  // south then north
+  legs: Array<{ from: string; to: string }>;
+  trainLengthM: number;
+}
+

@@ -123,7 +123,7 @@ export function buildTerrain(
 // ---------- roads, markings, footpaths, crossings, elevated decks ----------
 
 /** Polyline offset sideways by `off` metres (+ = right of travel). */
-function offsetLine(pts: [number, number][], off: number): [number, number][] {
+export function offsetLine(pts: [number, number][], off: number): [number, number][] {
   return pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     let tx = b[0] - a[0], tz = b[1] - a[1];
@@ -446,6 +446,7 @@ export function buildTrees(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean, allRoads: SegmentIndex,
   footprints: PolygonIndex<true>, ground: PolygonIndex<Ground>, junctions: PointGrid,
   forest?: { buildings: PointGrid },
+  keepClear?: (x: number, z: number) => boolean,
 ): number {
   let n = 0;
   // Flyover decks (with their ramps) and railway tracks: no tree grows up through them.
@@ -464,7 +465,7 @@ export function buildTrees(
   // The trunk stays clear of the carriageway by most of its crown, so crowns only just overhang it.
   const plant = (x: number, z: number, seed: number, setting: TreeSetting) => {
     const species = pickSpecies(setting, seed), crown = crownRadius(species);
-    if (!near(x, z) || allRoads.onRoad(x, z, Math.max(1.5, crown - 2)) || overhead.onRoad(x, z, crown) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
+    if (!near(x, z) || allRoads.onRoad(x, z, Math.max(1.5, crown - 2)) || overhead.onRoad(x, z, crown) || keepClear?.(x, z) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
     plantTree(geo, species, x, h(x, z), z, seed);
     n++;
   };

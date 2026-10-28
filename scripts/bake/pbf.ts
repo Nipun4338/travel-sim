@@ -14,7 +14,7 @@ interface RawNode { type: 'node'; id: number; lat: number; lon: number; }
 interface RawWay { type: 'way'; id: number; refs: number[]; tags?: Record<string, string>; }
 
 /** Growable typed arrays of node ids and coordinates, in the file's (ascending id) order. */
-class NodeStore {
+export class NodeStore {
   ids = new Float64Array(1 << 20);
   lat = new Float64Array(1 << 20);
   lon = new Float64Array(1 << 20);
