@@ -19,6 +19,9 @@ import { RegionWorld } from '../world/region';
 import { audio } from '../audio/audio';
 import { Atp } from './atp';
 import { NOTCH_MAX, NOTCH_MIN, Train } from './Train';
+import { Passengers } from './passengers';
+import { onTrack, StationView } from './stations';
+import { FLOOR_M, PLATFORM_EDGE_M } from '../shared/train';
 import { Track } from './track';
 
 await RAPIER.init();
@@ -55,15 +58,14 @@ const legStops = trackData.stops.slice(firstStop, lastStop + 1);
 const track = new Track(trackData);
 const train = new Train(track, legStops[0].stopS, line.trainLengthM);
 const view = new TrainView(scene, train);
-// The train starts authorised to the next station; each stop there releases authority onwards
-// (until M13d's doors and dispatch: a short pause at the stop mark).
-let nextIdx = 1;
-const atp = new Atp(track, train, legStops[nextIdx].stopS);
+// The train starts at the first station with its doors open; authority to each next station is
+// given when the doors are closed and locked there (dispatch).
+let nextIdx = 0;
+const atp = new Atp(track, train, legStops[0].stopS);
 const chime = audio.tone(1150, 'square', 0.06);
 let chimeOn = false;
 atp.onWarning = on => { chimeOn = on; if (!on) chime.set(false); };
 atp.onIntervention = () => audio.beep(440, 3, 0.2);
-let dwell = 0;
 
 loader.stage('loadStreets', 0.1, 0.85);
 view.sync();
@@ -71,6 +73,59 @@ await region.prime(view.cars[0].position, p => loader.progress(p));
 loader.stage('loadPrepare', 0.85, 1);
 const minimap = new Minimap();
 minimap.setRegion(region.route, await region.loadLanes());
+const stationView = new StationView(scene, line);
+const passengers = new Passengers(scene);
+
+// ---- Station stops (SPEC §20): arrive, rate the stop, doors, exchange, close, dispatch. ----
+type StopPhase = 'running' | 'stopped' | 'opening' | 'open' | 'closing';
+let phase: StopPhase = 'open';
+let phaseT = 0, openFor = 0, doorT = 1, announced = -1, mayCloseSaid = false, legDone = false;
+const BUSY = new Set(['Uttara North', 'Mirpur 10', 'Agargaon', 'Farmgate', 'Karwan Bazar', 'Shahbag', 'Motijheel']);
+const busy = (i: number) => BUSY.has(line.stations[legStops[i].station].name);
+const waitingAt = (i: number) => (busy(i) ? 60 : 24) + Math.floor(Math.random() * 18);
+const alightingAt = (i: number) => (i === legStops.length - 1 ? passengers.onboard : Math.round(passengers.onboard * (busy(i) ? 0.35 : 0.18)));
+const stopRating = { perfect: 0, good: 0, rough: 0, overrun: 0 };
+const announce = document.createElement('div');
+announce.className = 'metro-announce';
+document.body.appendChild(announce);
+let announceTimer = 0;
+function say(key: string, params: Record<string, string> = {}, ms = 5000): void {
+  announce.textContent = t(key, params);
+  announce.classList.add('on');
+  clearTimeout(announceTimer);
+  announceTimer = window.setTimeout(() => announce.classList.remove('on'), ms);
+  audio.beep(880, 1, 0.12);
+}
+const sideName = (st: { side: 'left' | 'right' }) => t(st.side === 'left' ? 'sideLeft' : 'sideRight');
+/** Sets up the platform at stop `i`: its screen doors and its waiting crowd. */
+function serve(i: number): void {
+  stationView.setActive(trackData, legStops[i]);
+  passengers.arrive(trackData, legStops[i], i === legStops.length - 1 ? 0 : waitingAt(i));
+}
+// The trip starts at the first station with the doors open and people boarding.
+serve(0);
+passengers.open(0);
+train.doorHold = true;
+function openDoors(side: 'left' | 'right'): void {
+  if (phase !== 'stopped') return;
+  const st = legStops[nextIdx];
+  if (st.side !== side) { say('doorsWrongSide', { side: sideName(st) }, 3000); return; }
+  const err = train.s - st.stopS;
+  if (err < -0.5) { say('stopShort', { m: Math.abs(err).toFixed(1) }, 3000); return; }
+  if (err > 1.5) return;   // an overrun: handled in the step
+  const grade = Math.abs(err) <= 0.3 ? 'perfect' : Math.abs(err) <= 0.5 ? 'good' : 'rough';
+  stopRating[grade]++;
+  say(grade === 'perfect' ? 'stopPerfect' : grade === 'good' ? 'stopGood' : 'stopRough', { m: err.toFixed(2) }, 2500);
+  phase = 'opening'; phaseT = 0; openFor = 0; mayCloseSaid = false;
+  train.doorHold = true;
+  passengers.open(alightingAt(nextIdx));
+}
+function closeDoors(): void {
+  if (phase !== 'open' || nextIdx === legStops.length - 1) return;
+  if (passengers.waiting > 0) say('platformLeft', { n: String(passengers.waiting) }, 3000);
+  else say('doorsClosing', {}, 3000);
+  phase = 'closing'; phaseT = 0;
+}
 
 // Next-station banner (top centre), like the bus's next-Stop banner.
 const strip = document.createElement('div');
@@ -83,12 +138,13 @@ dmi.className = 'metro-dmi';
 dmi.appendChild(view.screenCanvas);
 document.body.appendChild(dmi);
 const stationName = (i: number) => (getLang() === 'bn' ? line.stations[i].nameBn : line.stations[i].name);
-const nextStop = () => legStops[nextIdx];
+// While the doors are open at a station, the banner already shows the one after it.
+const nextStop = () => legStops[Math.min(nextIdx + (nextIdx < legStops.length - 1 && (phase === 'open' || phase === 'closing') ? 1 : 0), legStops.length - 1)];
 
 // Controls: W/S (or ↑/↓) move the master controller a notch; Space is the emergency brake.
 let paused = false;
-// Cameras (V cycles): the cab, chasing, alongside, from the air, a passenger seat, and trackside.
-const CAMS = ['cab', 'chase', 'side', 'aerial', 'passenger', 'trackside'] as const;
+// Cameras (V cycles): the cab, chasing, on the platform, alongside, from the air, a passenger seat, and trackside.
+const CAMS = ['cab', 'chase', 'platform', 'side', 'aerial', 'passenger', 'trackside'] as const;
 type Cam = typeof CAMS[number];
 let camMode: Cam = 'cab';
 const camLabel = document.createElement('div');
@@ -106,7 +162,10 @@ function nextCamera(): void {
 }
 addEventListener('keydown', e => {
   if (paused || e.repeat) return;
-  if (e.code === 'KeyW' || e.code === 'ArrowUp') train.setNotch(train.notch === NOTCH_MIN ? -7 : Math.min(NOTCH_MAX, train.notch + 1));
+  if (e.code === 'KeyQ') openDoors('left');
+  else if (e.code === 'KeyE') openDoors('right');
+  else if (e.code === 'KeyC') closeDoors();
+  else if (e.code === 'KeyW' || e.code === 'ArrowUp') train.setNotch(train.notch === NOTCH_MIN ? -7 : Math.min(NOTCH_MAX, train.notch + 1));
   else if (e.code === 'KeyS' || e.code === 'ArrowDown') train.setNotch(Math.max(-7, train.notch - 1));
   else if (e.code === 'Space') { e.preventDefault(); train.setNotch(NOTCH_MIN); }
   else if (e.code === 'KeyV') nextCamera();
@@ -148,7 +207,15 @@ function updateCamera(dt: number): void {
   const mid = view.cars[2].position;
   if (camMode === 'chase') follow(tmp.copy(car.position).addScaledVector(fwd, -30).addScaledVector(right, 7).addScaledVector(UP, 6.5), car.position.clone().addScaledVector(fwd, 18), dt);
   else if (camMode === 'side') follow(tmp.copy(car.position).addScaledVector(fwd, -14).addScaledVector(right, 24).addScaledVector(UP, 2), mid.clone().addScaledVector(fwd, 12), dt, 4);
-  else if (camMode === 'aerial') follow(tmp.copy(mid).addScaledVector(fwd, -60).addScaledVector(right, -45).addScaledVector(UP, 70), mid, dt, 1.5);
+  else if (camMode === 'platform') {
+    // On the platform of the station being served (or approached), at its far end, looking back.
+    const st = legStops[nextIdx], sd = st.side === 'left' ? -1 : 1;
+    const at = onTrack(trackData, st.stopS + 14, sd * (PLATFORM_EDGE_M + 2.3), tmp).p;
+    camera.position.set(at.x, at.y + FLOOR_M + 1.75, at.z);
+    camera.up.set(0, 1, 0);
+    const to = onTrack(trackData, st.stopS - 60, sd * 0.2).p;
+    camera.lookAt(to.x, to.y + FLOOR_M + 1.3, to.z);
+  } else if (camMode === 'aerial') follow(tmp.copy(mid).addScaledVector(fwd, -60).addScaledVector(right, -45).addScaledVector(UP, 70), mid, dt, 1.5);
   else {
     // Trackside: stand beside the line ahead and watch the train go by; once it's well past, move on.
     const ahead = track.at(Math.min(track.length, train.s + 140 + train.v * 4), new THREE.Vector3());
@@ -164,16 +231,57 @@ const frontPos = new THREE.Vector3();
 updateCamera(0);
 await renderer.compileAsync(scene, camera).catch(() => undefined);
 
+function stepStation(dt: number): void {
+  phaseT += dt;
+  const st = legStops[nextIdx], last = nextIdx === legStops.length - 1;
+  if (phase === 'running') {
+    // Approaching: announce once, about 400 m out, and fill the platform.
+    if (announced !== nextIdx && st.stopS - train.s < 400) { announced = nextIdx; say('arriving', { name: stationName(st.station), side: sideName(st) }, 6000); serve(nextIdx); }
+    if (train.stopped && Math.abs(train.s - st.stopS) < 30) { phase = 'stopped'; phaseT = 0; }
+  } else if (phase === 'stopped') {
+    if (!train.stopped) { phase = 'running'; return; }
+    // Overrun by more than 1.5 m: the doors can't line up; after a pause the station is skipped.
+    if (train.s - st.stopS > 1.5 && phaseT > 3) {
+      stopRating.overrun++;
+      say('overrun', { name: stationName(st.station) }, 4000);
+      passengers.leave();
+      stationView.setActive(null, null);
+      if (!last) { nextIdx++; atp.authorise(legStops[nextIdx].stopS); }
+      phase = 'running';
+    }
+  } else if (phase === 'opening') {
+    doorT = Math.min(1, phaseT / 2.5);
+    if (doorT >= 1) { phase = 'open'; phaseT = 0; }
+  } else if (phase === 'open') {
+    openFor += dt;
+    if (!last && !mayCloseSaid && !passengers.busy && openFor > 15) { mayCloseSaid = true; say('mayClose', {}, 4000); }
+    if (last && !legDone && !passengers.busy && openFor > 6) { legDone = true; say('legDone', { name: stationName(st.station) }, 8000); }
+  } else if (phase === 'closing') {
+    doorT = Math.max(0, 1 - phaseT / 3);
+    if (doorT <= 0) {
+      // Closed and locked: dispatch, with authority to the next station.
+      train.doorHold = false;
+      nextIdx++;
+      atp.authorise(legStops[nextIdx].stopS);
+      passengers.leave();
+      stationView.setActive(null, null);
+      phase = 'running'; phaseT = 0;
+      say('nextStation', { name: stationName(legStops[nextIdx].station) }, 5000);
+    }
+  }
+  passengers.update(dt, phase === 'open');
+  if (phase === 'opening' || phase === 'open' || phase === 'closing') {
+    stationView.setOpen(doorT);
+    view.doorOpen[st.side] = doorT;
+  }
+}
+
 startLoop(
   dt => {
     if (paused) return;
     atp.update();
     train.update(dt);
-    // Stopped at the stop mark (within 15 m either side): after a short pause, authority moves on.
-    const st = legStops[nextIdx];
-    if (train.stopped && Math.abs(train.s - st.stopS) < 15) {
-      if ((dwell += dt) > 4 && nextIdx < legStops.length - 1) { nextIdx++; dwell = 0; atp.authorise(legStops[nextIdx].stopS); }
-    } else dwell = 0;
+    stepStation(dt);
   },
   (frameDt, ahead) => {
     view.sync(paused ? 0 : ahead);
@@ -207,4 +315,4 @@ camLabel.textContent = t('metroControls');
 camLabel.classList.add('on');
 camLabelTimer = window.setTimeout(() => camLabel.classList.remove('on'), 6000);
 
-if (import.meta.env.DEV) Object.assign(window, { __metro: { train, atp, track, view, line, legStops, region, renderer, scene, camera, setPaused: (p: boolean) => { paused = p; }, pauseMenu } });
+if (import.meta.env.DEV) Object.assign(window, { __metro: { step: (dt: number) => { atp.update(); train.update(dt); stepStation(dt); }, train, atp, track, view, passengers, stationView, get phase() { return phase; }, get nextIdx() { return nextIdx; }, stopRating, openDoors, closeDoors, line, legStops, region, renderer, scene, camera, setPaused: (p: boolean) => { paused = p; }, pauseMenu } });

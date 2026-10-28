@@ -4,6 +4,7 @@
 // piers and the overhead line from that one centreline: the train and the viaduct always agree.
 import * as THREE from 'three';
 import type { LineData, LineStop, LineTrack, RouteData } from '../../src/shared/region';
+import { doorOffsets, FLOOR_M, PLATFORM_EDGE_M, TRAIN_M } from '../../src/shared/train';
 import { offsetLine } from './build';
 import { ChunkGeometry, color, densify, type V3 } from './geometry';
 import type { Indexed } from './osm';
@@ -13,7 +14,6 @@ const STEP = 5;                 // m between line samples
 const RAIL_LEVEL = 13;          // rail top above the (smoothed) ground, m
 const TRACK_GAP = 4.0;          // default track centre spacing when the pair can't be measured
 const TAIL_M = 180;             // tail track past each terminus
-const TRAIN_M = 120;            // six cars of 19.8 m plus couplers
 const DECK_W = 9.6;
 const LAT_ACC = 0.75;           // m/s² of uncompensated lateral acceleration allowed in curves
 const LINE_MAX = 100;
@@ -269,7 +269,10 @@ export function buildViaduct(geo: ChunkGeometry, bake: MetroBake, onRoad: (x: nu
     piers++;
   }
   // Overhead line masts every ~48 m, on both deck edges, with an arm over each track.
+  const stations = bake.line.stations;
   for (let i = 0; i < centre.length; i += Math.round(48 / STEP)) {
+    // Along a station the wires hang from its roof: no masts on the platforms.
+    if (stations.some(st => Math.hypot(st.x - centre[i][0], st.z - centre[i][2]) < 100)) continue;
     const yaw = yawAt(i);
     for (const side of [-1, 1]) {
       const [mx, mz] = offsetLine(xz.slice(Math.max(0, i - 1), i + 2), side * (DECK_W / 2 - 0.45))[i === 0 ? 0 : 1];
@@ -279,4 +282,66 @@ export function buildViaduct(geo: ChunkGeometry, bake: MetroBake, onRoad: (x: nu
     }
   }
   return { piers, skipped };
+}
+
+const S = {
+  platform: color(0xbab5a9), platformSide: color(0x9f9a8f), edge: color(0xe8c228), psd: color(0x9bbac4),
+  roof: color(0xdcd8cf), roofSide: color(0xa9a59c), column: color(0xc9c5bb), wall: color(0xe6e0d0), concourse: color(0xcfc6b2),
+};
+const PLATFORM_W = 4.4, PLATFORM_HALF_M = 90, PSD_H = 1.55;
+
+/** A point on a track at distance `s`, offset sideways by `off` (+ right of travel). */
+function trackPoint(tr: LineTrack, s: number, off: number): V3 {
+  const c = tr.cum, p = tr.points;
+  let i = 1;
+  while (i < c.length - 1 && c[i] < s) i++;
+  const t = Math.max(0, Math.min(1, (s - c[i - 1]) / ((c[i] - c[i - 1]) || 1)));
+  const x = p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, y = p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t, z = p[i - 1][2] + (p[i][2] - p[i - 1][2]) * t;
+  let dx = p[i][0] - p[i - 1][0], dz = p[i][2] - p[i - 1][2];
+  const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+  return [x - dz * off, y, z + dx * off];
+}
+
+/** Points every 3 m along a track between `a` and `b`, offset sideways, lifted by `dy`. */
+function along(tr: LineTrack, a: number, b: number, off: number, dy: number): V3[] {
+  const n = Math.max(1, Math.ceil((b - a) / 3));
+  return Array.from({ length: n + 1 }, (_, k) => { const p = trackPoint(tr, a + ((b - a) * k) / n, off); return [p[0], p[1] + dy, p[2]] as V3; });
+}
+
+/**
+ * The 16 stations (SPEC §20, M13d): side platforms at train-floor height, 180 m long, outside each
+ * track; platform screen doors with an opening at every train door when it stops on the mark; a
+ * roof over both platforms on columns; back walls; and the concourse block over the street below.
+ */
+export function buildStations(geo: ChunkGeometry, bake: MetroBake): number {
+  let n = 0;
+  const half = bake.gap / 2, lods = [0, 1];
+  for (const tr of bake.line.tracks) for (const st of tr.stops) {
+    const a = st.s - PLATFORM_HALF_M, b = st.s + PLATFORM_HALF_M, side = st.side === 'left' ? -1 : 1;
+    const pc = side * (PLATFORM_EDGE_M + PLATFORM_W / 2);
+    geo.ribbon(along(tr, a, b, pc, FLOOR_M - 0.02), PLATFORM_W, S.platform, 'deck', lods, 1.4, S.platformSide);
+    geo.ribbon(along(tr, a, b, side * (PLATFORM_EDGE_M + 0.22), FLOOR_M - 0.01), 0.35, S.edge, 'marking', lods);
+    // Screen doors: fixed panels between the openings where the train's doors stop.
+    const doors = doorOffsets().map(o => st.stopS - o).sort((p, q) => p - q);
+    let from = a;
+    for (const d of [...doors, b + 1]) {
+      const to = Math.min(b, d - 0.8);
+      if (to - from > 0.3) geo.ribbon(along(tr, from, to, side * (PLATFORM_EDGE_M + 0.45), FLOOR_M + PSD_H), 0.08, S.psd, 'prop', [0], PSD_H, S.psd);
+      from = d + 0.8;
+    }
+    // Back wall and roof columns at the platform's outer edge, and the roof out to the line's centre.
+    geo.ribbon(along(tr, a, b, side * (PLATFORM_EDGE_M + PLATFORM_W + 0.1), FLOOR_M + 2.6), 0.2, S.wall, 'deck', lods, 2.6, S.wall);
+    for (let s = a; s <= b; s += 15) {
+      const [x, y, z] = trackPoint(tr, s, side * (PLATFORM_EDGE_M + PLATFORM_W - 0.35));
+      geo.box(x, z, 0.18, 0.18, y + FLOOR_M, y + 7.0, S.column, 'prop', lods);
+    }
+    const outer = side * (PLATFORM_EDGE_M + PLATFORM_W + 0.6), inner = -side * half;
+    geo.ribbon(along(tr, a - 5, b + 5, (outer + inner) / 2, 7.4), Math.abs(outer - inner), S.roof, 'deck', lods, 0.45, S.roofSide);
+    // The concourse below the tracks, once per station (from the southbound side).
+    if (tr.dir === 'south') {
+      geo.ribbon(along(tr, st.s - 65, st.s + 65, half, -1.7), 2 * (PLATFORM_EDGE_M + PLATFORM_W + 0.6) + bake.gap, S.concourse, 'building', lods, 5.2, S.concourse);
+      n++;
+    }
+  }
+  return n;
 }

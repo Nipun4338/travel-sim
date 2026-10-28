@@ -4,8 +4,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { notchLabel, type Train } from '../metro/Train';
+import { CAR_GAP_M, CAR_M, DOOR_W, DOOR_X, FLOOR_M } from '../shared/train';
 
-const CAR = 19.8, GAP = 0.25, WIDTH = 2.95, FLOOR = 1.15, ROOF = 3.95, BOGIE = 6.9;
+const CAR = CAR_M, GAP = CAR_GAP_M, WIDTH = 2.95, FLOOR = FLOOR_M, ROOF = 3.95, BOGIE = 6.9;
 /** The driver's eye in the leading car's frame (+x forward, +y up from rail top, +z right). */
 export const METRO_EYE = new THREE.Vector3(CAR / 2 - 1.7, FLOOR + 1.55, -0.55);
 /** Seated on the left bench of a middle car, looking across and out of the right-hand windows. */
@@ -35,10 +36,8 @@ function carGeometry(cab: boolean, pantograph: boolean): THREE.BufferGeometry {
     parts.push(box(body, 0.14, 0.03, bx, FLOOR + 1.08, side * (WIDTH / 2 + 0.015), C.red));
     parts.push(box(body, 0.1, 0.03, bx, FLOOR + 0.92, side * (WIDTH / 2 + 0.015), C.green));
   }
-  for (const x of [-7.4, -2.5, 2.5, 7.4]) for (const side of [-1, 1]) {
-    parts.push(box(1.3, 1.95, 0.04, x - (cab ? 0.3 : 0), FLOOR + 1.0, side * (WIDTH / 2 + 0.01), C.door));
-    parts.push(box(1.1, 0.75, 0.05, x - (cab ? 0.3 : 0), FLOOR + 1.6, side * (WIDTH / 2 + 0.02), C.glass));
-  }
+  // Door frames (the sliding leaves are separate, so they can open: see TrainView).
+  for (const x of DOOR_X) for (const side of [-1, 1]) parts.push(box(DOOR_W + 0.12, 2.0, 0.03, x, FLOOR + 1.0, side * (WIDTH / 2 + 0.005), C.under));
   for (const x of [-BOGIE, BOGIE]) {
     parts.push(box(2.6, 0.6, WIDTH - 0.6, x, 0.55, 0, C.bogie));
     for (const ax of [-1, 1]) for (const side of [-1, 1]) parts.push(part(new THREE.CylinderGeometry(0.43, 0.43, 0.14, 12).rotateX(Math.PI / 2).translate(x + ax * 1.05, 0.43, side * 0.72), C.bogie));
@@ -82,6 +81,12 @@ export class TrainView {
   private tmpB = new THREE.Vector3();
   private m4 = new THREE.Matrix4();
   private up = new THREE.Vector3(0, 1, 0);
+  /** Door leaves: 2 per door, both sides of every car (6 × 4 × 2 × 2), sliding apart to open. */
+  private leaves: THREE.InstancedMesh;
+  /** How open the doors are on each side, 0..1 (−1 = left of travel, +1 = right). */
+  doorOpen = { left: 0, right: 0 };
+  private leafM = new THREE.Matrix4();
+  private leafP = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, private train: Train) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -129,6 +134,11 @@ export class TrainView {
     scr.rotation.set(-1.0, -Math.PI / 2, 0, 'YXZ');
     this.cab.add(scr);
     this.cars[0].add(this.cab);
+    const leafGeo = new THREE.BoxGeometry(DOOR_W / 2, 1.95, 0.05);
+    this.leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshLambertMaterial({ color: C.door, flatShading: true }), 6 * DOOR_X.length * 4);
+    this.leaves.frustumCulled = false;
+    this.leaves.castShadow = true;
+    scene.add(this.leaves);
 
     // Car 3's inside: floor, ceiling, walls with a window band, long bench seats, grab poles, lights.
     const wall = new THREE.MeshLambertMaterial({ color: 0xe4e6e8, flatShading: true, side: THREE.DoubleSide });
@@ -175,6 +185,20 @@ export class TrainView {
     }
     // The handle tips forward 8° per power notch and back per brake step; EB all the way back.
     this.handle.rotation.z = -tr.notch * 0.14;
+    // Door leaves slide apart along the car, each by its own width when fully open.
+    let k = 0;
+    for (const car of this.cars) {
+      car.updateMatrixWorld();
+      for (const x of DOOR_X) for (const side of [-1, 1]) {
+        const open = (side < 0 ? this.doorOpen.left : this.doorOpen.right) * (DOOR_W / 2);
+        for (const half of [-1, 1]) {
+          this.leafP.set(x + half * (DOOR_W / 4 + open), FLOOR + 1.0, side * (WIDTH / 2 + 0.03)).applyMatrix4(car.matrixWorld);
+          this.leafM.compose(this.leafP, car.quaternion, this.tmpB.set(1, 1, 1));
+          this.leaves.setMatrixAt(k++, this.leafM);
+        }
+      }
+    }
+    this.leaves.instanceMatrix.needsUpdate = true;
   }
 
   /**

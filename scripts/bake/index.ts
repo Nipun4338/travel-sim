@@ -13,7 +13,7 @@ import { flyoverProfiles } from './flyovers';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
-import { bakeLine, buildViaduct, type MetroBake } from './metro';
+import { bakeLine, buildStations, buildViaduct, type MetroBake } from './metro';
 import { pbfRegionData } from './pbfQuery';
 
 const CREDITS = [
@@ -93,19 +93,22 @@ async function main() {
     console.log(`      Speed limits (southbound): ${sb.limits.filter(l => l[2] < 100).map(l => `${(l[0] / 1000).toFixed(2)}–${(l[1] / 1000).toFixed(2)} km ${l[2]}`).join(', ') || 'none under 100'}`);
     // The baked viaduct replaces OSM's per-track ways (which would draw two overlapping decks).
     roads.ways = roads.ways.filter(wy => wy.tags?.railway !== 'subway');
-    // Nothing may stand in the viaduct: drop every building whose footprint comes within 8 m of the
-    // centreline (OSM maps the stations as buildings over the tracks; M13d models them properly).
-    const line = new PointGrid(20);
+    // Nothing may stand in the viaduct: drop every building whose footprint comes too close to the
+    // centreline (OSM maps the stations as buildings over the tracks; the bake models them).
+    // Stations are wider (platforms, back walls and concourse): 14 m either side there, 8 m elsewhere.
+    const line = new PointGrid(20), stationGrid = new PointGrid(20);
     for (const [x, , z] of metro.centre) line.add(x, z);
+    for (const [x, , z] of metro.centre) if (metro.line.stations.some(st => Math.hypot(st.x - x, st.z - z) < 110)) stationGrid.add(x, z);
+    const near = (x: number, z: number) => line.near(x, z, 8) || stationGrid.near(x, z, 14);
     const before = blds.ways.length;
     blds.ways = blds.ways.filter(wy => {
       if (!wy.tags?.building) return true;
       const pts = wy.nodes.map(id => blds.nodes.get(id)).filter(Boolean) as Array<{ x: number; z: number }>;
-      if (pts.some(p => line.near(p.x, p.z, 8))) return false;
+      if (pts.some(p => near(p.x, p.z))) return false;
       // Long footprints can straddle the line between their corners: test points along each edge too.
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1], b = pts[i], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 6);
-        for (let k = 1; k < n; k++) if (line.near(a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n, 8)) return false;
+        for (let k = 1; k < n; k++) if (near(a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n)) return false;
       }
       return true;
     });
@@ -133,6 +136,7 @@ async function main() {
   if (metro) {
     const v = buildViaduct(geo, metro, onRoad);
     console.log(`      viaduct: ${v.piers} piers (${v.skipped} of them in a mapped road's median)`);
+    console.log(`      ${buildStations(geo, metro)} stations`);
   }
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);

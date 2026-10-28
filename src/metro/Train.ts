@@ -24,6 +24,8 @@ export class Train {
   emergency = false;       // EB latched until standstill
   /** Penalty brake from ATP (M13c): a forced service-brake level, or 0. */
   penalty = 0;
+  /** Doors not closed and locked: traction is cut and the brake holds (the door interlock). */
+  doorHold = false;
   odometer = 0;
 
   constructor(readonly track: Track, startS: number, readonly lengthM = 120) { this.s = startS; }
@@ -39,7 +41,7 @@ export class Train {
   /** The acceleration the controller (and any brake override) asks for, m/s². */
   private target(): number {
     if (this.emergency) return -EMERGENCY;
-    const brake = Math.max(this.penalty, this.notch < 0 ? -this.notch : 0);
+    const brake = Math.max(this.penalty, this.doorHold ? 7 : 0, this.notch < 0 ? -this.notch : 0);
     if (brake > 0) return -(MAX_SERVICE * brake) / 7;
     if (this.notch > 0) {
       const full = MAX_TRACTION * (this.v > BASE_SPEED ? BASE_SPEED / this.v : 1);
