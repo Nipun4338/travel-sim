@@ -15,6 +15,8 @@ export type AtpState = 'normal' | 'warning' | 'penalty' | 'emergency';
 export class Atp {
   /** End of movement authority along the track (m): the next stop mark plus the overlap. */
   eoa: number;
+  /** The furthest the train ahead lets us go (its tail less a safety gap), or Infinity. */
+  block = Infinity;
   permittedKmh = 0;
   /** What the train must slow to next and where: the EoA (0 km/h) or a lower speed limit ahead. */
   target = { kmh: 0, distM: 0 };
@@ -40,7 +42,7 @@ export class Atp {
     for (const [a, b, v] of this.track.data.limits) if (b >= s - tr.lengthM && a <= s) civil = Math.min(civil, v);
     // Targets ahead: each lower speed limit within 1.5 km, and the stop at the EoA. The one whose
     // braking curve allows the least speed now is what the driver is shown and supervised against.
-    const toEoa = this.eoa - s;
+    const toEoa = Math.min(this.eoa, this.block) - s;
     const targets: Array<{ kmh: number; distM: number }> = [{ kmh: 0, distM: toEoa - OVERLAP }];
     for (const [a, , v] of this.track.data.limits) if (a > s && a - s < 1500 && v < civil) targets.push({ kmh: v, distM: a - s });
     let permitted = civil / 3.6, target = { kmh: civil, distM: 0 };

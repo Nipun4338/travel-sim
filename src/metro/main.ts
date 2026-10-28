@@ -5,7 +5,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { startLoop } from '../core/loop';
 import { effectiveQuality, loadSettings } from '../core/settings';
-import { getLang, num, t } from '../i18n/i18n';
+import { clock, getLang, num, t } from '../i18n/i18n';
 import { Atmosphere, type Tier } from '../render/atmosphere';
 import { setMaterialConditions } from '../render/materials';
 import { createStage } from '../render/stage';
@@ -21,6 +21,10 @@ import { Atp } from './atp';
 import { NOTCH_MAX, NOTCH_MIN, Train } from './Train';
 import { Passengers } from './passengers';
 import { onTrack, StationView } from './stations';
+import { HEADWAY_S, profileAt, referenceProfile } from './schedule';
+import { recordLeg } from '../core/progress';
+import { ResultsScreen } from '../ui/results';
+import type { LedgerEntry, RunResult } from '../bus/run/Run';
 import { FLOOR_M, PLATFORM_EDGE_M } from '../shared/train';
 import { Track } from './track';
 
@@ -58,9 +62,24 @@ const legStops = trackData.stops.slice(firstStop, lastStop + 1);
 const track = new Track(trackData);
 const train = new Train(track, legStops[0].stopS, line.trainLengthM);
 const view = new TrainView(scene, train);
+const tmpPos = new THREE.Vector3();
 // The train starts at the first station with its doors open; authority to each next station is
 // given when the doors are closed and locked there (dispatch).
 let nextIdx = 0;
+
+// ---- Timetable and the other trains (SPEC §20, M13e) ----
+const scored = params.has('mode') ? params.get('mode') === 'scored' : settings.scored;
+const otherData = line.tracks.find(tr => tr !== trackData)!;
+const otherTrack = new Track(otherData);
+const profile = referenceProfile(track, trackData.stops, line.trainLengthM);
+const otherProfile = referenceProfile(otherTrack, otherData.stops, line.trainLengthM);
+// The Leg starts at its first station's arrival on the full-line timetable.
+const legStart = profile.arrive[firstStop];
+const due = legStops.map((_, k) => ({ arrive: profile.arrive[firstStop + k] - legStart, depart: profile.depart[firstStop + k] - legStart }));
+let clockT = 0;
+/** Ghost trains run to the timetable: one 8 minutes ahead on this track, and two on the other. */
+const ahead = new Train(track, 0, line.trainLengthM);
+const opposite = [new Train(otherTrack, 0, line.trainLengthM), new Train(otherTrack, 0, line.trainLengthM)];
 const atp = new Atp(track, train, legStops[0].stopS);
 const chime = audio.tone(1150, 'square', 0.06);
 let chimeOn = false;
@@ -75,6 +94,36 @@ const minimap = new Minimap();
 minimap.setRegion(region.route, await region.loadLanes());
 const stationView = new StationView(scene, line);
 const passengers = new Passengers(scene);
+const ghostViews = [ahead, ...opposite].map(g => { const v = new TrainView(scene, g); v.setCabVisible(false); return v; });
+/** Places the ghost trains for leg time `t`; returns the tail of the train ahead (for ATP). */
+function placeGhosts(t: number): number {
+  const g = legStart + t;
+  const a = profileAt(profile, g + HEADWAY_S);
+  ahead.s = a.s; ahead.v = a.v;
+  // Opposite direction: trains leave their first station every 8 minutes; show the two nearest us.
+  const here = track.at(train.s, tmpPos).clone();
+  const cands: Array<{ s: number; v: number; d: number }> = [];
+  for (let k = -6; k <= 6; k++) {
+    const tk = g + k * HEADWAY_S;
+    if (tk < 0 || tk > otherProfile.s.length - 2) continue;
+    const p = profileAt(otherProfile, tk);
+    cands.push({ ...p, d: otherTrack.at(p.s, tmpPos).distanceTo(here) });
+  }
+  cands.sort((x, y) => x.d - y.d);
+  opposite.forEach((tr, i) => { const c = cands[i]; if (c) { tr.s = c.s; tr.v = c.v; } else tr.s = -1e4; });
+  // Ghosts open their doors while stood at a station.
+  [ahead, ...opposite].forEach((tr, i) => {
+    const stop = tr.track.data.stops.find(st => Math.abs(st.stopS - tr.s) < 1);
+    ghostViews[i].doorOpen.left = stop && tr.v < 0.01 ? 1 : 0;
+  });
+  return a.s - line.trainLengthM - 60;
+}
+const results = new ResultsScreen();
+const ledger: LedgerEntry[] = [];
+const book = (kind: LedgerEntry['kind'], tk: number, label: string) => { if (tk) ledger.push({ kind, tk, label }); };
+const rideKm = (i: number) => Math.abs(legStops[legStops.length - 1].stopS - legStops[i].stopS) / 2000;   // average ride: half the rest of the line
+const fare = (km: number) => Math.min(100, Math.max(20, Math.round((20 + 5 * km) / 5) * 5));
+let carried = 0, onTimeCount = 0, served = 0, leftBehindTotal = 0;
 
 // ---- Station stops (SPEC §20): arrive, rate the stop, doors, exchange, close, dispatch. ----
 type StopPhase = 'running' | 'stopped' | 'opening' | 'open' | 'closing';
@@ -115,6 +164,10 @@ function openDoors(side: 'left' | 'right'): void {
   if (err > 1.5) return;   // an overrun: handled in the step
   const grade = Math.abs(err) <= 0.3 ? 'perfect' : Math.abs(err) <= 0.5 ? 'good' : 'rough';
   stopRating[grade]++;
+  book('stop', grade === 'perfect' ? 30 : grade === 'good' ? 15 : 0, 'stop');
+  const lateS = clockT - due[nextIdx].arrive;
+  served++;
+  if (Math.abs(lateS) <= 15 || lateS < 0) { onTimeCount++; book('onTime', 20, 'on time'); } else book('late', -Math.min(60, Math.round(lateS - 15)), 'late');
   say(grade === 'perfect' ? 'stopPerfect' : grade === 'good' ? 'stopGood' : 'stopRough', { m: err.toFixed(2) }, 2500);
   phase = 'opening'; phaseT = 0; openFor = 0; mayCloseSaid = false;
   train.doorHold = true;
@@ -122,7 +175,9 @@ function openDoors(side: 'left' | 'right'): void {
 }
 function closeDoors(): void {
   if (phase !== 'open' || nextIdx === legStops.length - 1) return;
-  if (passengers.waiting > 0) say('platformLeft', { n: String(passengers.waiting) }, 3000);
+  if (passengers.waiting > 0) { say('platformLeft', { n: String(passengers.waiting) }, 3000); leftBehindTotal += passengers.waiting; book('leftBehind', -5 * passengers.waiting, 'left'); }
+  const earlyS = due[nextIdx].depart - clockT;
+  if (earlyS > 10) book('early', -Math.min(60, Math.round((earlyS - 10) * 2)), 'early');
   else say('doorsClosing', {}, 3000);
   phase = 'closing'; phaseT = 0;
 }
@@ -172,7 +227,6 @@ addEventListener('keydown', e => {
   else if (e.code === 'KeyM') minimap.toggle();
 });
 const pauseMenu = new PauseMenu({ restart: () => location.reload(), onChange: p => { paused = p; } });
-void backToMenu;
 
 const eye = new THREE.Vector3(), look = new THREE.Vector3(), fwd = new THREE.Vector3(), chasePos = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3(), tmp = new THREE.Vector3();
@@ -233,6 +287,8 @@ await renderer.compileAsync(scene, camera).catch(() => undefined);
 
 function stepStation(dt: number): void {
   phaseT += dt;
+  clockT += dt;
+  atp.block = placeGhosts(clockT);
   const st = legStops[nextIdx], last = nextIdx === legStops.length - 1;
   if (phase === 'running') {
     // Approaching: announce once, about 400 m out, and fill the platform.
@@ -243,6 +299,7 @@ function stepStation(dt: number): void {
     // Overrun by more than 1.5 m: the doors can't line up; after a pause the station is skipped.
     if (train.s - st.stopS > 1.5 && phaseT > 3) {
       stopRating.overrun++;
+      book('overrun', -100, 'overrun');
       say('overrun', { name: stationName(st.station) }, 4000);
       passengers.leave();
       stationView.setActive(null, null);
@@ -255,7 +312,7 @@ function stepStation(dt: number): void {
   } else if (phase === 'open') {
     openFor += dt;
     if (!last && !mayCloseSaid && !passengers.busy && openFor > 15) { mayCloseSaid = true; say('mayClose', {}, 4000); }
-    if (last && !legDone && !passengers.busy && openFor > 6) { legDone = true; say('legDone', { name: stationName(st.station) }, 8000); }
+    if (last && !legDone && !passengers.busy && openFor > 6) { legDone = true; say('legDone', { name: stationName(st.station) }, 8000); setTimeout(finishLeg, 2500); }
   } else if (phase === 'closing') {
     doorT = Math.max(0, 1 - phaseT / 3);
     if (doorT <= 0) {
@@ -269,11 +326,34 @@ function stepStation(dt: number): void {
       say('nextStation', { name: stationName(legStops[nextIdx].station) }, 5000);
     }
   }
+  const before = passengers.boarded;
   passengers.update(dt, phase === 'open');
+  const boardedNow = passengers.boarded - before;
+  if (boardedNow > 0) { carried += boardedNow; book('fare', boardedNow * fare(rideKm(nextIdx)), 'fare'); }
   if (phase === 'opening' || phase === 'open' || phase === 'closing') {
     stationView.setOpen(doorT);
     view.doorOpen[st.side] = doorT;
   }
+}
+
+function finishLeg(): void {
+  const pen = atp.penalties, em = atp.emergencies;
+  book('atp', -(50 * pen + 150 * em), 'atp');
+  const taka = ledger.reduce((sum, e) => sum + e.tk, 0);
+  const km = Math.abs(legStops[legStops.length - 1].stopS - legStops[0].stopS) / 1000;
+  const stars = {
+    punctuality: Math.max(1, Math.round(3 * (served ? onTimeCount / served : 1))),
+    comfort: Math.max(1, 3 - em - (pen > 2 ? 1 : 0)),
+    safety: Math.max(1, 3 - stopRating.overrun - em),
+  };
+  const r: RunResult = { status: 'finished', scored, stopsServed: served, takaEarned: taka, ledger, stars, km, seconds: clockT, passengersCarried: carried, jerkyMoments: em };
+  recordLeg(regionId, legNo, { done: true, stars: stars.punctuality + stars.comfort + stars.safety > 7 ? 3 : 2, taka: scored ? taka : undefined, km, passengers: carried, stops: served });
+  results.show({ n: legNo, from: stationName(legStops[0].station), to: stationName(legStops[legStops.length - 1].station) }, r, {
+    retry: () => location.reload(),
+    next: legNo < 4 ? () => { const q = new URLSearchParams(location.search); q.set('leg', String(legNo + 1)); location.search = q.toString(); } : undefined,
+    menu: backToMenu,
+  });
+  void leftBehindTotal;
 }
 
 startLoop(
@@ -285,6 +365,7 @@ startLoop(
   },
   (frameDt, ahead) => {
     view.sync(paused ? 0 : ahead);
+    for (const gv of ghostViews) gv.sync();
     view.setCabVisible(camMode === 'cab');
     view.setInteriorVisible(camMode === 'passenger');
     updateCamera(frameDt);
@@ -303,7 +384,9 @@ startLoop(
     if ((hudTimer += frameDt) > 0.1) {
       hudTimer = 0;
       const d = Math.max(0, nx.stopS - train.s);
-      strip.innerHTML = `${t('next')}: <b>${stationName(nx.station)}</b> · ${d >= 1000 ? `${num((d / 1000).toFixed(1))} ${t('km')}` : `${num(Math.round(d))} ${t('m')}`}`;
+      const k = legStops.indexOf(nx), dueIn = due[k].arrive - clockT;
+      const when = dueIn >= -15 ? t('metroDue', { t: clock(Math.max(0, dueIn)) }) : t('metroLate', { t: clock(-dueIn) });
+      strip.innerHTML = `${t('next')}: <b>${stationName(nx.station)}</b> · ${d >= 1000 ? `${num((d / 1000).toFixed(1))} ${t('km')}` : `${num(Math.round(d))} ${t('m')}`} · ${when}`;
       fwd.set(1, 0, 0).applyQuaternion(view.cars[0].quaternion);
       minimap.update(frontPos.x, frontPos.z, fwd.x, fwd.z, line.stations[nx.station].name);
     }

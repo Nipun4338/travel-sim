@@ -22,7 +22,7 @@ export interface RunStop {
   leftEarly?: boolean;
 }
 
-export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision' | 'junction' | 'conditions';
+export type LedgerKind = 'fare' | 'onTime' | 'late' | 'early' | 'missed' | 'leftBehind' | 'jerky' | 'collision' | 'junction' | 'conditions' | 'stop' | 'atp' | 'overrun';
 export interface LedgerEntry { kind: LedgerKind; tk: number; label: string; }
 
 export type RunEvent =
