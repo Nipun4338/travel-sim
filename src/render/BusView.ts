@@ -45,7 +45,8 @@ export class BusView {
     indL: new Lamp(0xffa000, 0x6b4a14), indR: new Lamp(0xffa000, 0x6b4a14),
     tail: new Lamp(0xff1a1a, 0x5a1010), reverse: new Lamp(0xffffff, 0x777777),
   };
-  private beam = new THREE.SpotLight(0xfff2d0, 0, 90, 0.42, 0.5, 1.2);
+  // Headlights in physical light units: strong enough to light dark asphalt 40 m ahead on low beam.
+  private beam = new THREE.SpotLight(0xfff2d0, 0, 130, 0.5, 0.45, 1.4);
   private cone = new THREE.Mesh(
     new THREE.ConeGeometry(7, 40, 16, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
@@ -234,8 +235,9 @@ export class BusView {
   }
 
   /**
-   * Night and weather (SPEC §9): the SpotLight only on Medium and High; the additive cone at night
-   * (stronger on Low, where it is the only beam) and faintly in rain or fog.
+   * Night and weather (SPEC §9): the headlight SpotLight lights the road on every tier (one light is
+   * cheap, and without it the road is invisible at night); the additive cone shows the beam in
+   * the air from outside, a little stronger on Low.
    */
   setBeamStyle(spot: boolean, night: boolean, murky: boolean): void {
     this.beamStyle = { spot, cone: night ? (spot ? 0.06 : 0.11) : murky ? 0.04 : 0 };
@@ -249,12 +251,12 @@ export class BusView {
     this.lamps.indR.set(l.rightFlashing);
     this.lamps.tail.set(l.brake ? 1 : l.headlights !== 'off' ? 0.55 : 0);
     this.lamps.reverse.set(l.reverse);
-    this.beam.intensity = head && this.beamStyle.spot ? (l.highBeam ? 45 : 18) : 0;
+    this.beam.intensity = head ? (l.highBeam ? 1200 : 600) : 0;
     // From the cab the cone would be a grey wedge across the windscreen; it reads only from outside.
     this.cone.visible = head && this.beamStyle.cone > 0 && !this.cab.visible;
     (this.cone.material as THREE.MeshBasicMaterial).opacity = this.beamStyle.cone * (l.highBeam ? 1.3 : 1);
-    this.beam.distance = l.highBeam ? 160 : 70;
-    this.beam.angle = l.highBeam ? 0.32 : 0.45;
+    this.beam.distance = l.highBeam ? 230 : 130;
+    this.beam.angle = l.highBeam ? 0.36 : 0.5;
   }
 
   /** Redraws the instrument cluster and the next-Stop display (~10 Hz). */

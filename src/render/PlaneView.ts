@@ -188,7 +188,7 @@ export class PlaneView {
     (this.disc.material as THREE.MeshBasicMaterial).opacity = (this.cockpit.visible ? 0.04 : 0.12) + 0.06 * s.throttle;
     this.beacon.color.setHex(this.time % 1.2 < 0.15 ? 0xff2a2a : 0x551111);
     this.strobe.color.setHex(this.time % 1.0 < 0.06 ? 0xffffff : 0x777777);
-    this.landingLight.intensity = s.landingLight ? 60 : 0;
+    this.landingLight.intensity = s.landingLight ? 4000 : 0;
     this.landingLamp.color.setHex(s.landingLight ? 0xfffbe8 : 0x888880);
     this.yoke.position.z = -1.05 + s.pitchInput * 0.06;
     this.yoke.rotation.z = -s.rollInput * 0.5;
