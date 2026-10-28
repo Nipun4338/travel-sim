@@ -117,14 +117,20 @@ Touch controls work like a mobile driving sim: a steering wheel you turn with yo
 
 Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readout.
 
-## Menus and updates
+## Pick a place on the map *(new in 1.2.0)*
 
 | | |
 |:-:|:-:|
-| ![The main menu in Bangla: Bus, Plane and Career](docs/images/menu.jpg) | ![The What's new card shown after an update](docs/images/whats-new.jpg) |
-| *The main menu: Bus, Plane and Metro; tap the version in the corner for the full version history* | *After an update, a What's new card lists the changes once* |
+| ![The menu: an illustrated map of Bangladesh with Dhaka and Bandarban pins](docs/images/menu-map.jpg) | ![Dhaka chosen: the map zooms in and a card offers Bus, Plane and Metro](docs/images/menu-destination.jpg) |
+| *The game opens on Bangladesh; coming-soon places are dimmed* | *Choose a place: the map zooms in, the card has every mode, its trips, and time and weather* |
 
-**Current version: 1.1.0**, which adds Metro Mode on MRT Line 6.
+The routes you've driven light up on the map, and a **Continue** button restarts your last trip in one tap. Prefer lists? The **List** button brings back the classic menu cards. After an update, a **What's new** card shows the changes once, and the **Version history** (tap the version in the corner) has every release with its picture.
+
+| | |
+|:-:|:-:|
+| ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
+
+**Current version: 1.2.0**, with the map menu. 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 

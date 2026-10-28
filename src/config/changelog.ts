@@ -3,14 +3,38 @@
 export interface Release {
   version: string;
   date: string;          // YYYY-MM-DD
+  /** The release's signature picture, in public/releases/ (shown in the history and What's new). */
+  image?: string;
   bn: string[];
   en: string[];
 }
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.2.0',
+    date: '2026-10-28',
+    image: '1.2.0.jpg',
+    bn: [
+      'নতুন মেনু: বাংলাদেশের মানচিত্রে জায়গা বেছে নিন; ম্যাপ সেখানে জুম করে আর পাশে খোলে গন্তব্যের কার্ড।',
+      'কার্ডে বাস, বিমান আর মেট্রোর ট্যাব, প্রতিটির ছবি, লেগ আর সময়-আবহাওয়া এক জায়গায়।',
+      '"চালিয়ে যান" বোতাম: শেষ যাত্রা এক ছোঁয়ায় আবার শুরু।',
+      'যে রুটে চালিয়েছেন তা মানচিত্রে জ্বলে ওঠে; খুঁজে পাওয়া স্থাপনাও দেখা যায়।',
+      'আসছে: চট্টগ্রাম, সিলেট, কক্সবাজার আর সুন্দরবন।',
+      'সংস্করণের ইতিহাসে প্রতিটি সংস্করণের ছবি; পুরনো তালিকা মেনুও রয়ে গেছে (তালিকা বোতাম)।',
+    ],
+    en: [
+      'A new menu: pick a place on a map of Bangladesh; the map zooms in and a destination card slides in beside it.',
+      'The card has Bus, Plane and Metro tabs, each with a picture, its trips, and time and weather in one place.',
+      'A Continue button starts your last trip again in one tap.',
+      "Routes you've driven light up on the map, and landmarks you've found show on it too.",
+      "Coming soon: Chattogram, Sylhet, Cox's Bazar and the Sundarbans.",
+      'Every release in the version history has its picture; the classic list menu is still there (List button).',
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-10-28',
+    image: '1.1.0.jpg',
     bn: [
       'নতুন মেট্রো মোড: আসল এমআরটি লাইন ৬-এ উত্তরা উত্তর থেকে মতিঝিল পর্যন্ত ছয় বগির ট্রেন চালান, ১৬টি স্টেশন।',
       'মাস্টার কন্ট্রোলার, সিগন্যাল আর এটিপি: অনুমোদিত গতি পেরোলে সতর্কতা, তারপর স্বয়ংক্রিয় ব্রেক।',
@@ -31,6 +55,7 @@ export const CHANGELOG: Release[] = [
   {
     version: '1.0.1',
     date: '2026-10-28',
+    image: '1.0.1.jpg',
     bn: [
       'নতুন লোডিং স্ক্রিন: কতটা লোড হলো তা দেখায়, সঙ্গে খেলার টিপস।',
       'আশপাশের রাস্তা আর ভবন পুরো তৈরি হওয়ার পরই খেলা শুরু হয়, হঠাৎ কিছু উদয় হয় না।',
@@ -45,6 +70,7 @@ export const CHANGELOG: Release[] = [
   {
     version: '1.0.0',
     date: '2026-10-28',
+    image: '1.0.0.jpg',
     bn: [
       'ফ্লাইওভারে বাস চালান: র‍্যাম্প বেয়ে উঠে ডেকের ওপর দিয়ে যান।',
       'ঢাকার বাসে কোম্পানির নাম, রুট বোর্ড আর "ঢাকা মেট্রো" নম্বর প্লেট; রাস্তার গাড়ি এখন মসৃণভাবে চলে।',
@@ -63,6 +89,7 @@ export const CHANGELOG: Release[] = [
   {
     version: '0.9.1',
     date: '2026-10-28',
+    image: '0.9.1.jpg',
     bn: [
       'ফোনে সিমুলেটরের মতো নিয়ন্ত্রণ: স্টিয়ারিং হুইল, ব্রেক ও গ্যাস প্যাডেল, গিয়ার লিভার; বিমানে জয়স্টিক ও থ্রটল।',
       'রাতে হেডলাইট এখন সব মানে রাস্তা আলোকিত করে।',
@@ -75,6 +102,7 @@ export const CHANGELOG: Release[] = [
   {
     version: '0.9.0',
     date: '2026-10-27',
+    image: '0.9.0.jpg',
     bn: [
       'প্রথম প্রকাশ: ঢাকার ফার্মগেট–বিমানবন্দর আর বান্দরবান–চিম্বুক রুটে বাস চালান।',
       'বিমান মোড: ঢাকা ও বান্দরবানের ওপর মুক্ত উড্ডয়ন আর চ্যালেঞ্জ।',

@@ -4,7 +4,7 @@
 import { amount, getLang, num, place, setLang, t, tAlt } from '../i18n/i18n';
 import { challengeUnlocked, landmarksFound, legKey, legUnlocked, loadProgress, type Progress } from '../core/progress';
 import { download, iosNeedsHomeScreen, offlineSupported, persist, remove, usage, type RegionMode } from '../core/offline';
-import { exportCode, importCode, readSave } from '../core/save';
+import { exportCode, importCode, readSave, updateSave } from '../core/save';
 import { loadSettings, saveSettings, type QualitySetting, type Settings } from '../core/settings';
 import { BUS_LIVERIES, careerTaka, chooseLivery, PLANE_LIVERIES, type Livery } from '../config/liveries';
 import type { BusLivery } from '../render/BusView';
@@ -16,6 +16,7 @@ import { audio } from '../audio/audio';
 import { SOUND_CREDITS } from '../audio/credits';
 import { CHANGELOG } from '../config/changelog';
 import { loader } from './loader';
+import { MenuMap, type MapProgress, type MapRegion } from './map/menuMap';
 import { APP_VERSION, showWhatsNew, versionLabel } from './whatsNew';
 
 type Mode = 'bus' | 'flight' | 'metro';
@@ -24,6 +25,8 @@ const REGIONS = ['dhaka', 'bandarban'] as const;
 type Region = (typeof REGIONS)[number] | 'line6';
 
 interface State {
+  /** The map pin chosen (Metro runs in Dhaka, on the line6 Region). */
+  place: MapRegion;
   screen: 'mode' | 'setup' | 'settings' | 'licences' | 'liveries' | 'history';
   mode: Mode;
   region: Region;
@@ -34,6 +37,7 @@ interface State {
 
 const base = import.meta.env.BASE_URL;
 const routes = new Map<Region, RouteData | null>();
+const origins = new Map<Region, { lat: number; lon: number }>();
 const zones = new Map<Region, ZoneManifest | null>();
 const credits = new Set<string>();
 
@@ -44,6 +48,7 @@ async function loadRoute(r: Region): Promise<RouteData | null> {
     if (!res.ok || !res.headers.get('content-type')?.includes('json')) throw new Error('not baked');
     const m: RegionManifest = await res.json();
     m.credits.forEach(c => credits.add(c));
+    origins.set(r, m.origin);
     routes.set(r, await (await fetch(`${base}regions/${r}/${m.route}`)).json());
   } catch { routes.set(r, null); }
   return routes.get(r)!;
@@ -71,17 +76,27 @@ export async function showMenu(): Promise<void> {
   const root = document.createElement('div');
   root.className = 'menu-screen';
   document.body.appendChild(root);
-  const st: State = { screen: 'mode', mode: 'bus', region: 'dhaka', trip: 1, time: 'random', weather: 'random' };
+  const st: State = { screen: 'mode', place: 'dhaka', mode: 'bus', region: 'dhaka', trip: 1, time: 'random', weather: 'random' };
+  // Map (default) or list view, remembered on this device.
+  let view: 'map' | 'list' = 'map';
+  try { if (localStorage.getItem('travel-sim.menuView') === 'list') view = 'list'; } catch { /* storage blocked */ }
+  const map = new MenuMap(k => t(k));
+  map.onPick = r => go({ screen: 'setup', place: r, mode: 'bus', region: r, trip: 1 });
+  map.draw({ routes: [], found: landmarksFound() });
+  void mapProgress().then(pr => map.draw(pr));
   const settings: Settings = loadSettings();
 
   const go = (patch: Partial<State>) => { Object.assign(st, patch); void render(); };
 
   function start(): void {
     const q = new URLSearchParams({ play: st.mode, world: st.region });
+    const trip = st.mode === 'flight' ? (st.trip === 'free' ? t('freeFlight') : t('challengeN', { n: st.trip })) : st.trip === 'full' ? t('fullRoute') : t('legN', { n: st.trip });
+    const label = `${t(st.mode === 'bus' ? 'busMode' : st.mode === 'metro' ? 'metroMode' : 'flightMode')} · ${t(`region.${st.region}`)} · ${trip}`;
     if (st.mode === 'bus' || st.mode === 'metro') q.set('leg', String(st.trip));
     else if (st.trip !== 'free') q.set('challenge', String(st.trip));
     if (st.time !== 'random') q.set('time', st.time);
     if (st.weather !== 'random') q.set('weather', st.weather);
+    updateSave(d => { d.lastTrip = { q: q.toString(), label }; });
     location.href = `${location.pathname}?${q}`;
   }
 
@@ -89,7 +104,7 @@ export async function showMenu(): Promise<void> {
     root.classList.add('busy');   // a thin progress line while a screen fetches its data
     const p = loadProgress();
     let html = '';
-    if (st.screen === 'mode') html = modeScreen(p);
+    if (st.screen === 'mode') html = view === 'map' ? mapHome(p) : modeScreen(p);
     if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : st.mode === 'metro' ? await metroSetup(p, st, settings) : await flightSetup(p, st, settings);
     if (st.screen === 'settings') html = settingsScreen(settings, await storagePanel());
     if (st.screen === 'liveries') html = liveriesScreen();
@@ -99,8 +114,14 @@ export async function showMenu(): Promise<void> {
       html = licencesScreen();
     }
     if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode === 'flight' ? 'flight' : 'bus', st.region));
+    const onMap = view === 'map' && (st.screen === 'mode' || st.screen === 'setup');
+    if (onMap && st.screen === 'setup') html = destCard(st, html);
+    map.el.hidden = !onMap;
+    map.focus(onMap && st.screen === 'setup' ? st.place : null);
+    root.classList.toggle('over-map', onMap);
     root.classList.remove('busy');
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
+      ${st.screen === 'mode' ? `<button class="chip view" data-view>${view === 'map' ? `☰ ${t('listView')}` : `🗺 ${t('mapLabel')}`}</button>` : ''}
       <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}
       <div class="osm-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">${t('osmCredit')}</a></div>${versionLabel(true)}`;
     // Offline: download a Region-mode with progress, or delete one from Settings.
@@ -119,7 +140,14 @@ export async function showMenu(): Promise<void> {
       await remove(mode, region);
       await render();
     }));
-    root.querySelector('[data-lang]')!.addEventListener('click', () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); void render(); });
+    root.querySelector('[data-lang]')!.addEventListener('click', () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); void mapProgress().then(pr => map.draw(pr)); void render(); });
+    root.querySelector('[data-view]')?.addEventListener('click', () => {
+      view = view === 'map' ? 'list' : 'map';
+      try { localStorage.setItem('travel-sim.menuView', view); } catch { /* storage blocked */ }
+      void render();
+    });
+    root.querySelector('[data-continue]')?.addEventListener('click', () => { const last = readSave().lastTrip; if (last) location.href = `${location.pathname}?${last.q}`; });
+    root.querySelectorAll<HTMLElement>('[data-pick]').forEach(el => el.addEventListener('click', () => map.onPick(el.dataset.pick as MapRegion)));
     root.querySelectorAll<HTMLElement>('button, [data-go]').forEach(el => el.addEventListener('click', () => audio.play('click', { gain: 0.5 })));
     root.querySelectorAll<HTMLElement>('[data-go]').forEach(el => el.addEventListener('click', () => {
       if (el.classList.contains('locked')) return;
@@ -165,6 +193,49 @@ export async function showMenu(): Promise<void> {
   await render();
   loader.done();
   showWhatsNew();
+}
+
+/** The map's progress layer: each Route (lit once any of its Legs is done) and the landmarks found. */
+async function mapProgress(): Promise<MapProgress> {
+  const p = loadProgress();
+  const out: MapProgress = { routes: [], found: landmarksFound() };
+  for (const [r, kind] of [['dhaka', 'bus'], ['bandarban', 'bus'], ['line6', 'metro']] as const) {
+    const route = await loadRoute(r), o = origins.get(r);
+    if (!route || !o) continue;
+    const kx = Math.cos((o.lat * Math.PI) / 180) * 111320, kz = 110574;
+    const latLon = route.points.filter((_, i) => i % 8 === 0).map(([x, , z]) => [o.lat - z / kz, o.lon + x / kx] as [number, number]);
+    const done = Object.entries(p.legs).some(([k, v]) => k.startsWith(`${r}:`) && v?.done);
+    out.routes.push({ id: r, latLon, done, kind });
+  }
+  return out;
+}
+
+/** The map home: a hint, the Regions as big buttons too, Continue, the career line and the links. */
+function mapHome(p: Progress): string {
+  const c = p.career, last = readSave().lastTrip;
+  return `<div class="map-home">
+    <p class="map-hint">${t('mapHint')}</p>
+    <div class="map-regions">${(['dhaka', 'bandarban'] as const).map(r => `<button class="btn" data-pick="${r}">📍 ${t(`region.${r}`)}</button>`).join('')}</div>
+    ${last ? `<button class="btn continue" data-continue>▶ ${t('continueTrip')}<small>${last.label}</small></button>` : ''}
+    <div class="map-career">৳ ${amount(c.taka)} · ${t('careerKm', { n: num(c.km.toFixed(1)) })} · ${t('careerPax', { n: amount(c.passengers) })}</div>
+    <div class="links"><button class="btn alt" data-go='{"screen":"liveries"}'>${t('liveries')}</button>
+      <button class="btn alt" data-go='{"screen":"settings"}'>${t('settings')}</button>
+      <button class="btn alt" data-go='{"screen":"licences"}'>${t('licences')}</button>
+      <button class="btn alt" data-go='{"screen":"history"}'>${t('versionHistory')}</button></div>
+  </div>`;
+}
+
+/** A chosen Region on the map: its modes as tabs, a picture of each, then the trip setup. */
+function destCard(st: State, setup: string): string {
+  const modes: Mode[] = st.place === 'dhaka' ? ['bus', 'flight', 'metro'] : ['bus', 'flight'];
+  const icon = { bus: '🚌', flight: '✈️', metro: '🚇' };
+  const key = { bus: 'busMode', flight: 'flightMode', metro: 'metroMode' };
+  return `<div class="dest-card" role="dialog" aria-label="${t(`region.${st.place}`)}">
+    <div class="dest-head"><h2>📍 ${t(`region.${st.place}`)}</h2><button class="chip close" data-go='{"screen":"mode"}' aria-label="${t('back')}">✕</button></div>
+    <div class="dest-tabs" role="tablist">${modes.map(m => `<button role="tab" aria-selected="${st.mode === m}" class="tab ${st.mode === m ? 'on' : ''}" data-go='${JSON.stringify({ mode: m, region: m === 'metro' ? 'line6' : st.place, trip: m === 'flight' ? 'free' : 1 })}'>${icon[m]} ${t(key[m])}</button>`).join('')}</div>
+    <img class="dest-hero" src="${base}menu/${st.mode}-${st.place}.jpg" alt="" loading="lazy">
+    ${setup}
+  </div>`;
 }
 
 function modeScreen(p: Progress): string {
@@ -377,7 +448,7 @@ function historyScreen(): string {
   const date = (d: string) => new Intl.DateTimeFormat(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T00:00:00`));
   return `<div class="menu-row"><div class="panel history">
     <h2>${dual('versionHistory')}</h2>
-    ${CHANGELOG.map(r => `<section${r.version === APP_VERSION ? ' class="current"' : ''}>
+    ${CHANGELOG.map(r => `<section${r.version === APP_VERSION ? ' class="current"' : ''}>${r.image ? `<img class="release-img" src="${base}releases/${r.image}" alt="" loading="lazy">` : ''}
       <h3>v${r.version} <span>${date(r.date)}</span>${r.version === APP_VERSION ? `<em>${t('currentVersion')}</em>` : ''}</h3>
       <ul>${r[lang].map(item => `<li>${item}</li>`).join('')}</ul></section>`).join('')}
     <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>

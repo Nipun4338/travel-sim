@@ -27,7 +27,7 @@ export function showWhatsNew(): void {
   card.className = 'whats-new';
   card.innerHTML = `<div class="whats-new-card" role="dialog" aria-modal="true" aria-labelledby="whats-new-title">
       <h2 id="whats-new-title">${t('whatsNew')}</h2>
-      ${releases.map(r => `<section><h3>v${r.version}</h3><ul>${r[lang].map(item => `<li>${item}</li>`).join('')}</ul></section>`).join('')}
+      ${releases.map(r => `<section>${r.image ? `<img class="release-img" src="${import.meta.env.BASE_URL}releases/${r.image}" alt="">` : ''}<h3>v${r.version}</h3><ul>${r[lang].map(item => `<li>${item}</li>`).join('')}</ul></section>`).join('')}
       <button class="primary">${t('gotIt')}</button>
     </div>`;
   const close = () => { markSeen(); card.remove(); removeEventListener('keydown', onKey); };

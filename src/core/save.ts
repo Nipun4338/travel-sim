@@ -13,6 +13,8 @@ export interface SaveData {
   lang?: 'bn' | 'en';
   /** The last game version whose What's new the player has seen. */
   seenVersion?: string;
+  /** The last trip started from the menu, for Continue: its URL query and a label. */
+  lastTrip?: { q: string; label: string };
 }
 
 const DB = 'travel-sim', STORE = 'save', KEY = 'main';

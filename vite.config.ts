@@ -34,7 +34,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,wasm,png,m4a}'],
+        globPatterns: ['**/*.{js,css,html,wasm,png,m4a}', 'menu/*.jpg', 'releases/*.jpg'],
         globIgnores: ['regions/**', 'zones/**'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/(regions|zones)\//],

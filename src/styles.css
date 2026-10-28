@@ -300,3 +300,62 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 .metro-touch .eb { position: fixed; right: 104px; bottom: 18px; width: 84px; height: 84px; border-radius: 50%; border: 4px solid #fff; background: #d0281e; color: #fff; font: 800 12px var(--art-font); z-index: 5; touch-action: none; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
 @media (pointer: coarse) { .metro-dmi { width: min(300px, 40vw); } }
 
+/* ===================== The map menu (v1.2.0) ===================== */
+.menu-map { position: fixed; inset: 0; z-index: 0; background: radial-gradient(120% 90% at 50% 10%, #2a5a7a 0%, #1d3f5e 45%, #162a45 100%); overflow: hidden; }
+.menu-map svg { width: 100%; height: 100%; display: block; }
+.menu-map .land { fill: url(#landFill); stroke: var(--yellow); stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.menu-map .division { fill: none; stroke: rgba(255,255,255,.18); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; }
+.menu-map .river { fill: none; stroke: #6cc3ef; stroke-width: 1.6px; vector-effect: non-scaling-stroke; stroke-linecap: round; opacity: .85; }
+.menu-map .route { fill: none; stroke-width: 2.5px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.menu-map .route.bus { stroke: var(--yellow); }
+.menu-map .route.metro { stroke: #e0412f; }
+.menu-map .route.done { opacity: 1; stroke-width: 3.5px; filter: drop-shadow(0 0 3px rgba(255,220,120,.8)); }
+.menu-map .found { fill: #ffe9a8; stroke: var(--maroon); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.menu-map .pin { cursor: pointer; transition: opacity .4s; }
+.menu-map .pin .dot { fill: var(--yellow); stroke: var(--maroon); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.menu-map .pin .pulse { fill: rgba(247,198,0,.35); transform-box: fill-box; transform-origin: center; animation: pin-pulse 2s ease-out infinite; }
+.menu-map .pin text { font: 800 12px var(--art-font); fill: #fff; text-anchor: middle; paint-order: stroke; stroke: rgba(46,26,71,.9); stroke-width: 3px; }
+.menu-map .pin:hover .dot, .menu-map .pin:focus .dot { fill: #fff; }
+.menu-map .pin:focus { outline: none; }
+.menu-map .pin.soon { cursor: default; opacity: .5; }
+.menu-map .pin.soon .dot { fill: #9aa3ab; stroke: #555; }
+.menu-map .pin.soon .pulse { display: none; }
+.menu-map .pin.soon text { font-size: 9px; font-weight: 600; }
+.menu-map.focused .pin { opacity: 0; pointer-events: none; }
+@keyframes pin-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .menu-map .pin .pulse { animation: none; } }
+
+/* Over the map, the menu is see-through except for its own panels. */
+.menu-screen.over-map { background: transparent; pointer-events: none; }
+.menu-screen.over-map > * { pointer-events: auto; }
+.menu-screen.over-map .menu-top { background: linear-gradient(rgba(46,26,71,.85), rgba(46,26,71,.55)); margin: -16px -16px 16px; padding: 12px 16px 8px; }
+.menu-top .view { margin-left: auto; }
+.menu-top .view + .lang { margin-left: 0; }
+.map-home { position: fixed; left: 16px; bottom: 26px; max-width: min(380px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.map-home .map-hint { margin: 0; padding: 4px 12px; border-radius: 12px; background: rgba(46,26,71,.8); color: var(--cream); font-size: 14px; }
+.map-home .continue { display: flex; flex-direction: column; align-items: flex-start; font-size: 19px; padding: 8px 18px; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+.map-home .continue small { font: 600 12px var(--art-font); color: var(--maroon); opacity: .8; }
+.map-home .map-career { padding: 3px 12px; border-radius: 12px; background: rgba(46,26,71,.75); color: #fff; font-size: 13px; }
+.map-home .links .btn { background: rgba(46,26,71,.8); }
+.dest-card { position: fixed; top: 76px; right: 16px; bottom: 16px; width: min(420px, 52vw); overflow: auto; box-sizing: border-box; padding: 12px 14px 14px; border-radius: 18px; background: rgba(46,26,71,.94); border: 3px solid var(--yellow); box-shadow: 0 12px 34px rgba(0,0,0,.5); animation: dest-in .45s cubic-bezier(.2,.7,.2,1); }
+.dest-card .dest-head { display: flex; align-items: center; justify-content: space-between; }
+.dest-card .dest-head h2 { margin: 0; }
+.dest-card .dest-tabs { display: flex; gap: 6px; margin: 8px 0; }
+.dest-card .tab { flex: 1; font: 800 15px var(--art-font); padding: 7px 6px; border-radius: 12px; border: 2px solid var(--yellow); background: transparent; color: var(--yellow); cursor: pointer; }
+.dest-card .tab.on { background: var(--yellow); color: var(--maroon); }
+.dest-card .dest-hero { width: 100%; aspect-ratio: 21 / 9; object-fit: cover; border-radius: 12px; display: block; margin-bottom: 8px; background: #1d1430; }
+.dest-card .menu-row { flex-direction: column; gap: 10px; }
+.dest-card .panel { max-width: none; min-width: 0; width: 100%; box-sizing: border-box; flex: 0 0 auto; background: rgba(0,0,0,.25); border-width: 2px; }
+@keyframes dest-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Phones: the card is a bottom sheet over the zoomed map. */
+@media (max-width: 640px) {
+  .dest-card { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 64vh; animation-name: dest-up; }
+  .map-home { bottom: 16px; }
+}
+@keyframes dest-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* A release's signature picture, in the version history and What's new. */
+.release-img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin: 4px 0 8px; border: 2px solid rgba(247,198,0,.6); }
+.menu-screen .history section { max-width: 560px; }
+
+/* Landscape phones are short: drop the destination picture so the trips show straight away. */
+@media (max-height: 420px) { .dest-card .dest-hero { display: none; } .dest-card { top: 64px; } }
