@@ -106,10 +106,13 @@ export class ZoneWorld implements FlightGround {
     return Math.abs(x) < H && Math.abs(z) < H;
   }
 
-  async prime(pos: THREE.Vector3): Promise<void> {
+  async prime(pos: THREE.Vector3, onProgress?: (p: number) => void): Promise<void> {
+    this.update(pos);
+    const all = [...this.pending];
+    let done = 0;
+    await Promise.all(all.map(p => p.finally(() => onProgress?.(++done / all.length))));
     this.update(pos);
     await Promise.all([...this.pending]);
-    this.update(pos);
   }
 
   update(pos: THREE.Vector3): void {

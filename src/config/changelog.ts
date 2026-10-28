@@ -9,6 +9,20 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.0.1',
+    date: '2026-10-28',
+    bn: [
+      'নতুন লোডিং স্ক্রিন: কতটা লোড হলো তা দেখায়, সঙ্গে খেলার টিপস।',
+      'আশপাশের রাস্তা আর ভবন পুরো তৈরি হওয়ার পরই খেলা শুরু হয়, হঠাৎ কিছু উদয় হয় না।',
+      'শুরুর কয়েক সেকেন্ডের ঝাঁকুনি কমেছে।',
+    ],
+    en: [
+      'A new loading screen that shows real progress, with tips.',
+      'The game starts only once the streets and buildings around you are ready, so nothing pops in.',
+      'Less stutter in the first seconds of play.',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-10-28',
     bn: [

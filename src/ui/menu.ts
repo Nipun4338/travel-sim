@@ -15,6 +15,7 @@ import { conditionsMultiplier, fogAllowed, type TimeOfDay, type Weather } from '
 import { audio } from '../audio/audio';
 import { SOUND_CREDITS } from '../audio/credits';
 import { CHANGELOG } from '../config/changelog';
+import { loader } from './loader';
 import { APP_VERSION, showWhatsNew, versionLabel } from './whatsNew';
 
 type Mode = 'bus' | 'flight';
@@ -69,7 +70,6 @@ export async function showMenu(): Promise<void> {
   const root = document.createElement('div');
   root.className = 'menu-screen';
   document.body.appendChild(root);
-  document.getElementById('loading')?.remove();
   const st: State = { screen: 'mode', mode: 'bus', region: 'dhaka', trip: 1, time: 'random', weather: 'random' };
   const settings: Settings = loadSettings();
 
@@ -85,6 +85,7 @@ export async function showMenu(): Promise<void> {
   }
 
   async function render(): Promise<void> {
+    root.classList.add('busy');   // a thin progress line while a screen fetches its data
     const p = loadProgress();
     let html = '';
     if (st.screen === 'mode') html = modeScreen(p);
@@ -97,6 +98,7 @@ export async function showMenu(): Promise<void> {
       html = licencesScreen();
     }
     if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode, st.region));
+    root.classList.remove('busy');
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
       <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}
       <div class="osm-credit"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">${t('osmCredit')}</a></div>${versionLabel(true)}`;
@@ -160,6 +162,7 @@ export async function showMenu(): Promise<void> {
   }
 
   await render();
+  loader.done();
   showWhatsNew();
 }
 

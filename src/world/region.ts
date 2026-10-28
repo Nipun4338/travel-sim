@@ -52,10 +52,13 @@ export class RegionWorld {
   }
 
   /** Loads everything the bus needs at `pos` before physics starts. */
-  async prime(pos: THREE.Vector3): Promise<void> {
+  async prime(pos: THREE.Vector3, onProgress?: (p: number) => void): Promise<void> {
+    this.update(pos);
+    const all = [...this.pending];
+    let done = 0;
+    await Promise.all(all.map(p => p.finally(() => onProgress?.(++done / all.length))));
     this.update(pos);
     await Promise.all([...this.pending]);
-    this.update(pos);
   }
 
   private pending = new Set<Promise<void>>();

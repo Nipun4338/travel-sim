@@ -30,6 +30,7 @@ import { streetLamps } from './world/streetLamps';
 import { buildTestTrack } from './world/testTrack';
 import { placeLandmarks } from './landmarks/place';
 import { Railways } from './world/railways';
+import { loader } from './ui/loader';
 
 await RAPIER.init();
 
@@ -59,6 +60,7 @@ atmosphere.enableShadows(renderer);
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
 const regionId = params.get('world') ?? 'dhaka';
+loader.stage('loadMap', 0, 0.1);
 if (regionId !== 'test') {
   region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, world);
   if (!(await region.init())) {
@@ -84,7 +86,11 @@ const legPose = (leg: number): Pose => {
   const from = tripStops(leg).from;
   return region.poseAt(region.route.stops.find(s => s.name === from)!.index);
 };
-if (region) await region.prime(legPose(initialTrip).position);
+if (region) {
+  loader.stage('loadStreets', 0.1, 0.75);
+  await region.prime(legPose(initialTrip).position, p => loader.progress(p));
+}
+loader.stage('loadTraffic', 0.75, 0.9);
 
 // AI traffic and junction phases (SPEC §7); the quality tier picks the vehicle cap until M8 adds settings.
 const quality = tier as QualityTier;
@@ -110,8 +116,8 @@ if (region) {
   const pts = region.route.points;
   atmosphere.addValleyMist(pts.filter((_, i) => i % 60 === 0).map(([x, y, z]) => ({ x, y, z })));
 }
+loader.stage('loadPrepare', 0.9, 1);
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
-document.getElementById('loading')?.remove();
 
 const bus = new Bus(world, legPose(initialTrip));
 bus.wet = atmosphere.rainy;
@@ -298,6 +304,9 @@ function junctionAhead() {
   return { name: a.j.name, stop: st.stop, secondsLeft: st.secondsLeft, distM: Math.max(0, a.dist) };
 }
 
+// Compile every shader now, behind the loading screen, so the first seconds of driving don't stutter.
+await renderer.compileAsync(scene, camera).catch(() => undefined);
+
 startLoop(
   dt => { if (!paused) step(dt); },
   (frameDt, ahead) => {
@@ -333,6 +342,8 @@ startLoop(
     }
   },
 );
+// The first frame is drawn with the loading screen still up, then it fades away.
+loader.done();
 
 void startLeg(initialTrip);
 const pauseMenu = new PauseMenu({ restart: () => void startLeg(legIndex), onChange: p => { paused = p; } });

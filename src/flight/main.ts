@@ -2,6 +2,7 @@
 // Free flight by default, with a landmark checklist; Challenges unlock in order per zone. Relaxed by
 // default: a crash just puts you back at the start. `?mode=scored` adds Taka, stars and failing.
 import { OUTSIDE_ZONE_FAIL_S } from '../config/flight';
+import { loader } from '../ui/loader';
 import { startLoop } from '../core/loop';
 import { challengeUnlocked, landmarksFound, loadProgress, recordChallenge, recordLanding, saveLandmarks } from '../core/progress';
 import { effectiveQuality, loadSettings } from '../core/settings';
@@ -42,11 +43,12 @@ setMaterialConditions({ night: false, wet: conditions.weather === 'rain', sheen:
 const atmosphere = new Atmosphere(scene, camera, conditions, { sun, hemi }, { tier: quality, dayFar: FOG[quality], flight: true });
 const hud = new FlightHud();
 const minimap = new Minimap();
+loader.stage('loadZone', 0, 0.15);
 const zone = new ZoneWorld(`${import.meta.env.BASE_URL}zones/${zoneId}`, scene, quality);
 zone.cityLights = atmosphere.night && zoneId === 'dhaka';
 if (!(await zone.init())) {
   hud.toast(t('zoneNotBaked', { id: zoneId }), 600000);
-  document.getElementById('loading')?.remove();
+  loader.done();
   throw new Error(`zone ${zoneId} not baked`);
 }
 const m = zone.manifest;
@@ -118,7 +120,8 @@ async function start(which: number | 'free'): Promise<void> {
       : data.ceilingM ? t('ceiling', { m: data.ceilingM }) : '';
     hud.toast(`${t(`ch.${data.id}`)}${hint ? ' · ' + hint : ''}`, 4000);
   }
-  await zone.prime(plane.pos);
+  loader.stage('loadTerrain', 0.15, 0.9);
+  await zone.prime(plane.pos, p => loader.progress(p));
 }
 
 function restart(): void { void start(current ? m.challenges.indexOf(current) : 'free'); }
@@ -241,8 +244,9 @@ function goalText(): { title: string; goal?: string; warn?: string } {
 const initial = parseInt(params.get('challenge') ?? '', 10);
 await start(Number.isFinite(initial) && initial >= 1 ? initial - 1 : 'free');
 setTimeout(() => hud.toast(t('conditionsLine', { time: t(`time.${conditions.time}`), weather: t(`weather.${conditions.weather}`) }), 3500), 4200);
+loader.stage('loadPrepare', 0.9, 1);
 await document.fonts?.load('600 20px "Noto Sans Bengali"').catch(() => undefined);
-document.getElementById('loading')?.remove();
+await renderer.compileAsync(scene, camera).catch(() => undefined);
 
 let hudTimer = 0, panelTimer = 0, zoneTimer = 0;
 startLoop(step, frameDt => {
@@ -266,6 +270,8 @@ startLoop(step, frameDt => {
     hud.render({ ...state, agl: plane.agl, inCockpit, outside: outsideS > 0, scored, glideM: glideDeviation(), ...goalText() });
   }
 });
+// The first frame is drawn with the loading screen still up, then it fades away.
+loader.done();
 
 if (import.meta.env.DEV) {
   Object.assign(window, { __flight: { plane, zone, view, cam, controls, hud, renderer, railways, start, step, pauseMenu, get challenge() { return challenge; }, get current() { return current; }, setPaused: (p: boolean) => { paused = p; } } });

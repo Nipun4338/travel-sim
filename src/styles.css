@@ -1,6 +1,5 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #a9cde0; font: 13px/1.35 "Noto Sans Bengali", system-ui, sans-serif; }
 canvas { display: block; touch-action: none; }
-#loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 18px; }
 
 .hud { position: fixed; top: 8px; left: 8px; background: rgba(255,255,255,.88); padding: 8px 10px; border-radius: 10px; min-width: 210px; font-variant-numeric: tabular-nums; }
 .hud .speed b { font-size: 28px; }
@@ -183,6 +182,10 @@ canvas { display: block; touch-action: none; }
 .menu-screen .store-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
 .menu-screen .osm-credit { position: fixed; right: 10px; bottom: 6px; font-size: 11px; color: var(--cream); opacity: .85; }
 .menu-screen .osm-credit a { color: var(--cream); }
+
+/* While a menu screen fetches its data: a thin bus-art line sweeping across the top. */
+.menu-screen.busy::before { content: ''; position: fixed; left: 0; top: 0; z-index: 50; height: 3px; width: 40%; background: var(--art-border); animation: menu-busy 1s ease-in-out infinite; }
+@keyframes menu-busy { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 
 /* Version, quiet in the bottom-left corner of the menu and pause screens. */
 .app-version { position: fixed; left: 10px; bottom: 6px; z-index: 1; font: 500 11px/1 system-ui, sans-serif; color: var(--cream); opacity: .55; letter-spacing: .03em; pointer-events: none; user-select: none; }
