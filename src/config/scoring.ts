@@ -22,7 +22,8 @@ export const STOP_BUSYNESS: Record<string, number> = {
   'Bandarban Bus Stand': 0.8, Milonchhari: 0.3, 'Shoilo Propat': 0.5, Chimbuk: 0.2,
 };
 
-export const fareTk = (km: number) => Math.max(10, Math.round(2.45 * km));
+/** BRTA Dhaka city bus fare: Tk 2.53 per km (May 2026 revision), Tk 10 minimum. */
+export const fareTk = (km: number) => Math.max(10, Math.round(2.53 * km));
 
 export const TK = {
   onTimeBonus: 20,
