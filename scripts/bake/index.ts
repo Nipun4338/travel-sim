@@ -43,8 +43,9 @@ async function main() {
   const stopXZ = region.stops.map(st => {
     const node = st.osmNode !== undefined ? roads.nodes.get(st.osmNode) : undefined;
     const [x, z] = node ? [node.x, node.z] : proj.toXZ(st.lat, st.lon);
-    // Hand-placed Stops (no OSM node) may sit off the road, e.g. Chimbuk's Tourist Centre.
-    return { x, z, radius: node ? 90 : 250 };
+    // Hand-placed Stops (no OSM node) are put on the road, so take a close node: with a wide radius
+    // the shortest route stops at the first node in reach, short of the Stop.
+    return { x, z, radius: node ? 90 : 60 };
   });
   const graph = buildGraph(roads);
   const routed = routeThroughStops(roads, graph, stopXZ);

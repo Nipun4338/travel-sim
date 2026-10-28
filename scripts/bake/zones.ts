@@ -109,7 +109,7 @@ export const BANDARBAN_ZONE: ZoneDef = {
     { name: 'Nilachal', lat: 22.16863, lon: 92.20988, radiusM: 600 },
     { name: 'Meghla', lat: 22.18157, lon: 92.18936, radiusM: 600 },
     { name: 'Sangu river boats', lat: 22.18331, lon: 92.23059, radiusM: 500 },
-    { name: 'Chimbuk', lat: 22.0569, lon: 92.2711, radiusM: 800 },
+    { name: 'Chimbuk', lat: 22.0573, lon: 92.2732, radiusM: 800 },
   ],
   challenges: [
     {
@@ -125,7 +125,7 @@ export const BANDARBAN_ZONE: ZoneDef = {
         { lat: 22.2231, lon: 92.1977, agl: 120 },   // Buddha Dhatu Jadi
         { lat: 22.1686, lon: 92.2100, agl: 150 },   // Nilachal
         { lat: 22.1100, lon: 92.2450, agl: 150 },
-        { lat: 22.0569, lon: 92.2711, agl: 120 },   // Chimbuk
+        { lat: 22.0573, lon: 92.2732, agl: 120 },   // Chimbuk
         { lat: 21.9900, lon: 92.2950, agl: 150 },
         { lat: 21.9128, lon: 92.3245, agl: 120 },   // Nilgiri
       ],

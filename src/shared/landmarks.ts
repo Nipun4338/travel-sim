@@ -41,7 +41,7 @@ export const LANDMARKS: LandmarkDef[] = [
   { id: 'sadarghat-launches', name: 'Sadarghat', lat: 23.70589, lon: 90.40929, tier: 'simple', footprintM: 0, headingDeg: 0, places: D('zone') },
   { id: 'airport-terminal', name: 'Airport Terminal', lat: 23.8501, lon: 90.4071, tier: 'simple', footprintM: 200, headingDeg: 140, places: D('zone') },
   // Bandarban Route (also seen from the air)
-  { id: 'chimbuk', name: 'Chimbuk', lat: 22.05686, lon: 92.27109, tier: 'hero', footprintM: 40, headingDeg: 30, places: B('both') },
+  { id: 'chimbuk', name: 'Chimbuk', lat: 22.0573, lon: 92.2732, tier: 'hero', footprintM: 40, headingDeg: 30, places: B('both') },
   { id: 'shoilo-propat', name: 'Shoilo Propat', lat: 22.15067, lon: 92.21688, tier: 'hero', footprintM: 0, headingDeg: 109, places: B('both') },
   { id: 'milonchhari', name: 'Milonchhari', lat: 22.16861, lon: 92.22284, tier: 'simple', footprintM: 0, headingDeg: 40, places: B('both') },
   { id: 'bandarban-bus-stand', name: 'Bandarban Bus Stand', lat: 22.18368, lon: 92.2178, tier: 'simple', footprintM: 0, headingDeg: 30, places: B('both') },

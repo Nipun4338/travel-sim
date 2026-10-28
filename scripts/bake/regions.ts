@@ -65,7 +65,7 @@ export const BANDARBAN: RegionDef = {
     { name: 'Bandarban Bus Stand', lat: 22.1837, lon: 92.2178 },
     { name: 'Milonchhari',         lat: 22.1686, lon: 92.2228 },
     { name: 'Shoilo Propat',       lat: 22.1507, lon: 92.2169 },
-    { name: 'Chimbuk',             lat: 22.0569, lon: 92.2711 },
+    { name: 'Chimbuk',             lat: 22.05755, lon: 92.27342 },  // the Thanchi Road's ridge top (GLO-30, M12)
   ],
   legEnds: ['Bandarban Bus Stand', 'Shoilo Propat', 'Chimbuk'],
   terrainFilter: { minPx: 1, blurPx: 1 },     // keep the ridges; only take the edge off the forest canopy
