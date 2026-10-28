@@ -50,8 +50,8 @@ export class Train {
 
   update(dt: number): void {
     const want = this.target();
-    // The emergency brake bypasses the jerk limit's slow build-up a little: it bites twice as fast.
-    const rate = (this.emergency ? 2 : 1) * JERK * dt;
+    // Emergency and ATP penalty braking build up twice as fast as the driver's own brake.
+    const rate = (this.emergency || this.penalty ? 2 : 1) * JERK * dt;
     this.applied += Math.max(-rate, Math.min(rate, want - this.applied));
     // Running resistance (bearings, flanges, air) and gravity on the gradient.
     const resist = 0.012 + 0.0004 * this.v + 0.00011 * this.v * this.v;

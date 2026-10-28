@@ -155,6 +155,9 @@ export class TrainView {
 
   setInteriorVisible(v: boolean): void { this.interior.visible = v; }
 
+  /** The driver display's canvas, also shown as an on-screen panel (SPEC §20). */
+  get screenCanvas(): HTMLCanvasElement { return this.screen.canvas; }
+
   setCabVisible(v: boolean): void { this.cab.visible = v; }
 
   /** Puts every car on the track behind the front at `s`, bogies on the rails. */
@@ -174,19 +177,55 @@ export class TrainView {
     this.handle.rotation.z = -tr.notch * 0.14;
   }
 
-  /** Redraws the cab screen (a few times a second is plenty). */
-  drawScreen(info: { limit: number; next: string; distM: number }): void {
+  /**
+   * Redraws the cab's driver display (a few times a second is plenty): a 0–100 km/h dial with the
+   * needle and the permitted speed as a hook on the rim, the target speed and a distance-to-target
+   * bar, the controller notch, the ATP lamp, and the next station.
+   */
+  drawScreen(info: { permitted: number; target: { kmh: number; distM: number }; atp: 'normal' | 'warning' | 'penalty' | 'emergency'; next: string; distM: number }): void {
     const { canvas, tex } = this.screen, g = canvas.getContext('2d')!, tr = this.train;
-    g.fillStyle = '#0d1418'; g.fillRect(0, 0, 512, 256);
-    g.fillStyle = '#7fe0ff'; g.font = '700 96px system-ui, sans-serif'; g.textAlign = 'left';
-    g.fillText(String(Math.round(tr.kmh)), 26, 112);
-    g.font = '600 26px system-ui, sans-serif'; g.fillStyle = '#9fb3bd'; g.fillText('km/h', 30, 148);
-    g.fillStyle = tr.kmh > info.limit + 0.5 ? '#ff5a4f' : '#ffd23f';
-    g.font = '700 44px system-ui, sans-serif'; g.fillText(`▲ ${info.limit}`, 220, 80);
+    const W = 512, H = 256, cx = 150, cy = 132, R = 104;
+    g.fillStyle = '#0b1216'; g.fillRect(0, 0, W, H);
+    const ang = (kmh: number) => Math.PI * 0.75 + (Math.min(100, Math.max(0, kmh)) / 100) * Math.PI * 1.5;
+    // Dial ticks and numbers.
+    g.strokeStyle = '#58656c'; g.lineWidth = 3; g.fillStyle = '#9fb3bd'; g.font = '600 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let v = 0; v <= 100; v += 10) {
+      const a = ang(v), major = v % 20 === 0;
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * (R - (major ? 14 : 8)), cy + Math.sin(a) * (R - (major ? 14 : 8))); g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke();
+      if (major) g.fillText(String(v), cx + Math.cos(a) * (R - 28), cy + Math.sin(a) * (R - 28));
+    }
+    // Permitted speed: a grey band up to it, then the hook (yellow, red in a warning).
+    const hookCol = info.atp === 'normal' ? '#ffd23f' : '#ff4b3e';
+    g.lineWidth = 7; g.strokeStyle = '#3a4a52';
+    g.beginPath(); g.arc(cx, cy, R + 6, ang(0), ang(info.permitted)); g.stroke();
+    g.strokeStyle = hookCol;
+    g.beginPath(); g.arc(cx, cy, R + 6, ang(info.permitted) - 0.03, ang(info.permitted) + 0.06); g.stroke();
+    // Needle and digital speed.
+    const a = ang(tr.kmh);
+    g.strokeStyle = info.atp === 'normal' ? '#e8f4f8' : hookCol; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * (R - 18), cy + Math.sin(a) * (R - 18)); g.stroke();
+    g.fillStyle = '#0b1216'; g.beginPath(); g.arc(cx, cy, 30, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e8f4f8'; g.font = '700 30px system-ui, sans-serif'; g.fillText(String(Math.round(tr.kmh)), cx, cy);
+    g.fillStyle = '#9fb3bd'; g.font = '600 12px system-ui, sans-serif'; g.fillText('km/h', cx, cy + 24);
+    // Target: speed and a bar that empties as the train closes on it (full bar = 1 km).
+    g.textAlign = 'left';
+    const showTarget = info.target.distM > 0 && info.target.kmh < info.permitted + 0.5 + 100;
+    g.fillStyle = '#9fb3bd'; g.font = '600 14px system-ui, sans-serif'; g.fillText('TARGET', 290, 34);
+    g.fillStyle = '#ffd23f'; g.font = '700 34px system-ui, sans-serif';
+    g.fillText(showTarget ? `${info.target.kmh}` : '–', 290, 68);
+    g.fillStyle = '#9fb3bd'; g.font = '600 16px system-ui, sans-serif';
+    g.fillText(showTarget ? (info.target.distM >= 1000 ? `${(info.target.distM / 1000).toFixed(1)} km` : `${Math.round(info.target.distM)} m`) : '', 350, 68);
+    g.fillStyle = '#25323a'; g.fillRect(290, 84, 170, 10);
+    g.fillStyle = '#ffd23f'; g.fillRect(290, 84, showTarget ? 170 * Math.min(1, info.target.distM / 1000) : 0, 10);
+    // Controller notch and the ATP lamp.
     g.fillStyle = tr.notch > 0 ? '#5ee27a' : tr.notch < 0 ? '#ff8a3d' : '#cfd8dc';
-    g.font = '800 64px system-ui, sans-serif'; g.fillText(notchLabel(tr.notch), 380, 112);
-    g.fillStyle = '#cfd8dc'; g.font = '600 30px "Noto Sans Bengali", system-ui, sans-serif';
-    g.fillText(`${info.next} · ${info.distM >= 1000 ? (info.distM / 1000).toFixed(1) + ' km' : Math.round(info.distM) + ' m'}`, 26, 222);
+    g.font = '800 46px system-ui, sans-serif'; g.fillText(notchLabel(tr.notch), 290, 148);
+    const lamp = { normal: ['#1f6b3a', 'ATP'], warning: ['#c9a400', 'OVERSPEED'], penalty: ['#d0281e', 'BRAKE'], emergency: ['#d0281e', 'EMERGENCY'] }[info.atp];
+    g.fillStyle = lamp[0]; g.fillRect(400, 118, 100, 34);
+    g.fillStyle = '#fff'; g.font = '700 14px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(lamp[1], 450, 136);
+    // Next station.
+    g.textAlign = 'left'; g.fillStyle = '#cfd8dc'; g.font = '600 24px "Noto Sans Bengali", system-ui, sans-serif';
+    g.fillText(`${info.next} · ${info.distM >= 1000 ? (info.distM / 1000).toFixed(1) + ' km' : Math.round(info.distM) + ' m'}`, 290, 214);
     tex.needsUpdate = true;
   }
 }

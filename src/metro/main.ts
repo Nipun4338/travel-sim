@@ -16,6 +16,8 @@ import { Minimap } from '../ui/minimap';
 import { backToMenu, PauseMenu } from '../ui/pause';
 import { pickConditions } from '../world/conditions';
 import { RegionWorld } from '../world/region';
+import { audio } from '../audio/audio';
+import { Atp } from './atp';
 import { NOTCH_MAX, NOTCH_MIN, Train } from './Train';
 import { Track } from './track';
 
@@ -53,6 +55,15 @@ const legStops = trackData.stops.slice(firstStop, lastStop + 1);
 const track = new Track(trackData);
 const train = new Train(track, legStops[0].stopS, line.trainLengthM);
 const view = new TrainView(scene, train);
+// The train starts authorised to the next station; each stop there releases authority onwards
+// (until M13d's doors and dispatch: a short pause at the stop mark).
+let nextIdx = 1;
+const atp = new Atp(track, train, legStops[nextIdx].stopS);
+const chime = audio.tone(1150, 'square', 0.06);
+let chimeOn = false;
+atp.onWarning = on => { chimeOn = on; if (!on) chime.set(false); };
+atp.onIntervention = () => audio.beep(440, 3, 0.2);
+let dwell = 0;
 
 loader.stage('loadStreets', 0.1, 0.85);
 view.sync();
@@ -65,8 +76,14 @@ minimap.setRegion(region.route, await region.loadLanes());
 const strip = document.createElement('div');
 strip.className = 'hud-strip';
 document.body.appendChild(strip);
+// The driver display (speed dial, permitted speed, target, notch, ATP lamp) as a panel at the
+// bottom centre, so the signalling can be read from every camera.
+const dmi = document.createElement('div');
+dmi.className = 'metro-dmi';
+dmi.appendChild(view.screenCanvas);
+document.body.appendChild(dmi);
 const stationName = (i: number) => (getLang() === 'bn' ? line.stations[i].nameBn : line.stations[i].name);
-const nextStop = () => legStops.find(st => st.stopS > train.s + 2) ?? legStops[legStops.length - 1];
+const nextStop = () => legStops[nextIdx];
 
 // Controls: W/S (or ↑/↓) move the master controller a notch; Space is the emergency brake.
 let paused = false;
@@ -148,7 +165,16 @@ updateCamera(0);
 await renderer.compileAsync(scene, camera).catch(() => undefined);
 
 startLoop(
-  dt => { if (!paused) train.update(dt); },
+  dt => {
+    if (paused) return;
+    atp.update();
+    train.update(dt);
+    // Stopped at the stop mark (within 15 m either side): after a short pause, authority moves on.
+    const st = legStops[nextIdx];
+    if (train.stopped && Math.abs(train.s - st.stopS) < 15) {
+      if ((dwell += dt) > 4 && nextIdx < legStops.length - 1) { nextIdx++; dwell = 0; atp.authorise(legStops[nextIdx].stopS); }
+    } else dwell = 0;
+  },
   (frameDt, ahead) => {
     view.sync(paused ? 0 : ahead);
     view.setCabVisible(camMode === 'cab');
@@ -162,7 +188,9 @@ startLoop(
     const nx = nextStop();
     if ((screenTimer += frameDt) > 0.15) {
       screenTimer = 0;
-      view.drawScreen({ limit: track.limit(train.s), next: stationName(nx.station), distM: Math.max(0, nx.stopS - train.s) });
+      view.drawScreen({ permitted: atp.permittedKmh, target: atp.target, atp: atp.state, next: stationName(nx.station), distM: Math.max(0, nx.stopS - train.s) });
+      // The overspeed chime pulses while the warning lasts.
+      chime.set(chimeOn && Math.floor(performance.now() / 250) % 2 === 0);
     }
     if ((hudTimer += frameDt) > 0.1) {
       hudTimer = 0;
@@ -179,4 +207,4 @@ camLabel.textContent = t('metroControls');
 camLabel.classList.add('on');
 camLabelTimer = window.setTimeout(() => camLabel.classList.remove('on'), 6000);
 
-if (import.meta.env.DEV) Object.assign(window, { __metro: { train, track, view, line, legStops, region, renderer, scene, camera, setPaused: (p: boolean) => { paused = p; }, pauseMenu } });
+if (import.meta.env.DEV) Object.assign(window, { __metro: { train, atp, track, view, line, legStops, region, renderer, scene, camera, setPaused: (p: boolean) => { paused = p; }, pauseMenu } });

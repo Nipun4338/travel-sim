@@ -277,3 +277,7 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 .cam-label { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); z-index: 6; padding: 3px 12px; border-radius: 12px; background: rgba(46,26,71,.78); color: #fff; border: 2px solid var(--yellow); font: 700 14px var(--art-font); opacity: 0; transition: opacity .25s; pointer-events: none; }
 .cam-label.on { opacity: 1; }
 
+/* Metro Mode: the driver display panel, bottom centre. */
+.metro-dmi { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 4; width: min(360px, 46vw); border: 3px solid #2b3238; border-radius: 12px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.45); pointer-events: none; }
+.metro-dmi canvas { display: block; width: 100%; height: auto; }
+
