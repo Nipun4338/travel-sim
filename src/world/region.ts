@@ -31,7 +31,8 @@ export class RegionWorld {
   private layers = new Map<number, ChunkLayer>();
   readonly root = new THREE.Group();
 
-  constructor(private baseUrl: string, scene: THREE.Scene, private world: RAPIER.World) {
+  /** `physics: false` streams the scenery only, with no colliders (Metro Mode runs on its line). */
+  constructor(private baseUrl: string, scene: THREE.Scene, private world: RAPIER.World, private physics = true) {
     scene.add(this.root);
     this.body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   }
@@ -72,7 +73,7 @@ export class RegionWorld {
       const dx = Math.max(x0 - pos.x, 0, pos.x - (x0 + size)), dz = Math.max(z0 - pos.z, 0, pos.z - (z0 + size));
       const d = Math.hypot(dx, dz);
       const want = LOD_DISTANCE.findIndex(limit => d < limit);
-      const needColliders = d < COLLIDER_DISTANCE;
+      const needColliders = this.physics && d < COLLIDER_DISTANCE;
       if (want !== c.lod && want !== c.loading) this.load(c, want);
       if (needColliders && !c.colliders.length && c.lod0) this.addColliders(c);
       if (!needColliders && c.colliders.length) this.removeColliders(c);

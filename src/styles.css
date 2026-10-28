@@ -272,3 +272,8 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 .rotate-phone .phone-icon { font-size: 54px; animation: turn 1.6s ease-in-out infinite; }
 @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
 @media (orientation: portrait) and (pointer: coarse) { .rotate-phone { display: flex; } }
+
+/* Camera name, briefly, when V switches view (Metro Mode). */
+.cam-label { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); z-index: 6; padding: 3px 12px; border-radius: 12px; background: rgba(46,26,71,.78); color: #fff; border: 2px solid var(--yellow); font: 700 14px var(--art-font); opacity: 0; transition: opacity .25s; pointer-events: none; }
+.cam-label.on { opacity: 1; }
+

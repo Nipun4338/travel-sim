@@ -93,6 +93,23 @@ async function main() {
     console.log(`      Speed limits (southbound): ${sb.limits.filter(l => l[2] < 100).map(l => `${(l[0] / 1000).toFixed(2)}–${(l[1] / 1000).toFixed(2)} km ${l[2]}`).join(', ') || 'none under 100'}`);
     // The baked viaduct replaces OSM's per-track ways (which would draw two overlapping decks).
     roads.ways = roads.ways.filter(wy => wy.tags?.railway !== 'subway');
+    // Nothing may stand in the viaduct: drop every building whose footprint comes within 8 m of the
+    // centreline (OSM maps the stations as buildings over the tracks; M13d models them properly).
+    const line = new PointGrid(20);
+    for (const [x, , z] of metro.centre) line.add(x, z);
+    const before = blds.ways.length;
+    blds.ways = blds.ways.filter(wy => {
+      if (!wy.tags?.building) return true;
+      const pts = wy.nodes.map(id => blds.nodes.get(id)).filter(Boolean) as Array<{ x: number; z: number }>;
+      if (pts.some(p => line.near(p.x, p.z, 8))) return false;
+      // Long footprints can straddle the line between their corners: test points along each edge too.
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 6);
+        for (let k = 1; k < n; k++) if (line.near(a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n, 8)) return false;
+      }
+      return true;
+    });
+    console.log(`      cleared ${before - blds.ways.length} buildings from the viaduct's path`);
   }
 
   console.log('[5/6] Building geometry');
