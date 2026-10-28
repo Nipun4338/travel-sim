@@ -8,7 +8,7 @@ export const LOD_COUNT = 3;
 /** Mesh layers inside a chunk GLB. Colliders are built from the COLLIDER_LAYERS of LOD 0. */
 export type ChunkLayer =
   | 'terrain' | 'road' | 'marking' | 'kerb' | 'building' | 'wall' | 'prop' | 'tree' | 'deck' | 'pillar' | 'water';
-export const COLLIDER_LAYERS: ReadonlyArray<ChunkLayer> = ['terrain', 'road', 'building', 'wall', 'pillar'];
+export const COLLIDER_LAYERS: ReadonlyArray<ChunkLayer> = ['terrain', 'road', 'building', 'wall', 'pillar', 'deck'];
 /** Layers whose meshes carry TEXCOORD_0 and use the shared window texture. */
 export const TEXTURED_LAYERS: ReadonlyArray<ChunkLayer> = ['wall'];
 

@@ -10,6 +10,7 @@ import { COLLIDER_LAYERS, type ChunkEntry, type ChunkLayer, type LaneData, type 
 // neighbours always qualify.
 const LOD_DISTANCE = [350, 1100, 2800]; // limits for LOD 0, 1, 2
 const COLLIDER_DISTANCE = 250;
+const SHADOW_CASTERS: ReadonlyArray<ChunkLayer> = ['building', 'wall', 'tree', 'deck', 'pillar', 'prop'];
 
 interface LoadedChunk {
   entry: ChunkEntry;
@@ -18,6 +19,7 @@ interface LoadedChunk {
   group: THREE.Group | null;
   colliders: RAPIER.Collider[];
   lod0: THREE.Group | null; // kept while colliders exist
+  retryAt: number;      // after a failed fetch, don't ask again until then (ms)
 }
 
 export class RegionWorld {
@@ -44,7 +46,7 @@ export class RegionWorld {
     const floorY = Math.min(...this.route.points.map(p => p[1])) - 2;
     this.world.createCollider(RAPIER.ColliderDesc.cuboid(20000, 0.5, 20000).setTranslation(0, floorY - 0.5, 0), this.body);
     for (const entry of this.manifest.chunks) {
-      this.chunks.set(entry.id, { entry, lod: -1, loading: -1, group: null, colliders: [], lod0: null });
+      this.chunks.set(entry.id, { entry, lod: -1, loading: -1, group: null, colliders: [], lod0: null, retryAt: 0 });
     }
     return true;
   }
@@ -60,7 +62,9 @@ export class RegionWorld {
 
   update(pos: THREE.Vector3): void {
     const size = this.manifest.chunkSize;
+    const now = performance.now();
     for (const c of this.chunks.values()) {
+      if (now < c.retryAt) continue;
       const x0 = c.entry.cx * size, z0 = c.entry.cz * size;
       const dx = Math.max(x0 - pos.x, 0, pos.x - (x0 + size)), dz = Math.max(z0 - pos.z, 0, pos.z - (z0 + size));
       const d = Math.hypot(dx, dz);
@@ -80,11 +84,17 @@ export class RegionWorld {
       if (c.loading !== lod) return;
       c.loading = -1;
       const group = gltf.scene;
-      group.traverse(o => { if (o instanceof THREE.Mesh) o.material = materialFor(o.name as ChunkLayer); });
+      group.traverse(o => {
+        if (!(o instanceof THREE.Mesh)) return;
+        o.material = materialFor(o.name as ChunkLayer);
+        // Sun shadows (when the tier turns them on): solid things cast, the ground and decks receive.
+        o.castShadow = SHADOW_CASTERS.includes(o.name as ChunkLayer);
+        o.receiveShadow = o.name !== 'tree';
+      });
       group.updateMatrixWorld(true);
       if (lod === 0) c.lod0 = group;
       this.show(c, group, lod);
-    }).catch(err => { c.loading = -1; console.error(`chunk ${c.entry.id} lod${lod}`, err); });
+    }).catch(err => { c.loading = -1; c.retryAt = performance.now() + 5000; console.error(`chunk ${c.entry.id} lod${lod}`, err); });
     this.pending.add(p);
     p.finally(() => this.pending.delete(p));
   }

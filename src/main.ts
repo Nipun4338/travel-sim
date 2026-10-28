@@ -54,6 +54,7 @@ const conditions = pickConditions(params.get('world') ?? 'dhaka', params);
 setMaterialConditions({ night: conditions.time === 'night', wet: conditions.weather === 'rain', sheen: tier !== 'low' });
 const atmosphere = new Atmosphere(scene, camera, conditions, { sun, hemi }, { tier, dayFar: 1500 });
 atmosphere.enableWipers();
+atmosphere.enableShadows(renderer);
 
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
@@ -299,9 +300,11 @@ function junctionAhead() {
 
 startLoop(
   dt => { if (!paused) step(dt); },
-  frameDt => {
+  (frameDt, ahead) => {
     region?.update(busPos);
-    busView.sync(bus);
+    atmosphere.follow(busPos);
+    busView.sync(bus, paused ? 0 : ahead);
+    traffic?.draw(paused ? 0 : ahead, frameDt);
     busView.syncLights(lights);
     const inCab = cam.mode === 'cockpit';
     busView.setCabVisible(inCab);
@@ -312,7 +315,7 @@ startLoop(
     cam.update(busView.group, bus.forward, bus.up, frameDt);
     busView.updateMirrors(renderer, scene);
     atmosphere.update(frameDt, inCab, bus.kmh);
-    railways?.update(frameDt, camera.position);
+    railways?.update(frameDt, camera.position, { x: busPos.x, z: busPos.z });
     renderer.render(scene, camera);
     minimap.update(busPos.x, busPos.z, bus.forward.x, bus.forward.z, next?.name);
     if ((hudTimer += frameDt) > 0.1) {
@@ -342,7 +345,7 @@ setTimeout(() => {
 if (import.meta.env.DEV) {
   Object.assign(window, {
     __game: {
-      bus, world, input, comfort, region, results, traffic, junctions, lights, cam, busView, pauseMenu, get railways() { return railways; },
+      bus, busPos, renderer, world, input, comfort, region, results, traffic, junctions, lights, cam, busView, pauseMenu, get railways() { return railways; },
       get run() { return run; }, get progress() { return progress; },
       startLeg, step, setPaused: (p: boolean) => { paused = p; },
       setInput: (fn: typeof readInput | null) => { readInput = fn ?? (() => input.read()); },

@@ -3,6 +3,7 @@
 // camera-local rain streaks, a CSS wiper overlay, and soft transparent mist planes on High.
 import * as THREE from 'three';
 import type { Conditions } from '../world/conditions';
+import { Sky } from './sky';
 import { WindscreenRain } from './windscreen';
 import { audio } from '../audio/audio';
 
@@ -10,11 +11,14 @@ export type Tier = 'low' | 'medium' | 'high';
 
 const RAIN_STREAKS: Record<Tier, number> = { low: 800, medium: 2000, high: 4000 };
 
+// `sky` is the horizon (and fog) colour, `zenith` the deep blue overhead; Dhaka's sky is usually
+// hazy, so the horizon is pale and the zenith only moderately blue. Direct sun is about three times
+// the sky's fill light, so shade reads as shade.
 const TIMES = {
-  morning: { sky: 0xcfe3f0, sun: 0xffd8a8, sunI: 1.2, sunPos: [600, 250, 300], hemiI: 0.9 },
-  midday: { sky: 0xa9cde0, sun: 0xffffff, sunI: 1.6, sunPos: [-200, 900, 150], hemiI: 1.1 },
-  golden: { sky: 0xf2c49a, sun: 0xffb070, sunI: 1.3, sunPos: [-700, 180, -200], hemiI: 0.7 },
-  night: { sky: 0x0b1020, sun: 0x8fa8ff, sunI: 0.15, sunPos: [300, 600, 200], hemiI: 0.15 },
+  morning: { sky: 0xcfe3f0, zenith: 0x5f95c8, sun: 0xffd8a8, sunI: 1.8, sunPos: [600, 250, 300], hemiI: 0.6 },
+  midday: { sky: 0xb8d3e3, zenith: 0x4f87c0, sun: 0xfff6e8, sunI: 2.4, sunPos: [-350, 800, 260], hemiI: 0.7 },
+  golden: { sky: 0xf2c49a, zenith: 0x6a86b4, sun: 0xffb070, sunI: 1.9, sunPos: [-700, 180, -200], hemiI: 0.5 },
+  night: { sky: 0x0b1020, zenith: 0x03050c, sun: 0x8fa8ff, sunI: 0.15, sunPos: [300, 600, 200], hemiI: 0.15 },
 } as const;
 
 export interface AtmosphereOptions {
@@ -32,6 +36,9 @@ export class Atmosphere {
   private rain: THREE.LineSegments | null = null;
   private mist: THREE.Group | null = null;
   private windscreen: WindscreenRain | null = null;
+  private sky_!: Sky;
+  private shadowRenderer: THREE.WebGLRenderer | null = null;
+  private shadowFrame = 0;
 
   constructor(
     private scene: THREE.Scene, private camera: THREE.Camera, readonly conditions: Conditions,
@@ -55,9 +62,9 @@ export class Atmosphere {
     this.scene.background = sky;
     const { sun, hemi } = this.lights;
     sun.color.setHex(tm.sun);
-    sun.intensity = tm.sunI * (this.rainy || this.foggy ? 0.4 : 1);
+    sun.intensity = tm.sunI * (this.rainy || this.foggy ? 0.3 : 1);
     sun.position.set(tm.sunPos[0], tm.sunPos[1], tm.sunPos[2]);
-    hemi.intensity = tm.hemiI * (this.rainy ? 0.7 : 1);
+    hemi.intensity = tm.hemiI * (this.rainy ? 1.1 : this.foggy ? 1.4 : 1);   // overcast: all fill, no sun
     // Visibility (SPEC §9): on the road, day 1500 m, night 600, rain 400, hill fog ~220 (near 15).
     // From the air: the clear-day range, half at night, 4 km in rain, 1.8 km in fog.
     const f = this.opts.flight;
@@ -66,6 +73,52 @@ export class Atmosphere {
     let near = far * 0.25;
     if (this.foggy) { far = f ? 1800 : 220; near = f ? 80 : 15; }
     this.scene.fog = new THREE.Fog(sky, near, far);
+
+    const zenith = new THREE.Color(tm.zenith);
+    if (this.rainy || this.foggy) zenith.copy(sky).multiplyScalar(this.foggy ? 1 : 0.85);
+    const cloudColor = new THREE.Color(this.night ? 0x1a1e28 : this.rainy ? 0x8a929b : this.conditions.time === 'golden' ? 0xf0d2b8 : 0xf4f6f8);
+    this.sky_ = new Sky({
+      horizon: sky, zenith, sun: new THREE.Color(this.night ? 0xc8d4ff : tm.sun).multiplyScalar(this.night ? 0.4 : 1),
+      sunDir: new THREE.Vector3(...tm.sunPos).normalize(), cloud: this.rainy ? 0.95 : this.foggy ? 0.8 : 0.3,
+      cloudColor, stars: this.night && !this.rainy && !this.foggy,
+    });
+    this.scene.add(this.sky_.mesh);
+  }
+
+  /**
+   * Sun shadows near the bus (Medium and High, by day in clear weather): a shadow box that follows
+   * `focus`, so buildings, trees, flyovers and traffic throw shade on the road.
+   */
+  enableShadows(renderer: THREE.WebGLRenderer): void {
+    if (this.opts.tier === 'low' || this.night || this.rainy || this.foggy) return;
+    const high = this.opts.tier === 'high', { sun } = this.lights, r = high ? 90 : 60;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Redrawing the shadow map is most of the cost, and the sun doesn't move: refresh it every
+    // other frame (moving vehicles' shadows lag by at most one frame).
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(high ? 2048 : 1024, high ? 2048 : 1024);
+    Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 1500 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.06;
+    this.scene.add(sun.target);
+    this.shadowRenderer = renderer;
+  }
+
+  /** Keeps the sun's shadow box centred on `focus` (snapped to texels so shadows don't shimmer). */
+  follow(focus: THREE.Vector3): void {
+    if (!this.shadowRenderer) return;
+    if (++this.shadowFrame % 2 === 0) this.shadowRenderer.shadowMap.needsUpdate = true;
+    const { sun } = this.lights, tm = TIMES[this.conditions.time];
+    const step = (sun.shadow.camera.right * 2) / sun.shadow.mapSize.x;
+    const fx = Math.round(focus.x / step) * step, fz = Math.round(focus.z / step) * step;
+    const dir = new THREE.Vector3(...tm.sunPos).normalize();
+    sun.target.position.set(fx, focus.y, fz);
+    sun.position.set(fx, focus.y, fz).addScaledVector(dir, 600);
+    sun.target.updateMatrixWorld();
   }
 
   private buildRain(n: number): void {
@@ -112,6 +165,7 @@ export class Atmosphere {
   }
 
   update(dt: number, inCab: boolean, kmh = 0): void {
+    this.sky_.update(dt);
     this.windscreen?.update(dt, inCab, kmh);
     if (!this.rain) return;
     this.rain.position.copy(this.camera.position).add(new THREE.Vector3(0, -15, 0));
