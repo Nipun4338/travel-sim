@@ -77,18 +77,24 @@ export class Bus {
 
     // Drive, brake, reverse (brake to a stop, then hold brake to reverse).
     let engine = 0, brake = 0;
-    if (input.gas > 0) {
+    if (input.gear === 'R' || input.gear === 'N') {
+      // The touch gear lever: R drives backwards on the accelerator, N coasts; the brake only brakes.
+      if (input.gear === 'R') engine = -h.engineForce * h.reverseForceRatio * input.gas * Math.max(0, 1 + kmh / h.reverseTopKmh);
+      if (input.gear === 'R' && v > 0.5) { engine = 0; brake = input.gas; }
+      brake = Math.max(brake, input.brake);
+    } else if (input.gas > 0) {
       if (v < -0.5) brake = input.gas;
       else engine = h.engineForce * input.gas * Math.max(0, 1 - kmh / h.topSpeedKmh);
     }
-    if (input.brake > 0) {
-      if (v > 0.5) brake = Math.max(brake, input.brake);
+    if (input.brake > 0 && input.gear !== 'R' && input.gear !== 'N') {
+      // In D on the touch lever the brake only brakes; on a keyboard, holding it at a stop reverses.
+      if (v > 0.5 || input.gear === 'D') brake = Math.max(brake, input.brake);
       else engine = -h.engineForce * h.reverseForceRatio * input.brake * Math.max(0, 1 + kmh / h.reverseTopKmh);
     }
     if (engine > 0 && this.forward.y > 0) engine += (HILL_ASSIST * BUS_MASS * G * this.forward.y * input.gas) / 2; // per rear wheel
     if (!input.gas && !input.brake && Math.abs(v) < 0.3) brake = 0.3; // auto-hold when idle
     if (this.doorsOpen) { engine = 0; brake = 1; }
-    this.gear = engine < 0 ? 'R' : Math.abs(v) < 0.3 && !input.gas ? 'N' : 'D';
+    this.gear = input.gear ?? (engine < 0 ? 'R' : Math.abs(v) < 0.3 && !input.gas ? 'N' : 'D');
     const brakeImpulse = (BUS_MASS * h.brakeDecel * dt / 4) * brake;
 
     // Steering: rate-limited and faded with speed.

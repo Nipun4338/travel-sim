@@ -22,7 +22,7 @@ import { BusHud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { backToMenu, PauseMenu } from './ui/pause';
 import { ResultsScreen } from './ui/results';
-import { mountBusTouchControls } from './ui/touchControls';
+import { mountBusTouchControls } from './ui/touch/busTouch';
 import { RegionWorld } from './world/region';
 import { RoadMask } from './world/roadMask';
 import { conditionsMultiplier, pickConditions } from './world/conditions';

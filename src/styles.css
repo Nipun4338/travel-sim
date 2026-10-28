@@ -10,13 +10,6 @@ canvas { display: block; touch-action: none; }
 .hud .keys { margin-top: 4px; font-size: 11px; color: #555; }
 .toast { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 600; color: #fff; background: rgba(0,0,0,.45); padding: 4px 12px; border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .4s; white-space: nowrap; }
 
-.touch .steer-area { position: fixed; left: 0; bottom: 0; width: 45%; height: 45%; background: rgba(0,0,0,.06); color: #333; font-size: 12px; display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; }
-.touch .pad { position: fixed; width: 84px; height: 84px; border-radius: 12px; border: 2px solid #333; background: rgba(255,255,255,.75); font: 700 13px system-ui; user-select: none; touch-action: none; }
-.touch .pad.down { background: #333; color: #fff; }
-.touch .gas { right: 16px; bottom: 16px; height: 120px; }
-.touch .brake { right: 112px; bottom: 16px; }
-.touch .door { right: 16px; bottom: 148px; height: 56px; }
-.touch .horn { right: 112px; bottom: 112px; height: 56px; }
 @media (max-width: 700px) { .hud { font-size: 12px; min-width: 170px; } .hud .speed b { font-size: 22px; } .hud .keys { display: none; } }
 
 .hud .next { font-size: 15px; margin-top: 2px; }
@@ -58,8 +51,6 @@ canvas { display: block; touch-action: none; }
 .hud-details .taka { font-size: 16px; font-weight: 700; }
 .hud-details .leg { font-size: 11px; color: #555; }
 .results .summary { font-size: 16px; margin: 10px 0; }
-.touch .lights-row { position: fixed; right: 16px; top: 12px; display: flex; gap: 6px; }
-.touch .mini { width: 48px; height: 40px; border-radius: 10px; border: 2px solid #333; background: rgba(255,255,255,.75); font: 700 16px system-ui; touch-action: none; }
 
 /* Corner minimap: bottom-right on desktop, clear of the cab cluster; top-left on touch, where the steer area takes the bottom. */
 .minimap { position: fixed; right: 14px; bottom: 14px; width: 180px; height: 180px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 2px 10px rgba(0,0,0,.35); pointer-events: none; overflow: hidden; }
@@ -74,11 +65,6 @@ canvas { display: block; touch-action: none; }
 .flight-read b { font-size: 22px; }
 .flight-read.left { left: 12px; }
 .flight-read.right { right: 12px; text-align: right; }
-.flight-touch .stick-zone { position: fixed; left: 0; bottom: 0; width: 45%; height: 50%; background: rgba(0,0,0,.05); }
-.flight-touch .stick-zone span { position: absolute; left: 10px; bottom: 10px; color: #333; font-size: 12px; }
-.flight-touch .thr-wrap { position: fixed; right: 20px; bottom: 20px; width: 50px; height: 170px; }
-.flight-touch .thr { position: absolute; width: 170px; left: -60px; top: 75px; transform: rotate(-90deg); }
-.flight-touch .brake { right: 84px; bottom: 20px; width: 70px; height: 70px; }
 
 
 /* ===================== M8: "Bus art" (SPEC §13) =====================
@@ -197,3 +183,66 @@ canvas { display: block; touch-action: none; }
 .menu-screen .store-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
 .menu-screen .osm-credit { position: fixed; right: 10px; bottom: 6px; font-size: 11px; color: var(--cream); opacity: .85; }
 .menu-screen .osm-credit a { color: var(--cream); }
+
+/* ===================== Phone controls, mobile-simulator style ===================== */
+.bus-touch button, .flight-touch button { font-family: var(--art-font); touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch .icon-row { position: fixed; right: 8px; top: 8px; display: flex; gap: 5px; z-index: 5; }
+.touch .icon-row button { width: 36px; height: 34px; border-radius: 10px; border: 2px solid var(--yellow); background: rgba(46,26,71,.78); color: #fff; font-size: 15px; padding: 0; }
+.touch .icon-row button:active { background: var(--yellow); }
+
+/* Bus: wheel bottom-left; gear lever, pedals and door bottom-right. */
+.bus-touch .steer { position: fixed; left: 10px; bottom: 8px; width: 150px; height: 150px; }
+.bus-touch .wheel { width: 100%; height: 100%; touch-action: none; }
+.bus-touch .wheel-svg { width: 100%; height: 100%; filter: drop-shadow(0 3px 6px rgba(0,0,0,.45)); }
+.bus-touch .steer.mode-buttons { display: flex; gap: 10px; align-items: flex-end; width: auto; height: auto; }
+.bus-touch .arrow { width: 74px; height: 74px; border-radius: 16px; border: 3px solid var(--yellow); background: rgba(46,26,71,.75); color: #fff; font-size: 30px; }
+.bus-touch .arrow.down { background: var(--yellow); color: var(--maroon); }
+.bus-touch .steer.mode-tilt { width: auto; height: auto; }
+.bus-touch .horn-btn { width: 66px; height: 66px; border-radius: 50%; border: 3px solid var(--yellow); background: var(--maroon); font-size: 28px; }
+.bus-touch .tilt-hint { color: #fff; font-size: 12px; text-shadow: 0 1px 3px #000; margin-top: 4px; }
+.bus-touch .pedal { position: fixed; bottom: 10px; touch-action: none; transition: transform .08s; transform-origin: 50% 100%; }
+.bus-touch .pedal svg { width: 100%; height: 100%; display: block; }
+.bus-touch .pedal span { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font: 800 12px var(--art-font); pointer-events: none; }
+.bus-touch .pedal.down { transform: perspective(300px) rotateX(18deg) scaleY(.94); }
+.bus-touch .pedal.gas { right: 12px; width: 62px; height: 140px; }
+.bus-touch .pedal.brake { right: 84px; width: 84px; height: 92px; }
+.bus-touch .gears { position: fixed; right: 178px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.bus-touch .gears button { width: 40px; height: 32px; border-radius: 8px; border: 2px solid #9aa3ab; background: rgba(28,28,30,.8); color: #9aa3ab; font-weight: 800; font-size: 15px; }
+.bus-touch .gears button.on { background: var(--yellow); color: var(--maroon); border-color: var(--yellow); }
+.bus-touch .round.door { position: fixed; right: 16px; bottom: 160px; width: 52px; height: 52px; border-radius: 50%; border: 3px solid var(--yellow); background: rgba(22,160,133,.9); font-size: 22px; }
+
+/* Plane: floating stick (left), rudder, throttle lever and brakes (right). */
+.flight-touch .stick-zone { position: fixed; left: 0; bottom: 0; width: 44%; height: 72%; touch-action: none; }
+.flight-touch .stick-zone > span { position: absolute; left: 12px; bottom: 8px; color: #fff; font-size: 12px; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.flight-touch .stick-base { position: absolute; left: 90px; top: 60%; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%; border: 3px solid rgba(247,198,0,.7); background: rgba(46,26,71,.35); opacity: .55; pointer-events: none; }
+.flight-touch .stick-base.on { opacity: 1; }
+.flight-touch .stick-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: var(--yellow); box-shadow: 0 3px 8px rgba(0,0,0,.4); }
+.flight-touch .recentre { position: absolute; left: 14px; bottom: 34px; width: 52px; height: 52px; border-radius: 50%; border: 3px solid var(--yellow); background: rgba(46,26,71,.8); color: #fff; font-size: 22px; }
+.flight-touch .rudder { position: fixed; left: 46%; bottom: 10px; display: flex; gap: 6px; }
+.flight-touch .rudder button { width: 46px; height: 40px; border-radius: 10px; border: 2px solid var(--yellow); background: rgba(46,26,71,.75); color: #fff; font-size: 18px; }
+.flight-touch .throttle { position: fixed; right: 14px; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.flight-touch .thr-track { position: relative; width: 54px; height: 170px; border-radius: 14px; border: 3px solid var(--yellow); background: rgba(28,28,30,.75); touch-action: none; overflow: hidden; }
+.flight-touch .thr-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(var(--red), var(--teal)); opacity: .55; }
+.flight-touch .thr-handle { position: absolute; left: 4px; right: 4px; height: 28px; border-radius: 8px; background: #e8e8e8; box-shadow: 0 2px 4px rgba(0,0,0,.5); pointer-events: none; }
+.flight-touch .thr-pct { color: #fff; font: 800 13px var(--art-font); text-shadow: 0 1px 3px #000; order: -1; }
+.flight-touch .pad.brake { position: fixed; right: 82px; bottom: 10px; width: 66px; height: 54px; border-radius: 12px; border: 3px solid var(--yellow); background: rgba(192,57,43,.85); color: #fff; font: 800 13px var(--art-font); }
+.flight-touch .pad.brake.down { background: var(--yellow); color: var(--maroon); }
+
+/* Phone HUD: a smaller map, the banner left of the icon row, speed in the banner, pause in the row. */
+@media (pointer: coarse) {
+  .minimap { width: 96px; height: 96px; }
+  .hud-strip { left: 118px; transform: none; font-size: 13px; padding: 2px 10px; max-width: calc(100vw - 420px); overflow: hidden; text-overflow: ellipsis; }
+  .toast { top: 50px; font-size: 13px; }
+  .pause-btn { display: none; }
+  .hud-corner.tr { top: 50px; }
+  .hud-corner.tc { top: 46px; }
+  .flight-read { font-size: 11px; padding: 4px 8px; }
+  .flight-read b { font-size: 16px; }
+  .flight-read.right { right: 84px; }
+}
+
+/* Portrait phones: ask for landscape. */
+.rotate-phone { display: none; position: fixed; inset: 0; z-index: 50; background: linear-gradient(135deg, var(--maroon), var(--plum)); color: #fff; font: 800 18px var(--art-font); flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 24px; }
+.rotate-phone .phone-icon { font-size: 54px; animation: turn 1.6s ease-in-out infinite; }
+@keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { .rotate-phone { display: flex; } }

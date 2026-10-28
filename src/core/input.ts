@@ -4,6 +4,8 @@ export interface BusInput {
   gas: number;    // 0..1
   brake: number;  // 0..1
   steer: number;  // -1..1, + = left
+  /** The touch gear lever: D never reverses on the brake, R drives backwards on the accelerator. */
+  gear?: 'D' | 'N' | 'R';
 }
 
 export type BusAction =
@@ -17,7 +19,7 @@ const ACTION_KEYS: Record<string, BusAction> = {
   Backquote: 'language', Tab: 'details', KeyM: 'map',
 };
 
-interface TouchState { steer: number; gas: number; brake: number; }
+interface TouchState { steer: number; gas: number; brake: number; gear?: 'D' | 'N' | 'R'; }
 
 const GAS_RAMP_S = 0.6;
 const BRAKE_RAMP_S = 1.2;
@@ -57,8 +59,10 @@ export class Input {
     const k = (...codes: string[]) => (codes.some(c => this.keys.has(c)) ? 1 : 0);
     const gasHeld = Math.max(k('KeyW', 'ArrowUp'), this.touch.gas);
     const brakeHeld = Math.max(k('KeyS', 'ArrowDown'), this.touch.brake);
-    this.gasPedal = gasHeld ? Math.min(1, this.gasPedal + dt / GAS_RAMP_S) : 0;
-    this.brakePedal = brakeHeld ? Math.min(1, this.brakePedal + dt / BRAKE_RAMP_S) : 0;
+    // Touch pedals are analog (how far down the pedal you press): ramp towards that, not to full.
+    const gasTarget = Math.max(k('KeyW', 'ArrowUp'), this.touch.gas), brakeTarget = Math.max(k('KeyS', 'ArrowDown'), this.touch.brake);
+    this.gasPedal = gasHeld ? Math.min(gasTarget, this.gasPedal + dt / GAS_RAMP_S) : 0;
+    this.brakePedal = brakeHeld ? Math.min(brakeTarget, this.brakePedal + dt / BRAKE_RAMP_S) : 0;
     let gas = this.gasPedal, brake = this.brakePedal;
     let steer = k('KeyA', 'ArrowLeft') - k('KeyD', 'ArrowRight');
     const gp = navigator.getGamepads?.().find(Boolean);
@@ -69,6 +73,6 @@ export class Input {
       brake = Math.max(brake, gp.buttons[6]?.value ?? 0);
     }
     if (this.touch.steer) steer = this.touch.steer;
-    return { gas, brake, steer };
+    return { gas, brake, steer, gear: this.touch.gear };
   }
 }

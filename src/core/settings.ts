@@ -14,9 +14,12 @@ export interface Settings {
   volMusic: number;
   volSfx: number;
   volVoice: number;
+  /** Touch steering for the bus, and touch flying for the plane. */
+  touchSteer: 'wheel' | 'tilt' | 'buttons';
+  touchFlight: 'stick' | 'tilt';
 }
 
-const DEFAULTS: Settings = { quality: 'auto', invertPitch: false, scored: false, volMaster: 0.8, volMusic: 0.5, volSfx: 0.9, volVoice: 1 };
+const DEFAULTS: Settings = { quality: 'auto', invertPitch: false, scored: false, volMaster: 0.8, volMusic: 0.5, volSfx: 0.9, volVoice: 1, touchSteer: 'wheel', touchFlight: 'stick' };
 
 export function loadSettings(): Settings { return { ...DEFAULTS, ...readSave().settings }; }
 

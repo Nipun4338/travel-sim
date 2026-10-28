@@ -306,6 +306,11 @@ Check each model's separable parts (wheels, doors, control surfaces) in Sketchfa
 | Bus | W/↑ gas · S/↓ brake/reverse · A/D steer · F doors · H horn · L headlights · K high beam · Q/E indicators · X hazards · V camera · Tab details · ` language · mouse-drag to look around in the cab | left stick steer, RT gas, LT brake | drag-to-steer area bottom-left (~45% × 45%, 70 px = full lock); GAS and BRAKE bottom-right; DOOR and HORN above GAS; ◀ 💡 ▶ (indicators, headlights) top-right |
 | Plane | W/S pitch (**W = nose down**, invert option) · A/D roll · Q/E rudder · Shift/Z throttle · B brakes · V camera | left stick, RT/LT throttle, LB/RB rudder, A brakes | floating virtual stick bottom-left (70 px = full deflection; drag down = nose up); vertical throttle slider and BRAKE bottom-right; no touch rudder |
 
+**Touch, as built (mobile-simulator style, revised 2026-10-28):**
+- **Bus:** a steering wheel you turn with a finger (1.25 turns lock to lock, self-centring, tap the hub for the horn), or tilt steering, or ◀ ▶ buttons (Settings); analog brake and accelerator pedals (press lower to press harder); a D/N/R gear lever (R drives backwards on the accelerator, the brake only brakes); a door button; and an icon row for view, lights, indicators, hazards, map and pause.
+- **Plane:** a floating joystick under the left thumb (drag down = nose up), or tilt to fly with a re-centre button; a throttle lever with its percentage; wheel brakes; rudder buttons; and the same icon row.
+- **Phone:** fullscreen and landscape lock on the first tap, a "turn your phone sideways" screen in portrait, a smaller minimap, and the next-Stop banner left of the icon row.
+
 Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh drives on the left), with a dashboard, analog speedometer, tell-tale lamps, a steering wheel that turns with the steering, live side mirrors and an amber next-Stop display; V switches to the chase camera. The plane also defaults to its **cockpit**: a panel with airspeed, attitude, altimeter, throttle, heading and vertical-speed instruments, a yoke that follows the controls, the high wing overhead; mouse drag looks around. L toggles the landing light; nav lights, beacon and strobes are always on.
 
 ## 13. UI

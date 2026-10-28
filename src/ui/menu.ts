@@ -126,6 +126,8 @@ export async function showMenu(): Promise<void> {
       if (k === 'quality') settings.quality = v as QualitySetting;
       if (k === 'invert') settings.invertPitch = v === '1';
       if (k === 'scored') settings.scored = v === '1';
+      if (k === 'steer') settings.touchSteer = v as Settings['touchSteer'];
+      if (k === 'fly') settings.touchFlight = v as Settings['touchFlight'];
       if (k === 'lang') setLang(v as 'bn' | 'en');
       if (k === 'livery') { const [kind, id] = v.split(':'); chooseLivery(kind as 'bus' | 'plane', id); }
       else saveSettings(settings);
@@ -282,6 +284,8 @@ function settingsScreen(s: Settings, storage: string): string {
       <div class="chips"><b>${t('quality')}</b>${qs.map(q => chip('quality', q, t(`q.${q}`), s.quality === q)).join('')}</div>
       <div class="chips"><b>${t('playStyle')}</b>${chip('scored', '0', t('relaxed'), !s.scored)}${chip('scored', '1', t('scoredStyle'), s.scored)}</div>
       <div class="chips"><b>${t('invertPitch')}</b>${chip('invert', '0', t('off'), !s.invertPitch)}${chip('invert', '1', t('on'), s.invertPitch)}</div>
+      <div class="chips"><b>${t('touchSteerLabel')}</b>${(['wheel', 'tilt', 'buttons'] as const).map(m => chip('steer', m, t(`steer.${m}`), s.touchSteer === m)).join('')}</div>
+      <div class="chips"><b>${t('touchFlightLabel')}</b>${(['stick', 'tilt'] as const).map(m => chip('fly', m, t(`fly.${m}`), s.touchFlight === m)).join('')}</div>
       ${(['volMaster', 'volMusic', 'volSfx', 'volVoice'] as const).map(k => `<label class="vol"><b>${t(k)}</b>
         <input type="range" min="0" max="1" step="0.05" value="${s[k]}" data-vol="${k}"></label>`).join('')}
       <div class="links"><button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div>
