@@ -158,6 +158,65 @@ class AudioEngine {
     osc.stop(t0 + count * 0.22 + 0.05);
   }
 
+  /** A continuous synthesised tone whose pitch and level follow the game (e.g. a train's traction inverters). */
+  drone(type: OscillatorType = 'sawtooth'): { set(freq: number, level: number): void } {
+    let osc: OscillatorNode | null = null, f: BiquadFilterNode | null = null, g: GainNode | null = null;
+    return {
+      set: (freq, level) => {
+        const ctx = this.ctx;
+        if (!ctx) return;
+        if (!osc) {
+          osc = ctx.createOscillator(); osc.type = type;
+          f = ctx.createBiquadFilter(); f.type = 'lowpass';
+          g = ctx.createGain(); g.gain.value = 0;
+          osc.connect(f).connect(g).connect(this.buses.sfx);
+          osc.start();
+        }
+        osc.frequency.setTargetAtTime(Math.max(20, freq), ctx.currentTime, 0.05);
+        f!.frequency.setTargetAtTime(Math.max(200, freq * 4), ctx.currentTime, 0.05);
+        g!.gain.setTargetAtTime(level, ctx.currentTime, 0.08);
+      },
+    };
+  }
+
+  /** Filtered noise at a settable level: rolling rumble (lowpass) or brake hiss (highpass). */
+  noise(kind: 'lowpass' | 'highpass', freq: number): { set(level: number): void } {
+    let g: GainNode | null = null;
+    return {
+      set: level => {
+        const ctx = this.ctx;
+        if (!ctx) return;
+        if (!g) {
+          const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+          const f = ctx.createBiquadFilter(); f.type = kind; f.frequency.value = freq;
+          g = ctx.createGain(); g.gain.value = 0;
+          src.connect(f).connect(g).connect(this.buses.sfx);
+          src.start();
+        }
+        g.gain.setTargetAtTime(level, ctx.currentTime, 0.1);
+      },
+    };
+  }
+
+  /** A short sequence of soft notes (door chimes, station jingles), each `dur` seconds. */
+  chime(freqs: number[], dur = 0.45, level = 0.16): void {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    freqs.forEach((fq, i) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + i * dur;
+      osc.type = 'sine';
+      osc.frequency.value = fq;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(level, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur * 1.6);
+      osc.connect(g).connect(this.buses.sfx);
+      osc.start(t0);
+      osc.stop(t0 + dur * 1.7);
+    });
+  }
+
   get running(): boolean { return this.ctx?.state === 'running'; }
   get silentLoop(): Loop { return SILENT_LOOP; }
 }

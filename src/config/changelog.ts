@@ -9,6 +9,26 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.1.0',
+    date: '2026-10-28',
+    bn: [
+      'নতুন মেট্রো মোড: আসল এমআরটি লাইন ৬-এ উত্তরা উত্তর থেকে মতিঝিল পর্যন্ত ছয় বগির ট্রেন চালান, ১৬টি স্টেশন।',
+      'মাস্টার কন্ট্রোলার, সিগন্যাল আর এটিপি: অনুমোদিত গতি পেরোলে সতর্কতা, তারপর স্বয়ংক্রিয় ব্রেক।',
+      'স্টেশনে প্ল্যাটফর্ম স্ক্রিন ডোর, দাগে থামা, দরজা খোলা-বন্ধ, যাত্রী ওঠানামা আর বাংলা ঘোষণা।',
+      'সময়সূচি, সামনে আর উল্টো দিকে চলা অন্য ট্রেন, ফলাফল আর ক্যারিয়ারে হিসাব।',
+      'সাতটি ক্যামেরা: চালকের কেবিন, পেছন থেকে, প্ল্যাটফর্ম, পাশ থেকে, আকাশ থেকে, যাত্রীর আসন, লাইনের পাশ থেকে।',
+      'ফোনে মাস্টার কন্ট্রোলার লিভার, দরজার বোতাম আর জরুরি ব্রেক।',
+    ],
+    en: [
+      'New Metro mode: drive a six-car train on the real MRT Line 6, Uttara North to Motijheel, 16 stations.',
+      'Master controller, cab signalling and ATP: a warning over the permitted speed, then an automatic brake.',
+      'Stations with platform screen doors: stop on the mark, work the doors, passengers get on and off, Bangla announcements.',
+      'A timetable, other trains ahead and the other way, results and career stats.',
+      'Seven cameras: cab, chase, platform, alongside, aerial, passenger seat and trackside.',
+      'On phones: a master controller lever, door buttons and an emergency brake.',
+    ],
+  },
+  {
     version: '1.0.1',
     date: '2026-10-28',
     bn: [

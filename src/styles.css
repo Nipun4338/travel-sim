@@ -285,3 +285,18 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 .metro-announce { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); z-index: 6; max-width: min(640px, 90vw); padding: 5px 14px; border-radius: 12px; background: rgba(13,40,30,.86); color: #fff; border: 2px solid #2ea56a; font: 600 15px var(--art-font); text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
 .metro-announce.on { opacity: 1; }
 
+/* The Metro card: Line 6 green. */
+.menu-screen .card.metro { background: linear-gradient(160deg, #1d6b45, #145a3a); }
+
+/* Metro touch: doors bottom-left; the master controller lever and EB bottom-right. */
+.metro-touch .doors { position: fixed; left: 12px; bottom: 14px; display: flex; gap: 8px; z-index: 5; }
+.metro-touch .doors button { min-width: 64px; height: 52px; border-radius: 14px; border: 3px solid var(--yellow); background: rgba(29,107,69,.9); color: #fff; font: 800 15px var(--art-font); touch-action: none; }
+.metro-touch .lever { position: fixed; right: 18px; bottom: 16px; width: 70px; height: min(260px, 52vh); z-index: 5; }
+.metro-touch .lever-track { position: absolute; inset: 0 22px; border-radius: 14px; background: linear-gradient(#2d6b3f, #3a3f46 55%, #7a2a1c); border: 2px solid #9aa3ab; touch-action: none; }
+.metro-touch .lever-track i { position: absolute; left: -6px; right: -6px; height: 2px; background: rgba(255,255,255,.35); }
+.metro-touch .lever-handle { position: absolute; left: -22px; right: -22px; height: 36px; border-radius: 10px; background: #e8e8e8; border: 3px solid #333; display: grid; place-items: center; font: 800 15px system-ui, sans-serif; color: #222; pointer-events: none; transition: bottom .08s; }
+.metro-touch .lever-handle.power { background: #7ee08f; }
+.metro-touch .lever-handle.brake { background: #ffb07a; }
+.metro-touch .eb { position: fixed; right: 104px; bottom: 18px; width: 84px; height: 84px; border-radius: 50%; border: 4px solid #fff; background: #d0281e; color: #fff; font: 800 12px var(--art-font); z-index: 5; touch-action: none; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+@media (pointer: coarse) { .metro-dmi { width: min(300px, 40vw); } }
+

@@ -2,9 +2,9 @@
 
 # ট্রাভেল সিম · Travel Sim
 
-**Drive a Dhaka city bus and fly over Bangladesh, in your browser.**
+**Drive a Dhaka city bus, a Dhaka Metro train, and fly over Bangladesh, in your browser.**
 
-A relaxing bus and plane simulator set on the real streets of Dhaka and the hill roads of Bandarban, built from OpenStreetMap and satellite elevation data. Bangla first, English optional. Free to play, works offline and on phones.
+A relaxing bus, metro and plane simulator set on the real streets of Dhaka, its MRT Line 6 and the hill roads of Bandarban, built from OpenStreetMap and satellite elevation data. Bangla first, English optional. Free to play, works offline and on phones.
 
 **[▶ Play now at travel-sim.pages.dev](https://travel-sim.pages.dev)**
 
@@ -14,7 +14,7 @@ A relaxing bus and plane simulator set on the real streets of Dhaka and the hill
 
 ---
 
-## Two ways to travel
+## Three ways to travel
 
 ### 🚌 Bus: drive the real Route
 
@@ -33,6 +33,19 @@ Take off from Hazrat Shahjalal International Airport and fly over Dhaka's skylin
 |:-:|:-:|
 | ![A light aircraft lined up on the Dhaka airport runway](docs/images/flight-dhaka-runway.jpg) | ![The plane over Bandarban's hills at golden hour](docs/images/flight-bandarban.jpg) |
 | *Lined up at Dhaka airport, the city on the horizon* | *Golden hour over the Bandarban hills* |
+
+### 🚇 Metro: drive MRT Line 6 *(new in 1.1.0)*
+
+![A six-car Line 6 train curving along the viaduct near Bijoy Sarani](docs/images/metro-hero.jpg)
+
+Drive a six-car Dhaka Metro train along the whole of MRT Line 6, Uttara North to Motijheel: 16 stations on the real elevated alignment, with the city below. Work the master controller through power and brake notches while cab signalling and ATP watch your speed: go over the permitted speed and you get a warning, then the brakes. Stop on the mark so the train's doors line up with the platform screen doors, open them on the platform side, let people off and on, close up and wait for the dispatch signal. Keep to the timetable, with the train ahead and trains the other way sharing the line.
+
+| | |
+|:-:|:-:|
+| ![The cab: the line curving ahead under the overhead wires](docs/images/metro-cab.jpg) | ![Passengers queued at the platform screen doors while the train's doors are open](docs/images/metro-station.jpg) |
+| *From the cab: the driver display shows speed, the permitted speed and the target* | *Platform screen doors, a waiting crowd and Bangla announcements* |
+
+Seven cameras: the cab, chasing, on the platform, alongside, from the air, a passenger seat, and trackside.
 
 ## A living Dhaka
 
@@ -61,7 +74,7 @@ Morning, midday, golden hour or night, in clear skies, monsoon rain or hill fog.
 
 ![Phone landscape controls: steering wheel, pedals, gear lever](docs/images/phone-controls.jpg)
 
-Touch controls work like a mobile driving sim: a steering wheel you turn with your finger (or tilt steering, or ◀ ▶ buttons), analog brake and accelerator pedals, a D/N/R gear lever and a row of icon buttons. In the plane, a floating stick (or tilt), a throttle lever and rudder buttons. Install it to your home screen; once a Region has loaded, it plays without a connection.
+Touch controls work like a mobile driving sim: a steering wheel you turn with your finger (or tilt steering, or ◀ ▶ buttons), analog brake and accelerator pedals, a D/N/R gear lever and a row of icon buttons. In the plane, a floating stick (or tilt), a throttle lever and rudder buttons. On the metro, a master controller lever, door buttons and an emergency brake. Install it to your home screen; once a Region has loaded, it plays without a connection.
 
 ## Controls
 
@@ -91,6 +104,17 @@ Touch controls work like a mobile driving sim: a steering wheel you turn with yo
 | Wheel brakes | `B` | A |
 | Camera / landing light / map | `V` / `L` / `M` | |
 
+**Metro**
+
+| Action | Keyboard |
+|---|---|
+| Master controller: more power / more brake (one notch) | `W` / `S` or `↑` / `↓` |
+| Emergency brake | `Space` |
+| Open doors left / right | `Q` / `E` |
+| Close doors | `C` |
+| Camera (7 views) / map | `V` / `M` |
+| Pause | `Esc` |
+
 Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readout.
 
 ## Menus and updates
@@ -98,9 +122,9 @@ Add `?invert=1` to the URL to invert pitch, and `?fps=1` for a frame-rate readou
 | | |
 |:-:|:-:|
 | ![The main menu in Bangla: Bus, Plane and Career](docs/images/menu.jpg) | ![The What's new card shown after an update](docs/images/whats-new.jpg) |
-| *The main menu; tap the version in the corner for the full version history* | *After an update, a What's new card lists the changes once* |
+| *The main menu: Bus, Plane and Metro; tap the version in the corner for the full version history* | *After an update, a What's new card lists the changes once* |
 
-**Current version: 1.0.0.** Coming next in **1.1.0**: drive a six-car Dhaka Metro train along the whole of MRT Line 6, Uttara North to Motijheel.
+**Current version: 1.1.0**, which adds Metro Mode on MRT Line 6.
 
 ## Build it yourself
 
@@ -116,6 +140,7 @@ The baked map data isn't in the repository. Build it from OpenStreetMap and GLO-
 ```bash
 npm run bake -- dhaka            # bus Regions (public/regions)
 npm run bake -- bandarban
+npm run bake -- line6            # MRT Line 6 (the line, stations and the city along it); needs the .pbf too
 npm run bake:flight -- dhaka     # Flight Zones (public/zones); needs data/raw/osm/bangladesh-latest.osm.pbf
 npm run bake:flight -- bandarban
 ```

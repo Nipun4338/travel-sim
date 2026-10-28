@@ -19,6 +19,8 @@ import { RegionWorld } from '../world/region';
 import { audio } from '../audio/audio';
 import { Atp } from './atp';
 import { NOTCH_MAX, NOTCH_MIN, Train } from './Train';
+import { mountMetroTouch } from './touch';
+import { TrainSounds } from './sounds';
 import { Passengers } from './passengers';
 import { onTrack, StationView } from './stations';
 import { HEADWAY_S, profileAt, referenceProfile } from './schedule';
@@ -63,6 +65,7 @@ const track = new Track(trackData);
 const train = new Train(track, legStops[0].stopS, line.trainLengthM);
 const view = new TrainView(scene, train);
 const tmpPos = new THREE.Vector3();
+const sounds = new TrainSounds(train);
 // The train starts at the first station with its doors open; authority to each next station is
 // given when the doors are closed and locked there (dispatch).
 let nextIdx = 0;
@@ -170,6 +173,7 @@ function openDoors(side: 'left' | 'right'): void {
   if (Math.abs(lateS) <= 15 || lateS < 0) { onTimeCount++; book('onTime', 20, 'on time'); } else book('late', -Math.min(60, Math.round(lateS - 15)), 'late');
   say(grade === 'perfect' ? 'stopPerfect' : grade === 'good' ? 'stopGood' : 'stopRough', { m: err.toFixed(2) }, 2500);
   phase = 'opening'; phaseT = 0; openFor = 0; mayCloseSaid = false;
+  sounds.doors(true);
   train.doorHold = true;
   passengers.open(alightingAt(nextIdx));
 }
@@ -180,6 +184,7 @@ function closeDoors(): void {
   if (earlyS > 10) book('early', -Math.min(60, Math.round((earlyS - 10) * 2)), 'early');
   else say('doorsClosing', {}, 3000);
   phase = 'closing'; phaseT = 0;
+  sounds.doors(false);
 }
 
 // Next-station banner (top centre), like the bus's next-Stop banner.
@@ -226,6 +231,7 @@ addEventListener('keydown', e => {
   else if (e.code === 'KeyV') nextCamera();
   else if (e.code === 'KeyM') minimap.toggle();
 });
+mountMetroTouch(train, { doors: openDoors, close: closeDoors, camera: nextCamera, map: () => minimap.toggle() });
 const pauseMenu = new PauseMenu({ restart: () => location.reload(), onChange: p => { paused = p; } });
 
 const eye = new THREE.Vector3(), look = new THREE.Vector3(), fwd = new THREE.Vector3(), chasePos = new THREE.Vector3();
@@ -373,6 +379,7 @@ startLoop(
     region.update(frontPos);
     atmosphere.follow(frontPos);
     atmosphere.update(frameDt, camMode === 'cab', train.kmh);
+    sounds.update(camMode === 'cab' || camMode === 'passenger');
     renderer.render(scene, camera);
     const nx = nextStop();
     if ((screenTimer += frameDt) > 0.15) {

@@ -18,9 +18,10 @@ import { CHANGELOG } from '../config/changelog';
 import { loader } from './loader';
 import { APP_VERSION, showWhatsNew, versionLabel } from './whatsNew';
 
-type Mode = 'bus' | 'flight';
+type Mode = 'bus' | 'flight' | 'metro';
 const REGIONS = ['dhaka', 'bandarban'] as const;
-type Region = (typeof REGIONS)[number];
+/** Bus and plane Regions, plus the metro line (Metro Mode only). */
+type Region = (typeof REGIONS)[number] | 'line6';
 
 interface State {
   screen: 'mode' | 'setup' | 'settings' | 'licences' | 'liveries' | 'history';
@@ -77,7 +78,7 @@ export async function showMenu(): Promise<void> {
 
   function start(): void {
     const q = new URLSearchParams({ play: st.mode, world: st.region });
-    if (st.mode === 'bus') q.set('leg', String(st.trip));
+    if (st.mode === 'bus' || st.mode === 'metro') q.set('leg', String(st.trip));
     else if (st.trip !== 'free') q.set('challenge', String(st.trip));
     if (st.time !== 'random') q.set('time', st.time);
     if (st.weather !== 'random') q.set('weather', st.weather);
@@ -89,7 +90,7 @@ export async function showMenu(): Promise<void> {
     const p = loadProgress();
     let html = '';
     if (st.screen === 'mode') html = modeScreen(p);
-    if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : await flightSetup(p, st, settings);
+    if (st.screen === 'setup') html = st.mode === 'bus' ? await busSetup(p, st, settings) : st.mode === 'metro' ? await metroSetup(p, st, settings) : await flightSetup(p, st, settings);
     if (st.screen === 'settings') html = settingsScreen(settings, await storagePanel());
     if (st.screen === 'liveries') html = liveriesScreen();
     if (st.screen === 'history') html = historyScreen();
@@ -97,7 +98,7 @@ export async function showMenu(): Promise<void> {
       await Promise.all(REGIONS.flatMap(r => [loadRoute(r), loadZone(r)]));
       html = licencesScreen();
     }
-    if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode, st.region));
+    if (st.screen === 'setup') html = html.replace('<!--offline-->', await offlineLine(st.mode === 'flight' ? 'flight' : 'bus', st.region));
     root.classList.remove('busy');
     root.innerHTML = `<div class="menu-top"><h1>${t('appTitle')}</h1><span>${t('tagline')}</span>
       <button class="chip lang" data-lang>${getLang() === 'bn' ? 'English' : 'বাংলা'}</button></div>${html}
@@ -178,6 +179,11 @@ function modeScreen(p: Progress): string {
   return `<div class="menu-row">
     ${card('bus', 'bus', 'busBlurb', 'drive')}
     ${card('flight', 'flight', 'flightBlurb', 'fly')}
+    <div class="panel card metro">
+      <h2>${dual('metroMode')}</h2>
+      <p>${t('metroBlurb')}</p>
+      <div><button class="btn" data-go='${JSON.stringify({ screen: 'setup', mode: 'metro', region: 'line6', trip: 1 })}'>${t('drive')} · ${t('region.line6')}</button></div>
+    </div>
     <div class="panel career">
       <h2>${dual('career')}</h2>
       <div>${t('careerTaka', { n: amount(c.taka) })}</div>
@@ -237,6 +243,31 @@ async function busSetup(p: Progress, st: State, s: Settings): Promise<string> {
   </div>`;
 }
 
+/** Metro Mode's trips: Line 6's four Legs, two each way (SPEC §20). All are open from the start. */
+async function metroSetup(p: Progress, st: State, s: Settings): Promise<string> {
+  const route = await loadRoute('line6');
+  if (!route) return `<div class="menu-row"><div class="panel"><h2>${t('region.line6')}</h2><p>${t('notBakedShort')}</p>
+    <button class="btn alt" data-go='{"screen":"mode"}'>${t('back')}</button></div></div>`;
+  const kmAt = (name: string) => route.stops.find(x => x.name === name)!.km;
+  const [a, b] = route.legs;
+  const legs = [[a.from, a.to], [b.from, b.to], [b.to, b.from], [a.to, a.from]];
+  const rows = legs.map(([from, to], i) => {
+    const best = p.legs[legKey('line6', i + 1)];
+    const result = !best?.done ? `<i>${t('notPlayed')}</i>` : s.scored ? `${stars(best.stars)} ${best.taka ? t('bestTk', { n: amount(best.taka) }) : ''}` : '✓';
+    return `<div class="trip ${st.trip === i + 1 ? 'on' : ''}" data-go='${JSON.stringify({ trip: i + 1 })}'>
+      <b>${t('legN', { n: i + 1 })}</b><span>${place(from)} → ${place(to)} · ${t('km1', { n: num(Math.abs(kmAt(to) - kmAt(from)).toFixed(1)) })}</span>
+      <span class="res">${result}</span></div>`;
+  });
+  return `<div class="menu-row">
+    <div class="panel trips">
+      <h2>${t('region.line6')} · ${place(a.from)} ⇄ ${place(b.to)}</h2>
+      ${rows.join('')}
+      <p class="help">${t('metroHelp')}</p>
+    </div>
+    ${conditionsPanel(st, s)}
+  </div>`;
+}
+
 async function flightSetup(p: Progress, st: State, s: Settings): Promise<string> {
   const zone = await loadZone(st.region);
   if (!zone) return `<div class="menu-row"><div class="panel"><h2>${t(`region.${st.region}`)}</h2><p>${t('notBakedShort')}</p>
@@ -273,10 +304,10 @@ async function offlineLine(mode: RegionMode, region: string): Promise<string> {
 async function storagePanel(): Promise<string> {
   if (!offlineSupported()) return '';
   const rows: string[] = [];
-  for (const mode of ['bus', 'flight'] as const) for (const r of REGIONS) {
+  for (const [mode, r] of [...(['bus', 'flight'] as const).flatMap(m => REGIONS.map(r => [m, r] as const)), ['bus', 'line6'] as const]) {
     const u = await usage(mode, r);
     if (!u.bytes) continue;
-    rows.push(`<div class="store-row"><span>${t(mode === 'bus' ? 'busMode' : 'flightMode')} · ${t(`region.${r}`)} · ${mb(u.bytes)}${u.complete ? '' : ` (${t('partial')})`}</span>
+    rows.push(`<div class="store-row"><span>${t(r === 'line6' ? 'metroMode' : mode === 'bus' ? 'busMode' : 'flightMode')} · ${t(`region.${r}`)} · ${mb(u.bytes)}${u.complete ? '' : ` (${t('partial')})`}</span>
       <button class="chip" data-delete="${mode}:${r}">${t('delete')}</button></div>`);
   }
   return `<div class="panel"><h2>${dual('storage')}</h2>${rows.join('') || `<p class="help">${t('storageNone')}</p>`}<p class="help">${t('storageWarn')}</p></div>`;
