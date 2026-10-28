@@ -149,3 +149,13 @@ The runway length matches OurAirports (3,200 m), which the earlier research reco
 - A dedicated Overpass query for Bandarban town bus stations (Nominatim filled this).
 - Overpass Thanchi Road geometry and length (OSRM filled this).
 - Overpass building counts for Bandarban (the OSM API filled this).
+
+## Measured later (M12, 2026-10-28)
+
+The Overpass gaps above were measured from the local Geofabrik extract (`data/raw/osm/bangladesh-latest.osm.pbf`) with `npx tsx scripts/research/osm-figures.ts`:
+
+- `route=bus` relations: 3 in all of Bangladesh, 1 with a way in Dhaka (`23.68,90.33,23.90,90.46`).
+- Dhaka corridor (`23.750,90.383,23.858,90.428`) major ways: 812 ways, 265.7 km inside the box; `lanes` 45%, `oneway` 79%, `maxspeed` 27%, `surface` 55%, `width` under 1%.
+- Bandarban (`21.90,92.18,22.22,92.40`): 2,688 buildings (none with `building:levels`), 575 highway ways, 74 major (none with `lanes`), 8 bus stops, one unnamed `amenity=bus_station` (21.9832, 92.2369), 14 places, no `natural=peak` and no `tourism=viewpoint`.
+- Chimbuk by GLO-30: 556 m at the Tourist Centre point; the Thanchi Road's high point beside it is 579 m, next to a 592 m knoll.
+

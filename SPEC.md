@@ -107,7 +107,7 @@ The path runs along Old Airport Road and Bijoy Sarani, then Bir Uttam Ziaur Rahm
 
 The routed km figures include short detours; staying on the arterials comes to ~13.5–14.8 km.
 
-### Bandarban Route: Bandarban Bus Stand → Chimbuk (~23.7 km, outbound only)
+### Bandarban Route: Bandarban Bus Stand → Chimbuk (~22.6 km as baked, outbound only)
 
 The road is the Bandarban–Thanchi Road (`secondary`, Z1811). Stops are hand-placed because they aren't bus stops in OSM.
 
@@ -116,7 +116,7 @@ The road is the Bandarban–Thanchi Road (`secondary`, Z1811). Stops are hand-pl
 | 1 | Bandarban Bus Stand (Thanchi Road stands) | ~22.1837, 92.2178 | 0 | Leg 1 start |
 | 2 | Milonchhari | ~22.1686, 92.2228 | 3.2 | |
 | 3 | Shoilo Propat | ~22.1507, 92.2169 | 6.6 | Leg 1 end / Leg 2 start |
-| 4 | Chimbuk (Tourist Centre, on the main road; no side road) | 22.0569, 92.2711 | ~23.7 | Leg 2 end (~17 km) |
+| 4 | Chimbuk (Tourist Centre, on the main road at its ridge top; no side road) | 22.05755, 92.27342 | 22.6 | Leg 2 end (~17 km) |
 
 ### Flight Zones
 
@@ -410,17 +410,17 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
 
 ## 18. Verify during the build
 
-These are known gaps the build must check. None of them is an open decision.
+These were known gaps the build had to check. None of them is an open decision. Results from M12 (2026-10-28) follow each item.
 
-1. **Minimum phone:** repeat the 30 fps checks on a Helio G99 / Snapdragon 680-class phone. The user's test phone wasn't recorded ([024](docs/wayfinder/tickets/024-prototype-fog-and-rain.md), [017](docs/wayfinder/tickets/017-judge-touch-controls.md)).
-2. **Chimbuk height:** confirm with GLO-30. The decision used SRTM ([015](docs/wayfinder/tickets/015-revise-chimbuk-and-landmarks.md)).
-3. **Approximate coordinates:** the Bandarban Stops and the landmarks not named in OSM are approximate; snap them to the baked road.
-4. **Rickshaw ban:** whether cycle rickshaws are banned from the corridor is assumed, not researched ([013](docs/wayfinder/tickets/013-define-ai-traffic-behaviour.md)).
-5. **Terminal 3:** it is tagged under construction in OSM; check its current state before modelling.
-6. **Tuning values:** fare, Fine and bonus amounts, par times, and Livery thresholds.
-7. **OSM figures not measured** (Overpass was overloaded): city-wide bus-route relations, corridor tag statistics, Bandarban peaks and places. See the research files.
-8. **Vehicle models:** check separable parts before committing.
-9. **Elevated roads:** pick deck heights per `layer`, since OSM has no height tags.
+1. **Minimum phone:** repeat the 30 fps checks on a Helio G99 / Snapdragon 680-class phone. The user's test phone wasn't recorded ([024](docs/wayfinder/tickets/024-prototype-fog-and-rain.md), [017](docs/wayfinder/tickets/017-judge-touch-controls.md)). **Open: needs the user's phone.** Add `?fps=1` to the URL for a frame-rate readout (green at 30 fps or more). On a desktop GPU, High holds ~60 fps in Dhaka with shadows.
+2. **Chimbuk height:** **confirmed.** GLO-30 gives 556 m at the Wikidata "Tourist Centre" point (SRTM said ~558 m). That point lies ~210 m off the road and below it; the Thanchi Road tops out at 579 m beside a 592 m knoll. The Stop now stands on the road at that ridge top (22.05755, 92.27342) and the landmark on the knoll beside it (22.0573, 92.2732).
+3. **Approximate coordinates:** **snapped.** Bandarban Stops snap to the baked road within 19 m (Bus Stand), 3 m (Milonchhari, Shoilo Propat) and 1 m (Chimbuk). The bake now takes a node within 60 m for hand-placed Stops; a wide radius had let the Route end short of the last one.
+4. **Rickshaw ban:** **researched.** DMP orders ban rickshaws and other slow vehicles from Dhaka's main roads (Mirpur Road since 2019; VIP Road and Pragati Sarani named in July 2024), but reports describe wide breaches since August 2024. The game keeps rickshaws off the corridor's carriageways except crossing at junctions and in the kerb lane near Farmgate.
+5. **Terminal 3:** **checked.** The building is complete but not open to passengers; the latest target (CAAB, 2026) is a soft opening on 16 December 2026, pending the Japanese operator deal. It's modelled as a finished building with no activity.
+6. **Tuning values:** **reviewed.** The fare follows BRTA's May 2026 Dhaka city rate, Tk 2.53 per km with a Tk 10 minimum (was 2.45). Fines, bonuses, par times and Livery thresholds are game balance and stay as set.
+7. **OSM figures:** **measured** from the Geofabrik extract (`npx tsx scripts/research/osm-figures.ts`): 3 `route=bus` relations in Bangladesh, 1 touching Dhaka; the Dhaka corridor box has 812 major ways (266 km), 45% with `lanes`, 79% `oneway`, 27% `maxspeed`, 55% `surface`, almost none with `width`; the Bandarban box has 2,688 buildings (none with levels), 575 highway ways (74 major, none with lanes), 8 bus stops, one unnamed bus station, 14 places, and **no** mapped peaks or viewpoints.
+8. **Vehicle models:** **not applicable.** All vehicles and landmarks are scripted low-poly models with their moving parts (wheels, doors, wipers, control surfaces) built separately.
+9. **Elevated roads:** **done.** Deck heights per `layer` (7 / 12 / 16 m) with ramps to street level; decks are solid and drivable.
 
 ## 19. Reference material
 
