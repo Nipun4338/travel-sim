@@ -339,6 +339,7 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
   - Driving view first: in relaxed mode the HUD is the next-Stop banner, the minimap (top-left), speed bottom-left in the chase view, and pause. Taka, passengers and comfort appear top-right only in scored mode; details stay behind Tab.
   - Flight adds heading top-centre, airspeed and altitude at the sides and throttle bottom-left in the chase view, and a glide-path cue (bottom-right, under the heading on phones) on the landing Challenge's final.
   - Settings: language, quality (Auto picks Low on phones), play style (relaxed or scored), invert pitch, and the controls list. Storage per Region and the save code arrive with M11 and M9; progress and career stats are kept in localStorage until M9.
+- **Version and What's new (v1.0.0, 2026-10-28):** the version (`package.json`, built in by Vite) shows quietly in the bottom-left corner of the menu and pause screens. After an update, the menu shows a What's new card once, listing the releases since the player's last version from `src/config/changelog.ts` in their language; first-time players don't see it, and a save from before versions existed sees only the latest release. A **Version history** screen (from the corner version label or the mode-select links) lists every release with its date, newest first, the current one marked. Each release bumps `package.json`'s version and adds a changelog entry. Versions: **0.9.0** was the first public release (M11, 2026-10-27), **0.9.1** added the phone controls and headlight fix, **1.0.0** is the game through M12; the Metro Mode (M13) ships as **1.1.0**.
 - **Language (revised 2026-10-27):** **বাংলা by default**, English optional. That covers Bangla text and Stop names, Bangla numerals (৳ ১,২৪০, ৩৫ কিমি/ঘণ্টা) and the Noto Sans Bengali font. The choice is remembered on the device.
 
 ## 14. Audio
@@ -430,4 +431,29 @@ These were known gaps the build had to check. None of them is an open decision. 
   - [fog-and-rain](prototypes/fog-and-rain/PROTOTYPE-fog-and-rain.html)
   - [hud-and-menus](prototypes/hud-and-menus/PROTOTYPE-hud-and-menus.html)
 - **Research:** [docs/research/](docs/research/)
-- **Decision trail:** [docs/wayfinder/map.md](docs/wayfinder/map.md) and its 24 tickets.
+- **Decision trail:** [docs/wayfinder/map.md](docs/wayfinder/map.md) and its 25 tickets.
+
+## 20. Metro Mode (M13)
+[025](docs/wayfinder/tickets/025-define-metro-simulator.md); data in [docs/research/metro-line-6.md](docs/research/metro-line-6.md)
+
+A third mode: drive a six-car MRT Line 6 train along the real elevated line, Uttara North ↔ Motijheel. Like the bus, it's relaxed by default; scored play adds stop accuracy, punctuality and comfort.
+
+- **Line:** all 16 open stations, ~20 km, both directions, baked as its own Region (`line6`) from OSM: the viaduct and its two tracks with the 1,500 V overhead line, the 16 station nodes, and the city along it (buildings, roads and traffic below, landmarks such as Farmgate). The Kamalapur extension is out of scope.
+- **Legs:** Uttara North → Agargaon (9 stations) and Agargaon → Motijheel (8 stations), and the same two southbound legs reversed; 4 Legs in all.
+- **Train:** six cars, ~120 m, top speed 100 km/h. One-dimensional along the track (no physics engine): position, speed and the master controller drive it, with a traction curve that tapers above ~40 km/h, rolling and air resistance and gradients from the viaduct profile.
+- **Master controller:** one handle with power notches P1–P4, coast (N), service brake B1–B7 and emergency brake (EB). Full power gives ~0.9 m/s² from rest; B7 ~1.0 m/s²; EB ~1.25 m/s² and stays applied until the train stops. Notch changes are rate-limited so the train doesn't jerk.
+- **Signalling and ATP (CBTC-style cab signalling):**
+  - The cab display shows the current speed, the permitted speed and the target (distance to the end of movement authority).
+  - Permitted speed comes from the static limits (100 km/h line maximum, lower through tight curves and turnouts) and a braking curve to the end of authority: the next station's stop mark, or behind the train ahead.
+  - Over the permitted speed: a warning chime at +3 km/h, then a penalty brake at +6 km/h until the train is back under; passing the end of authority triggers the emergency brake.
+- **Stations:** elevated, with side platforms (OSM maps no platforms; the user confirms any station that differs), platform screen doors, roofs, Bangla and English name boards, waiting passengers who walk to the doors, board and alight. The stop mark is shown on the platform and in the cab.
+- **Stopping and doors:** stop with the train's doors aligned to the screen doors: within ±0.5 m is good, within ±0.3 m perfect. Short or long by more than that, the player can creep (≤5 km/h) to correct within 5 m; beyond it the stop is an overrun. Doors open on the platform side (the cab shows which), passengers board and alight over a ~30 s dwell, then close doors and depart on the dispatch signal.
+- **Timetable:** run times between stations add up to ~35 minutes end to end; the on-time window is ±15 s. Other trains run the opposite track on the same timetable, and one runs ahead on yours at the line's 8–10 minute headway, so its tail sets your end of authority if you catch up.
+- **Scoring (scored play):** Taka per passenger carried, a stop-accuracy bonus, on-time bonuses, and Fines for overruns, ATP interventions, emergency brakes and Jerky Moments (as on the bus). Relaxed play shows the same feedback without Fines.
+- **Cab:** the default view: windscreen, desk with the master controller, speedometer with the permitted-speed marker, the ATP display, door buttons and the dispatch light. Outside views: chase and platform.
+- **Announcements:** a chime and Bangla (and English) text for "next station", "doors closing" and arrival, with recorded voices to follow (like the Helper call-outs). The user, who rides the line, checks the wording.
+- **Controls:**
+  - Keyboard: `W` / `S` notch up (power) and down (brake), `Space` emergency brake, `Q` / `E` open left / right doors, `C` close doors, `V` camera, `M` map.
+  - Gamepad: the right stick moves the master controller; bumpers open doors; A closes them.
+  - Touch: a vertical master-controller lever on the right, door buttons on the left, EB on screen.
+- **Menu:** a third card, মেট্রো (Metro), with Leg and direction choice; career stats add stations served and kilometres driven.

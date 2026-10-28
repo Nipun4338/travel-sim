@@ -18,3 +18,16 @@ Milestones for building v1 from [SPEC.md](../SPEC.md). Each one ends with someth
 | M11 | **PWA, caching and deploy** | Workbox shell and Region caching, offline download, Cloudflare Pages deploy (free plan; `npm run deploy` after a one-time `wrangler login`) | §16, §17 |
 | M12 | **Verification pass** | the "Verify during the build" list in SPEC §18, including the minimum-phone 30 fps check | §18 |
 | M13 | **Dhaka Metro Rail simulator** (requested 2026-10-27, the project's final milestone) | a third mode: drive MRT Line 6 trains as realistically as possible. Real alignment, stations and platforms from OSM; the viaduct; train controls (master controller, brakes, doors); station dwell and timetable; signalling; the cab view and Bangla announcements. Its own decision round first (scope, realism level, data sources) | new SPEC section |
+
+## M13 steps
+
+Decided in [025](wayfinder/tickets/025-define-metro-simulator.md); the design is SPEC §20. Each step ends with something you can run (`?play=metro`).
+
+| # | Step | Done when |
+|---|---|---|
+| M13a | **Line 6 bake** | `npm run bake -- line6` builds a Region along the viaduct: both tracks as a 1-D line with distances, gradients, curve radii and speed limits; the 16 stations with platform sides and stop marks; the city along the line |
+| M13b | **Train and cab** | a six-car train drives the line with the master controller, traction and brake curves; the cab view with speedometer and controls; chase view |
+| M13c | **Signalling and ATP** | permitted speed, braking curve to the end of authority, warning, penalty and emergency brakes; the cab ATP display |
+| M13d | **Stations and passengers** | elevated stations with platform screen doors, roofs and name boards; stop-mark accuracy; doors; passengers boarding and alighting; dwell and dispatch |
+| M13e | **Timetable, other trains, Legs and scoring** | the 4 Legs, run times, the train ahead and opposite-track trains, relaxed and scored results |
+| M13f | **Menu, touch, audio and polish** | the Metro card, touch lever and door buttons, chimes and announcement text, saves and career stats, README screenshots, deploy |
