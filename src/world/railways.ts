@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { LevelCrossing, RailData, RailLine } from '../shared/region';
 
 interface Line { kind: RailLine['kind']; pts: THREE.Vector3[]; cum: number[]; length: number; }
-interface Train { line: Line; s: number; dir: 1 | -1; speed: number; cars: THREE.Mesh[]; carLen: number[]; }
+interface Train { line: Line; s: number; dir: 1 | -1; speed: number; cruise: number; cars: THREE.Mesh[]; carLen: number[]; }
 interface Crossing { def: LevelCrossing; line: Line | null; s: number; booms: THREE.Object3D[]; lamps: THREE.MeshBasicMaterial[]; closed: boolean; }
 
 const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -102,7 +102,7 @@ export class Railways {
     const s = at !== undefined ? at * line.length : dir === 1 ? -total : line.length + total;
     // Main-line trains crawl through the city (~35 km/h); the metro runs at ~60 between stations.
     const speed = (kind === 'metro' ? 60 : 30 + this.rnd() * 15) / 3.6;
-    this.trains.push({ line, s, dir, speed, cars, carLen });
+    this.trains.push({ line, s, dir, speed, cruise: speed, cars, carLen });
   }
 
   private buildCrossing(def: LevelCrossing): Crossing {
@@ -149,13 +149,23 @@ export class Railways {
     return { def, line: best ? (best as { line: Line }).line : null, s: best ? (best as { s: number }).s : 0, booms, lamps, closed: false };
   }
 
-  update(dt: number, viewer: THREE.Vector3): void {
+  /** `blocker`: the bus, if it's standing on a crossing a train must stop short of. */
+  update(dt: number, viewer: THREE.Vector3, blocker?: { x: number; z: number }): void {
     this.time += dt;
     for (const kind of ['rail', 'metro'] as const) {
       if ((this.next[kind] -= dt) <= 0) { this.spawn(kind); this.next[kind] = kind === 'metro' ? 90 + this.rnd() * 60 : 150 + this.rnd() * 120; }
     }
     const tmp = new THREE.Vector3(), ahead = new THREE.Vector3();
+    // A crossing with the bus on it: trains heading for it brake to a stop 40 m short, as a driver
+    // seeing an obstruction would, and carry on once it's clear.
+    const blocked = blocker ? this.crossings.filter(c => c.line && Math.hypot(c.def.x - blocker.x, c.def.z - blocker.z) < 8) : [];
     this.trains = this.trains.filter(tr => {
+      let target = tr.cruise;
+      for (const c of blocked) {
+        const rel = (c.s - tr.s) * tr.dir;
+        if (c.line === tr.line && rel > 0 && rel < 400) target = Math.min(target, Math.max(0, (rel - 40) * 0.12));
+      }
+      tr.speed += Math.max(-1.2 * dt, Math.min(0.5 * dt, target - tr.speed));
       tr.s += tr.speed * tr.dir * dt;
       let off = 0, any = false;
       tr.cars.forEach((car, i) => {

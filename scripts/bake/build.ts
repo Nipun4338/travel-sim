@@ -5,6 +5,7 @@ import { CHUNK_SIZE } from '../../src/shared/region';
 import { ChunkGeometry, color, densify, hash01, type UV, type V3 } from './geometry';
 import { DRIVABLE, isElevated, isOneway, roadRank, roadWidth, type Indexed } from './osm';
 import { PointGrid, PolygonIndex, SegmentIndex } from './spatial';
+import { crownRadius, pickSpecies, plantTree, type TreeSetting } from './trees';
 import type { HeightSampler } from './terrain';
 
 const C = {
@@ -136,15 +137,17 @@ function offsetLine(pts: [number, number][], off: number): [number, number][] {
  * sleepers every 0.9 m and two steel rails at standard 1.676 m broad gauge (Bangladesh's main
  * line around Dhaka). On a bridge, steel girders run along both sides.
  */
-function buildTrack(geo: ChunkGeometry, pts: V3[], lods: number[], bridge: boolean, ballast = true): void {
+function buildTrack(geo: ChunkGeometry, pts: V3[], lods: number[], bridge: boolean, ballast = true, flush: boolean[] = []): void {
   if (ballast) geo.ribbon(pts, 3.8, C.ballast, 'road', lods, 0.3, C.ballast);
   const flat = pts.map(([x, , z]) => [x, z] as [number, number]);
-  const yAt = (i: number) => pts[i][1];
+  // At a level crossing the rails are set into the road surface; elsewhere they sit on sleepers.
+  const yAt = (i: number) => pts[i][1] - (flush[i] ? 0.12 : 0);   // flush: rail tops just above the road
   let carry = 0;
   for (let i = 1; i < pts.length; i++) {
     const [ax, ay, az] = pts[i - 1], [bx, by, bz] = pts[i], len = Math.hypot(bx - ax, bz - az);
     const ux = (bx - ax) / (len || 1), uz = (bz - az) / (len || 1);
     for (let d = carry; d < len; d += 0.9) {
+      if (flush[i - 1] || flush[i]) continue;
       const x = ax + ux * d, z = az + uz * d, y = ay + ((by - ay) * d) / (len || 1);
       // A sleeper across the track: a thin slab, rotated to the track's direction.
       const hw = 1.3, hd = 0.12, rx = -uz, rz = ux;
@@ -198,6 +201,8 @@ export function buildRoads(
   let pillars = 0, skipped = 0, crossings = 0, footbridges = 0;
   const lift = (rank: number) => 0.12 + rank * 0.01; // major roads draw over minor ones at junctions
   const at = (pts: [number, number][], y: number) => pts.map(([x, z]) => [x, h(x, z) + y, z] as V3);
+  const levelCrossings = new PointGrid(20);
+  for (const nd of idx.nodes.values()) if (nd.tags?.railway === 'level_crossing') levelCrossings.add(nd.x, nd.z);
 
   for (const w of idx.ways) {
     const t = w.tags ?? {};
@@ -222,7 +227,13 @@ export function buildRoads(
     const railBridge = !!isRail && !!t.bridge && t.bridge !== 'no';
     // In the hills a road `layer` marks a river bridge, already graded straight across: no deck.
     const elevated = isRail ? railBridge && (t.railway !== 'rail' || (parseInt(t.layer ?? '0', 10) || 0) >= 3) : !bridgesAtGrade && isElevated(w, idx);
-    if (isRail && !elevated) { buildTrack(geo, at(pts2, 0.3), [0, 1], railBridge); continue; }
+    if (isRail && !elevated) {
+      // The track bed stands 0.3 m proud of the ground, except across a road at a level crossing,
+      // where it sits just under the road surface (the rails show through) so the bus drives straight over.
+      const flush = pts2.map(([x, z]) => levelCrossings.near(x, z, 12));
+      buildTrack(geo, pts2.map(([x, z], i) => [x, h(x, z) + (flush[i] ? 0.06 : 0.3), z] as V3), [0, 1], railBridge, true, flush);
+      continue;
+    }
     const width = isRail ? 9 : roadWidth(t);
     const profile = !isRail ? flyovers.get(w.id) : undefined;
     if (elevated && profile) {
@@ -436,13 +447,25 @@ export function buildTrees(
   footprints: PolygonIndex<true>, ground: PolygonIndex<Ground>, junctions: PointGrid,
   forest?: { buildings: PointGrid },
 ): number {
-  const canopy = new THREE.IcosahedronGeometry(2.4, 0);
   let n = 0;
-  const plant = (x: number, z: number, seed: number) => {
-    if (!near(x, z) || allRoads.onRoad(x, z, 1.5) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
-    const g = h(x, z), tall = 2.5 + hash01(seed) * 2;
-    geo.box(x, z, 0.18, 0.18, g, g + tall, C.trunk, 'tree', [0]);
-    geo.mesh(canopy, x, g + tall + 1.6, z, C.canopy[Math.floor(hash01(seed + 1) * C.canopy.length)], 'tree', [0, 1]);
+  // Flyover decks (with their ramps) and railway tracks: no tree grows up through them.
+  const overhead = new SegmentIndex(50);
+  for (const w of idx.ways) {
+    const t = w.tags ?? {};
+    const rail = t.railway && /^(subway|light_rail|rail)$/.test(t.railway);
+    if (!rail && !(t.highway && DRIVABLE.has(t.highway) && isElevated(w, idx))) continue;
+    const half = rail ? 3 : roadWidth(t) / 2 + 2;
+    for (let i = 1; i < w.nodes.length; i++) {
+      const a = idx.nodes.get(w.nodes[i - 1]), b = idx.nodes.get(w.nodes[i]);
+      if (a && b) overhead.add(a.x, a.z, b.x, b.z, half);
+    }
+  }
+  // A mix of real species per setting (trees.ts): city streets and greens, hill road and forest.
+  // The trunk stays clear of the carriageway by most of its crown, so crowns only just overhang it.
+  const plant = (x: number, z: number, seed: number, setting: TreeSetting) => {
+    const species = pickSpecies(setting, seed), crown = crownRadius(species);
+    if (!near(x, z) || allRoads.onRoad(x, z, Math.max(1.5, crown - 2)) || overhead.onRoad(x, z, crown) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
+    plantTree(geo, species, x, h(x, z), z, seed);
     n++;
   };
   // Street trees on the verge of major roads, roughly every 20 m.
@@ -452,7 +475,7 @@ export function buildTrees(
     const pts = densify(w.nodes.map(id => idx.nodes.get(id)).filter(Boolean).map(nd => [nd!.x, nd!.z] as [number, number]), 20);
     const off = roadWidth(t) / 2 + 3.2;
     for (const side of [-1, 1]) offsetLine(pts, side * off).forEach(([x, z], i) => {
-      if (hash01(w.id + i * 7 + side) < 0.55) plant(x, z, w.id + i);
+      if (hash01(w.id + i * 7 + side) < 0.55) plant(x, z, w.id + i * 13 + side, forest ? 'hillStreet' : 'cityStreet');
     });
   }
   // Scattered trees in green land use, on a jittered 15 m grid.
@@ -464,7 +487,7 @@ export function buildTrees(
     // Hill forest: unmapped ground away from town buildings is wooded (OSM rarely maps it).
     const wooded = forest && !kind && !forest.buildings.near(x, z, 35);
     if ((kind === 'green' || kind === 'leafy' || wooded) && hash01(x * 0.37 + z * 0.11) < (wooded ? 0.6 : 0.45)) {
-      plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z));
+      plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z), wooded ? 'hillForest' : forest ? 'hillStreet' : 'cityGreen');
     }
   }
   return n;
