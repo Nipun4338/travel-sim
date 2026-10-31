@@ -3,7 +3,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LOD_COUNT, type ChunkEntry, type LaneData, type LevelCrossing, type RailData, type RailLine, type RegionManifest, type RouteData } from '../../src/shared/region';
-import { buildBuildings, buildRoads, buildTerrain, buildTrees, buildWater, junctionGrid, landuseIndex, roadIndex } from './build';
+import { buildBuildings, buildRoads, type HeightSource, buildTerrain, buildTrees, buildWater, junctionGrid, landuseIndex, roadIndex } from './build';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmWay } from './fetch';
 import { ChunkGeometry, densify } from './geometry';
@@ -15,10 +15,12 @@ import { PointGrid, PolygonIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
 import { bakeLine, buildStations, buildViaduct, type MetroBake } from './metro';
 import { pbfRegionData } from './pbfQuery';
+import { OpenBuildings, utm46 } from './heights';
 
 const CREDITS = [
   'Map data © OpenStreetMap contributors, ODbL (openstreetmap.org/copyright)',
   'produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved',
+  'Building heights: Google Open Buildings 2.5D Temporal, CC BY 4.0 (Sirko et al. 2023), containing modified Copernicus Sentinel data 2016-2023 processed by ESA',
 ];
 
 async function main() {
@@ -147,7 +149,13 @@ async function main() {
     return { def: l, x, z };
   });
   const cleared = (x: number, z: number) => placed.some(p => p.def.footprintM && Math.hypot(x - p.x, z - p.z) < p.def.footprintM);
-  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared);
+  const google = await OpenBuildings.load(region.bbox, 4);
+  const capAt = region.heightCap ? proj.toXZ(region.heightCap.lat, region.heightCap.lon) : null;
+  const heights: HeightSource = {
+    p75: ring => google.p75(ring.map(p => { const [lat, lon] = proj.toLatLon(p.x, p.y); return utm46(lat, lon); })),
+    cap: (x, z) => (capAt && region.heightCap && Math.hypot(x - capAt[0], z - capAt[1]) > region.heightCap.radiusM ? region.heightCap.maxM : Infinity),
+  };
+  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared, heights);
   lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
   let forest: { buildings: PointGrid } | undefined;

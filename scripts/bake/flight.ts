@@ -11,6 +11,7 @@ import {
   BUILDING_STRIDE, ZONE_CHUNK, type ChallengeData, type Landmark, type Ring, type Runway, type Spawn, type ZoneChunk, type ZoneManifest,
 } from '../../src/shared/zone';
 import { buildingHeight, pickWall } from './build';
+import { OpenBuildings, utm46 } from './heights';
 import { encodeChunk, shortHash, writeHashed } from './export';
 import { copernicusWindow, overpass, type OsmData } from './fetch';
 import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
@@ -29,6 +30,7 @@ const GLIDE = Math.tan((3 * Math.PI) / 180);
 const CREDITS = [
   'Map data © OpenStreetMap contributors, ODbL (openstreetmap.org/copyright)',
   'produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved',
+  'Building heights: Google Open Buildings 2.5D Temporal, CC BY 4.0 (Sirko et al. 2023), containing modified Copernicus Sentinel data 2016-2023 processed by ESA',
 ];
 const C = {
   water: color(0x3f7fa8), green: color(0x6f8f4a), paved: color(0x8f8c86), runway: color(0x3a3a3c), taxiway: color(0x55555a),
@@ -288,6 +290,7 @@ async function main() {
   // Landmarks (SPEC §10) replace the OSM buildings on their footprints.
   const models = landmarksFor(`${id}-zone` as LandmarkPlace).map(l => { const [x, z] = proj.toXZ(l.lat, l.lon); return { def: l, x, z }; });
   const clearedByLandmark = (x: number, z: number) => models.some(p => p.def.footprintM && Math.hypot(x - p.x, z - p.z) < p.def.footprintM);
+  const google = await OpenBuildings.load(bbox, 8);
   let packed = 0;
   blds.forEach((w, k) => {
     const [cx, cz] = centres[k];
@@ -296,7 +299,10 @@ async function main() {
     if (!rect || rect.w < 2 || rect.d < 2) return;
     const tags = w.tags ?? {};
     let height: number;
+    const g = tags.height || tags['building:levels'] ? undefined : google.p75(w.geometry!.map(p => utm46(p.lat, p.lon)));
     if (tags.height || tags['building:levels']) height = buildingHeight(w.id, tags);
+    else if (typeof g === 'number') height = Math.max(3, g);
+    else if (g === null && rect.w * rect.d < 100) height = 3.2 + 1;
     else {
       // No tags: low and rural where buildings are sparse, taller where they crowd together.
       const d = densityAt(cx, cz), r = hash01(w.id);

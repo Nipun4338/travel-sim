@@ -49,7 +49,7 @@ Seven cameras: the cab, chasing, on the platform, alongside, from the air, a pas
 
 ## A living Dhaka
 
-- **Real places.** Roads, flyovers, the Elevated Expressway, railways and level crossings come from OpenStreetMap, and the terrain from Copernicus GLO-30. Over 20 landmarks are hand-modelled, among them the Farmgate metro station, Jahangir Gate, Novo Theatre, Airport Terminal 3, Shoilo Propat and Chimbuk.
+- **Real places.** Roads, flyovers, the Elevated Expressway, railways and level crossings come from OpenStreetMap, the terrain from Copernicus GLO-30, and building heights from Google Open Buildings. Over 20 landmarks are hand-modelled, among them the Farmgate metro station, Jahangir Gate, Novo Theatre, Airport Terminal 3, Shoilo Propat and Chimbuk.
 - **Dhaka traffic.** Buses, green CNGs, cars, motorbikes, painted trucks and rickshaws follow the lanes, change lanes, honk, and stop for traffic police at the big junctions. City buses carry Bangla company names, route boards and "ঢাকা মেট্রো" plates.
 - **Drivable flyovers.** Ramps climb at real flyover grades; take the bus up and along the deck.
 - **Trains.** Bangladesh Railway trains and Dhaka Metro sets run on the real lines; crossing booms come down as they pass.
@@ -166,5 +166,6 @@ The full design is in [SPEC.md](SPEC.md) and the milestone plan in [docs/build-p
 
 - Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL. The baked Region data is offered under the ODbL.
 - Terrain: produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.
+- Building heights: [Google Open Buildings 2.5D Temporal](https://sites.research.google/gr/open-buildings/temporal/), CC BY 4.0 (Sirko et al. 2023), containing modified Copernicus Sentinel data 2016–2023 processed by ESA.
 - Sounds from [Freesound](https://freesound.org) (CC0 and CC BY); each clip and its credit is listed in [docs/audio/sound-list.md](docs/audio/sound-list.md) and on the in-game Licences screen.
 - Bus company names in the game are fictional; routes and places are real.

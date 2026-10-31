@@ -69,7 +69,7 @@ A **custom TypeScript bake script** runs at build time and writes, per Region:
 **Inputs:**
 - **OSM:** Geofabrik Bangladesh extract (ODbL).
 - **Terrain:** Copernicus GLO-30 DEM (30 m).
-- **Building heights:** OSM `building:levels` or `height` first, then Google Open Buildings 2.5D (CC BY 4.0), then a per-area default. In Dhaka only 12.5% of OSM buildings have levels, so the Google data matters.
+- **Building heights (v1.3, [polish spec §2](docs/polish-spec.md)):** OSM `height`, then `building:levels` (ignored above 45 floors), then the p75 of Google Open Buildings 2.5D Temporal (2023) built pixels inside the footprint, then 1 floor for a footprint under 100 m² with no built pixel, then the per-type default. Regions read the 4 m overview, Flight Zones the 8 m one (`scripts/bake/heights.ts`, cached in `data/raw/open-buildings/`). Bandarban caps buildings more than 2 km from the town at 10 m. In Dhaka only 12.5% of OSM buildings have levels, so the Google data matters.
 
 **Rules:**
 - **Roads are graded into the terrain.** This matters for the Bandarban hairpins. The Bandarban road has no width or lane tags in OSM, so use defaults.
@@ -408,7 +408,7 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
 
 - **OSM:** "© OpenStreetMap contributors", ODbL, with a link to openstreetmap.org/copyright. Show it on the splash screen or in the game view, and in the licences menu. **Baked OSM-derived Region data must be offered under ODbL**; the game code and art are not affected.
 - **Copernicus**, verbatim: `produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved`.
-- **Building heights:** Google Open Buildings 2.5D, CC BY 4.0.
+- **Building heights:** `Building heights: Google Open Buildings 2.5D Temporal, CC BY 4.0 (Sirko et al. 2023), containing modified Copernicus Sentinel data 2016-2023 processed by ESA` (in every Region and Flight Zone manifest since v1.3).
 - **CC BY credits** for every vehicle model, generic landmark model, sound clip and the music track. Attribution text is in the research files and per clip.
 
 ## 18. Verify during the build

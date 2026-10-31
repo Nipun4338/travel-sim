@@ -344,26 +344,37 @@ export function buildRoads(
   return { pillars, skipped, crossings, footbridges };
 }
 
-// ---------- buildings (OSM-only heights for now; SPEC §4 Google 2.5D is a follow-up) ----------
+// ---------- buildings (heights: OSM tags, then Google Open Buildings 2.5D; polish spec §2) ----------
 const DEFAULT_LEVELS: Record<string, number> = {
   house: 3, residential: 5, apartments: 7, commercial: 7, office: 9, retail: 3, industrial: 3, warehouse: 2,
   school: 4, hospital: 7, university: 5, mosque: 3, hotel: 9, yes: 5,
 };
 const FLOOR_H = 3.2;
 
-export function buildingHeight(id: number, tags: Record<string, string>): number {
+/**
+ * OSM `height`, then `building:levels` (tags above 45 floors are mistakes), then the Google p75
+ * (`google`: a number, `null` when the footprint holds no built pixel, `undefined` when uncovered),
+ * then 1 floor for a small footprint with no pixel, then the per-type default. `cap` limits the
+ * last three (Bandarban's hills).
+ */
+export function buildingHeight(id: number, tags: Record<string, string>, google?: number | null, area = Infinity, cap = Infinity): number {
   const height = parseFloat(tags.height ?? '');
   if (height > 0) return height;
   const levels = parseFloat(tags['building:levels'] ?? '');
-  if (levels > 0) return levels * FLOOR_H + 1;
+  if (levels > 0 && levels <= 45) return levels * FLOOR_H + 1;
+  if (typeof google === 'number') return Math.min(cap, Math.max(3, google));
+  if (google === null && area < 100) return Math.min(cap, FLOOR_H + 1);
   const base = DEFAULT_LEVELS[tags.building] ?? 5;
-  return (base + Math.floor(hash01(id) * 4) - 1) * FLOOR_H + 1; // per-type default ± a little variety
+  return Math.min(cap, (base + Math.floor(hash01(id) * 4) - 1) * FLOOR_H + 1); // per-type default ± a little variety
 }
+
+/** Where a bake gets Google heights for its footprints, and the height cap at a point. */
+export interface HeightSource { p75: (ring: THREE.Vector2[]) => number | null | undefined; cap: (x: number, z: number) => number; }
 
 export function buildBuildings(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean,
   onRoad: (x: number, z: number) => boolean, majorRoads: SegmentIndex, footprints?: PolygonIndex<true>,
-  cleared: (x: number, z: number) => boolean = () => false,
+  cleared: (x: number, z: number) => boolean = () => false, heights?: HeightSource,
 ): { built: number; droppedOnRoad: number; signs: number; billboards: number } {
   let count = 0, dropped = 0, signs = 0, billboards = 0;
   for (const w of idx.ways) {
@@ -377,8 +388,8 @@ export function buildBuildings(
     if (THREE.ShapeUtils.isClockWise(ring)) ring.reverse();
     footprints?.add(ring.map(p => ({ x: p.x, y: p.y })), true);
 
-    const height = buildingHeight(w.id, t);
     const area = Math.abs(THREE.ShapeUtils.area(ring));
+    const height = buildingHeight(w.id, t, heights?.p75(ring), area, heights?.cap(cx, cz));
     const lods = height >= 30 ? ALL : height >= 15 || area > 600 ? [0, 1] : [0];
     const base = Math.min(...ring.map(p => h(p.x, p.y)));
     const top = base + height;

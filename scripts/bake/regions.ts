@@ -28,6 +28,8 @@ export interface RegionDef {
   footpaths: boolean;
   /** Painted lane markings (default on; Bandarban's hill road is one unmarked lane). */
   markings?: boolean;
+  /** Buildings farther than `radiusM` from this point are capped at `maxM` unless OSM tags a height. */
+  heightCap?: { lat: number; lon: number; radiusM: number; maxM: number };
   /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
   metro?: boolean;
   /** Read OSM from the local Geofabrik extract instead of Overpass (big city areas). */
@@ -82,6 +84,7 @@ export const BANDARBAN: RegionDef = {
   gradeRoads: true,
   footpaths: false,
   markings: false,
+  heightCap: { lat: 22.19, lon: 92.218, radiusM: 2000, maxM: 10 }, // low-rise hill villages outside the town
 };
 
 /** MRT Line 6, Uttara North → Motijheel (SPEC §20; stations are OSM's, north to south). */
