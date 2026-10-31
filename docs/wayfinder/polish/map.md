@@ -26,16 +26,12 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Research how the Line 6 stations really differ](tickets/003-research-line6-stations.md): four station types (standard, arched, Uttara North, Farmgate); side platforms, ~180 m, shared terracotta-and-grey-roof look; current roof and Farmgate model are off.
 - [Ground-truth the Bandarban road and its Stops](tickets/004-ground-truth-bandarban-road.md): the Route takes a 1 km shortcut off the Thanchi Road and Chimbuk sits ~100 m off the summit; the road width holds; Thanchi buses are missing from traffic.
 - [Capture in-game vs real side-by-side comparisons](tickets/005-capture-side-by-side-comparisons.md): 30 cab shots with notes (agent-judged, user-delegated); the headline gaps are generic Line 6 stations, a flat uniform Dhaka skyline with no street life, and Bandarban's wrong centre line and missing ridge views.
+- [Rank the fidelity gaps and pick what each place fixes](tickets/006-rank-fidelity-gaps.md): real heights as a shared first-release base; Line 6 leads with station models, Dhaka with the skyline, Bandarban with route correctness; the last item per place waits on the budget.
 
 ## Not yet specified
 
-- **Street life approach**: how to make shop signs, billboards, rickshaw art, tea stalls and Stop crowds read as Dhaka (procedural, CC assets or hand-made, and how dense). Hangs on which gaps the ranking picks.
-- **Landmark additions and upgrades**: which places on the corridor and Line 6 deserve a model (or an upgrade from simple to hero), and which existing ones are wrong in shape or position.
-- **Vehicle accuracy**: whether the bus, CNG, rickshaw and Line 6 train need a closer pass, and against what reference.
-- **Flight Zone skyline**: what "exact from the air" needs once corridor heights are settled (district height bands, river and lake shapes).
-- **Time-and-place feel**: traffic density by time of day, haze, colour palette per place.
-- **Budget check**: what real heights and extra props cost on the minimum phone, measured once the fixes are chosen.
-- **Release plan**: the order of the per-place releases and what goes in each.
+- **Landmark additions and upgrades**: beyond the Line 6 stations and the Kuril interchange, which corridor and Line 6 places deserve a model (or an upgrade from simple to hero), and which existing ones are wrong in shape or position.
+- **Flight Zone skyline**: whether district height bands or river and lake shapes are needed, judged from air shots once the real heights land.
 
 ## Out of scope
 
@@ -43,3 +39,4 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - Editing OpenStreetMap upstream: it publishes changes, so it's the user's separate choice; the bake uses local overrides.
 - Photorealism, or exceeding the SPEC §2 budgets.
 - Full detail across the whole 30 km / 40 km Flight Zones: it doesn't fit the per-Region-mode budget.
+- A closer pass on the existing vehicles, and time-of-day traffic and haze: the comparisons didn't flag them, so [Rank the fidelity gaps](tickets/006-rank-fidelity-gaps.md) left them as they are.
