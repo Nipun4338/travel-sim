@@ -26,6 +26,8 @@ export interface RegionDef {
   gradeRoads: boolean;
   /** Raised footpaths along main roads (city Regions; hill roads have none). */
   footpaths: boolean;
+  /** Painted lane markings (default on; Bandarban's hill road is one unmarked lane). */
+  markings?: boolean;
   /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
   metro?: boolean;
   /** Read OSM from the local Geofabrik extract instead of Overpass (big city areas). */
@@ -79,6 +81,7 @@ export const BANDARBAN: RegionDef = {
   forest: true,
   gradeRoads: true,
   footpaths: false,
+  markings: false,
 };
 
 /** MRT Line 6, Uttara North → Motijheel (SPEC §20; stations are OSM's, north to south). */

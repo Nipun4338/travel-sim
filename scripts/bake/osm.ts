@@ -79,7 +79,10 @@ export function buildGraph(idx: Indexed): Map<number, Edge[]> {
     if (!t.highway || !DRIVABLE.has(t.highway) || baseType(t.highway) === 'motorway' || isElevated(w, idx)) continue;
     if (t.access === 'private' || t.access === 'no') continue;
     const dir = isOneway(t);
-    const penalty = t.highway === 'service' ? 3 : t.highway === 'residential' ? 1.6 : 1;
+    // Unnamed unclassified ways are usually village lanes; without a cost they shortcut real roads
+    // (Bandarban's Route left the Thanchi Road for two of them between km 2.6 and 3.7).
+    const lane = t.highway === 'unclassified' && !t.name && !t.ref;
+    const penalty = t.highway === 'service' ? 3 : t.highway === 'residential' || lane ? 1.6 : 1;
     for (let i = 1; i < w.nodes.length; i++) {
       const a = idx.nodes.get(w.nodes[i - 1]), b = idx.nodes.get(w.nodes[i]);
       if (!a || !b) continue;

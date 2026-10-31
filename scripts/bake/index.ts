@@ -131,7 +131,7 @@ async function main() {
   const flyovers = region.gradeRoads ? new Map<number, (s: number) => number>() : flyoverProfiles(roads.ways.filter(wy => wy.tags?.highway).map(wy => ({
     id: wy.id, nodes: wy.nodes, tags: wy.tags!, pts: wy.nodes.map(n => roads.nodes.get(n)).filter(Boolean).map(nd => [nd!.x, nd!.z] as [number, number]),
   })));
-  const rd = buildRoads(geo, roads, h, onRoad, junctions, region.footpaths, flyovers, region.gradeRoads);
+  const rd = buildRoads(geo, roads, h, onRoad, junctions, region.footpaths, flyovers, region.gradeRoads, region.markings ?? true);
   lap('roads');
   if (metro) {
     const v = buildViaduct(geo, metro, onRoad);

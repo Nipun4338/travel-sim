@@ -196,7 +196,7 @@ function dashes(pts: [number, number][], dash: number, space: number): [number, 
 
 export function buildRoads(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, onRoad: (x: number, z: number) => boolean, junctions: PointGrid,
-  footpaths = true, flyovers: Map<number, (s: number) => number> = new Map(), bridgesAtGrade = false,
+  footpaths = true, flyovers: Map<number, (s: number) => number> = new Map(), bridgesAtGrade = false, markings = true,
 ): { pillars: number; skipped: number; crossings: number; footbridges: number } {
   let pillars = 0, skipped = 0, crossings = 0, footbridges = 0;
   const lift = (rank: number) => 0.12 + rank * 0.01; // major roads draw over minor ones at junctions
@@ -311,12 +311,12 @@ export function buildRoads(
         for (const seg of dashed ? dashes(line, 3, 6) : [line]) geo.ribbon(at(seg, y + 0.02), wdt, c, 'marking', [0]);
       };
       // lane dividers
-      for (let i = 1; i < lanes; i++) {
+      for (let i = 1; markings && i < lanes; i++) {
         const off = -width / 2 + (i * width) / lanes;
         if (!oneway && i === lanes / 2) mark(off, C.yellow, false, 0.3); // centre line on two-way roads
         else mark(off, C.white, true);
       }
-      if (rank >= 4) { mark(-width / 2 + 0.3, C.white, false); mark(width / 2 - 0.3, C.white, false); }
+      if (markings && rank >= 4) { mark(-width / 2 + 0.3, C.white, false); mark(width / 2 - 0.3, C.white, false); }
       // Raised footpaths both sides; on dual carriageways the inner one reads as the median kerb.
       const fw = rank >= 4 ? 2.5 : 1.8;
       if (footpaths) for (const side of [-1, 1]) geo.ribbon(at(offsetLine(run, side * (width / 2 + fw / 2)), 0.3), fw, C.kerb, 'kerb', [0, 1], 0.18, C.kerbSide);

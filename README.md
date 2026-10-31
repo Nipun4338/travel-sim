@@ -130,7 +130,7 @@ The routes you've driven light up on the map, zoomed-in places name their landma
 |:-:|:-:|
 | ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
 
-**Current version: 1.2.1**: gamepad control for the metro, the passport card and landmark names on the map. 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
+**Current version: 1.2.2**: the Bandarban bus keeps to the Thanchi Road all the way, Chimbuk's summit complex stands where it really is, and the hill road loses its yellow centre line. 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 

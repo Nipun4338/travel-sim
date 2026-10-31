@@ -11,6 +11,21 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.2.2',
+    date: '2026-10-31',
+    image: '1.2.2.jpg',
+    bn: [
+      'বান্দরবানের বাস এখন পুরো পথ থানচি সড়ক ধরেই চলে; শহরের কাছের গ্রামের শর্টকাটটা আর নেই।',
+      'চিম্বুকের চূড়ার কমপ্লেক্স এখন তার আসল জায়গায়, সড়ক থেকে একটু ভেতরে।',
+      'পাহাড়ি সড়কে আর হলুদ মাঝের দাগ নেই, আসল সড়কের মতো একটাই লেন।',
+    ],
+    en: [
+      'The Bandarban bus now keeps to the Thanchi Road all the way; the village shortcut near town is gone.',
+      'Chimbuk’s summit complex now stands where it really is, a short way off the road.',
+      'The hill road has no yellow centre line any more: one unmarked lane, like the real one.',
+    ],
+  },
+  {
     version: '1.2.1',
     date: '2026-10-28',
     image: '1.2.1.jpg',

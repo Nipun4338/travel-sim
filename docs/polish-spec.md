@@ -69,7 +69,9 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 
 ## 5. Bandarban road
 
-### 5.1 Correctness (v1.2.2)
+### 5.1 Correctness (v1.2.2, built 2026-10-31)
+
+As built: the Route is 22.82 km (Stops at 0, 2.2, 5.7 and 22.8 km). The summit complex is 103 m off the road, so the Stop stayed on the road and only the landmark moved; from the cab it is hidden by forest, which the user accepted for accuracy.
 
 [Ground-truth the Bandarban road](wayfinder/polish/tickets/004-ground-truth-bandarban-road.md), [research](research/bandarban-road.md)
 

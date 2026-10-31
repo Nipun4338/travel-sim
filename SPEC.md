@@ -107,16 +107,16 @@ The path runs along Old Airport Road and Bijoy Sarani, then Bir Uttam Ziaur Rahm
 
 The routed km figures include short detours; staying on the arterials comes to ~13.5–14.8 km.
 
-### Bandarban Route: Bandarban Bus Stand → Chimbuk (~22.6 km as baked, outbound only)
+### Bandarban Route: Bandarban Bus Stand → Chimbuk (~22.8 km as baked, outbound only)
 
-The road is the Bandarban–Thanchi Road (`secondary`, Z1811). Stops are hand-placed because they aren't bus stops in OSM.
+The road is the Bandarban–Thanchi Road (`secondary`, Z1811) the whole way: the route graph costs unnamed `unclassified` ways like `residential`, so the Route no longer cuts through village lanes at km 2.6–3.7 (v1.2.2). Stops are hand-placed because they aren't bus stops in OSM.
 
 | # | Stop | Lat, Lon | km | Leg |
 |---|---|---|---|---|
 | 1 | Bandarban Bus Stand (Thanchi Road stands) | ~22.1837, 92.2178 | 0 | Leg 1 start |
-| 2 | Milonchhari | ~22.1686, 92.2228 | 3.2 | |
-| 3 | Shoilo Propat | ~22.1507, 92.2169 | 6.6 | Leg 1 end / Leg 2 start |
-| 4 | Chimbuk (Tourist Centre, on the main road at its ridge top; no side road) | 22.05755, 92.27342 | 22.6 | Leg 2 end (~17 km) |
+| 2 | Milonchhari | ~22.1686, 92.2228 | 2.2 | |
+| 3 | Shoilo Propat | ~22.1507, 92.2169 | 5.7 | Leg 1 end / Leg 2 start |
+| 4 | Chimbuk (Tourist Centre, on the main road at its ridge top; no side road) | 22.05755, 92.27342 | 22.8 | Leg 2 end (~17 km) |
 
 ### Flight Zones
 
@@ -416,7 +416,7 @@ Cameras: the **driver's cab is the default** (right-hand drive, as Bangladesh dr
 These were known gaps the build had to check. None of them is an open decision. Results from M12 (2026-10-28) follow each item.
 
 1. **Minimum phone:** repeat the 30 fps checks on a Helio G99 / Snapdragon 680-class phone. The user's test phone wasn't recorded ([024](docs/wayfinder/tickets/024-prototype-fog-and-rain.md), [017](docs/wayfinder/tickets/017-judge-touch-controls.md)). **Open: needs the user's phone.** Add `?fps=1` to the URL for a frame-rate readout (green at 30 fps or more). On a desktop GPU, High holds ~60 fps in Dhaka with shadows.
-2. **Chimbuk height:** **confirmed.** GLO-30 gives 556 m at the Wikidata "Tourist Centre" point (SRTM said ~558 m). That point lies ~210 m off the road and below it; the Thanchi Road tops out at 579 m beside a 592 m knoll. The Stop now stands on the road at that ridge top (22.05755, 92.27342) and the landmark on the knoll beside it (22.0573, 92.2732).
+2. **Chimbuk height:** **confirmed.** GLO-30 gives 556 m at the Wikidata "Tourist Centre" point (SRTM said ~558 m). That point lies ~210 m off the road and below it; the Thanchi Road tops out at 579 m beside a 592 m knoll. The Stop stands on the road at that ridge top (22.05755, 92.27342). The landmark stands on the summit complex seen in satellite imagery, a paved plaza ~100 m off the road (22.0571, 92.2724; moved in v1.2.2, [polish 004](docs/wayfinder/polish/tickets/004-ground-truth-bandarban-road.md)).
 3. **Approximate coordinates:** **snapped.** Bandarban Stops snap to the baked road within 19 m (Bus Stand), 3 m (Milonchhari, Shoilo Propat) and 1 m (Chimbuk). The bake now takes a node within 60 m for hand-placed Stops; a wide radius had let the Route end short of the last one.
 4. **Rickshaw ban:** **researched.** DMP orders ban rickshaws and other slow vehicles from Dhaka's main roads (Mirpur Road since 2019; VIP Road and Pragati Sarani named in July 2024), but reports describe wide breaches since August 2024. The game keeps rickshaws off the corridor's carriageways except crossing at junctions and in the kerb lane near Farmgate.
 5. **Terminal 3:** **checked.** The building is complete but not open to passengers; the latest target (CAAB, 2026) is a soft opening on 16 December 2026, pending the Japanese operator deal. It's modelled as a finished building with no activity.
