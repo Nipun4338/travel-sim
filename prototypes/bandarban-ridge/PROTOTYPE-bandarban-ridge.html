@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PROTOTYPE · Bandarban ridge</title>
+<!--
+  THROWAWAY PROTOTYPE for polish ticket 011 "Choose how the Bandarban road gets its ridge drops and long views".
+  Question: what makes the Thanchi Road read as a ridge road: longer visibility with a far backdrop,
+  steep valley-side edges with parapets instead of graded embankments, or exaggerated relief?
+  Real data: 6.7 km of the baked Route between Y Junction and Chimbuk (with its graded heights) on GLO-30.
+  A: today (1.5 km visibility, 30 m embankments, yellow centre line)   B: long views + far ranges
+  C: B + steep valley edges and parapets   D: C + canopy stripped deeper (±60 m min)   E: D + 1.3× relief away from the road
+  Run: python -m http.server 5173 --directory prototypes, then open /bandarban-ridge/PROTOTYPE-bandarban-ridge.html
+  data.json is made by prep.mjs (run from the repo root).
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font:13px/1.35 system-ui,sans-serif;color:#111}
+  canvas{display:block}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:5;white-space:nowrap}
+  #stats{position:fixed;top:30px;left:8px;background:rgba(255,255,255,.88);padding:6px 9px;border-radius:8px;font-variant-numeric:tabular-nums;max-width:270px}
+  #bar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:6px 10px;background:#111;color:#fff;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5}
+  #bar button{background:#333;color:#fff;border:0;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer}
+  #bar span{min-width:300px;text-align:center;font-weight:600}
+  #view{position:fixed;right:8px;top:30px;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
+  #view button{padding:5px 9px;border:1px solid #888;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+  #view button.on{background:#222;color:#fff}
+  #credit{position:fixed;right:8px;bottom:4px;font-size:10px;color:#fff;text-shadow:0 0 3px #000;max-width:45vw;text-align:right}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: Bandarban ridge (throwaway)</div>
+<div id="stats">loading terrain…</div>
+<div id="view"></div>
+<div id="bar"><button id="prev">←</button><span id="label"></span><button id="next">→</button></div>
+<div id="credit"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+const VARIANTS = {
+  A: { name: 'Today', far: false, edges: false, relief: 1, centreLine: true },
+  B: { name: 'Long views + far ranges', far: true, edges: false, relief: 1 },
+  C: { name: 'B + steep edges, parapets', far: true, edges: true, relief: 1 },
+  D: { name: 'C + canopy stripped deeper', far: true, edges: true, relief: 1, deep: true },
+  E: { name: 'D + 1.3× relief off-road', far: true, edges: true, relief: 1.3, deep: true },
+};
+const KEYS = Object.keys(VARIANTS);
+let key = new URLSearchParams(location.search).get('variant') ?? 'A';
+if (!VARIANTS[key]) key = 'A';
+let view = 'drive';
+
+const data = await (await fetch('data.json')).json();
+document.getElementById('credit').textContent = data.credit;
+const dec = g => ({ ...g, h: new Float32Array(Uint8Array.from(atob(g.h), c => c.charCodeAt(0)).buffer) });
+const NEAR = dec(data.near), FAR = dec(data.far);
+const route = data.route; // [x, yGraded, z]
+
+// Ground filters. GLO-30 is a surface model, so the forest canopy is in it. The bake takes a min over ±1
+// GLO pixel (±30 m) then blurs ±30 m; "deep" takes the min over ±60 m to strip more canopy off the ridges.
+function groundFilter(src, n, r) {
+  const m = new Float32Array(src.length), b = new Float32Array(src.length);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { let v = Infinity; for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const ii = Math.min(n - 1, Math.max(0, i + di)), jj = Math.min(n - 1, Math.max(0, j + dj)); v = Math.min(v, src[jj * n + ii]); } m[j * n + i] = v; }
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { let s = 0, c = 0; for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; s += m[jj * n + ii]; c++; } b[j * n + i] = s / c; }
+  return b;
+}
+const RAW = NEAR.h, GROUND = { bake: groundFilter(RAW, NEAR.n, 3), deep: groundFilter(RAW, NEAR.n, 6) };
+NEAR.h = GROUND.bake;
+const sample = (G, x, z) => {
+  const fx = (x + G.size / 2) / G.step, fz = (z + G.size / 2) / G.step;
+  const i = Math.max(0, Math.min(G.n - 2, Math.floor(fx))), j = Math.max(0, Math.min(G.n - 2, Math.floor(fz))), tx = fx - i, tz = fz - j;
+  const a = G.h[j * G.n + i], b = G.h[j * G.n + i + 1], c = G.h[(j + 1) * G.n + i], d = G.h[(j + 1) * G.n + i + 1];
+  return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
+};
+
+// ---------- nearest point on the Route ----------
+const CELL = 40, buckets = new Map();
+for (let k = 1; k < route.length; k++) {
+  const [ax, , az] = route[k - 1], [bx, , bz] = route[k];
+  for (const [x, z] of [[ax, az], [bx, bz]]) { const key = Math.floor(x / CELL) + ',' + Math.floor(z / CELL); if (!buckets.has(key)) buckets.set(key, new Set()); buckets.get(key).add(k); }
+}
+function nearest(x, z, reach = 2) {
+  let best = { d: Infinity, y: 0, k: 0, side: 0 };
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let dx = -reach; dx <= reach; dx++) for (let dz = -reach; dz <= reach; dz++) {
+    const s = buckets.get((cx + dx) + ',' + (cz + dz)); if (!s) continue;
+    for (const k of s) {
+      const [ax, ay, az] = route[k - 1], [bx, by, bz] = route[k], vx = bx - ax, vz = bz - az, L2 = vx * vx + vz * vz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / L2)), px = ax + vx * t, pz = az + vz * t, d = Math.hypot(x - px, z - pz);
+      if (d < best.d) best = { d, y: ay + (by - ay) * t, k, side: Math.sign(vx * (z - az) - vz * (x - ax)) };
+    }
+  }
+  return best;
+}
+// a coarse distance field (50 m) for the relief ramp far from the road
+const DF = { n: 101, step: 50 }, dist = new Float32Array(DF.n * DF.n), refY = new Float32Array(DF.n * DF.n);
+for (let j = 0; j < DF.n; j++) for (let i = 0; i < DF.n; i++) {
+  const x = -2500 + i * 50, z = -2500 + j * 50; let bd = Infinity, by = 0;
+  for (let k = 0; k < route.length; k += 4) { const d = Math.hypot(x - route[k][0], z - route[k][2]); if (d < bd) { bd = d; by = route[k][1]; } }
+  dist[j * DF.n + i] = bd; refY[j * DF.n + i] = by;
+}
+const coarse = (x, z) => { const i = Math.max(0, Math.min(DF.n - 1, Math.round((x + 2500) / 50))), j = Math.max(0, Math.min(DF.n - 1, Math.round((z + 2500) / 50))); return [dist[j * DF.n + i], refY[j * DF.n + i]]; };
+const meanY = route.reduce((s, p) => s + p[1], 0) / route.length;
+
+const HALF = 2.75, SHOULDER = 3, CORE = HALF + SHOULDER;
+const smooth = t => t * t * (3 - 2 * t);
+function groundY(x, z, V) {
+  let n = sample(NEAR, x, z);
+  const [cd, cy] = coarse(x, z);
+  if (V.relief !== 1) { const r = Math.max(0, Math.min(1, (cd - 150) / 450)); n = cy + (n - cy) * (1 + (V.relief - 1) * r); }
+  if (cd > 120) return n;
+  const p = nearest(x, z);
+  if (p.d === Infinity) return n;
+  if (p.d <= CORE) return p.y - 0.15;
+  if (!V.edges) { const t = Math.min(1, (p.d - CORE) / 30); return p.y - 0.15 + (n - (p.y - 0.15)) * smooth(t); } // the bake: cut and fill blended over 30 m
+  if (n >= p.y) { const t = Math.min(1, (p.d - CORE) / 18); return p.y + (n - p.y) * smooth(t); }        // cut side: a bank up to the hill
+  return Math.max(n, p.y - 0.15 - (p.d - CORE) * 2.2);                                                 // fill side: drop away steeply to the real slope
+}
+
+// ---------- scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 2000);
+scene.add(new THREE.HemisphereLight(0xeef6ff, 0x4a5a3a, 1.0));
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.7); sun.position.set(-600, 900, 300); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const terrainMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const GREEN = new THREE.Color(0x4f7a3a), DARK = new THREE.Color(0x3c5e2c), BARE = new THREE.Color(0x8a7a55);
+
+function gridMesh(n, step, size, heightAt, yDrop = 0) {
+  const pos = new Float32Array(n * n * 3), colr = new Float32Array(n * n * 3), idx = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -size / 2 + i * step, z = -size / 2 + j * step, k = (j * n + i) * 3; pos[k] = x; pos[k + 1] = heightAt(x, z) - yDrop(x, z); pos[k + 2] = z; }
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const k = j * n + i, y = pos[k * 3 + 1], yx = pos[(j * n + Math.min(n - 1, i + 1)) * 3 + 1], yz = pos[(Math.min(n - 1, j + 1) * n + i) * 3 + 1];
+    const slope = Math.hypot(yx - y, yz - y) / step, c = slope > 1.0 ? BARE : slope > 0.5 ? DARK : GREEN;
+    colr[k * 3] = c.r; colr[k * 3 + 1] = c.g; colr[k * 3 + 2] = c.b;
+    if (i < n - 1 && j < n - 1) idx.push(k, k + n, k + 1, k + 1, k + n, k + n + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(colr, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, terrainMat);
+}
+
+let world = null, viewpoint = null, tris = 0;
+function build() {
+  if (world) { scene.remove(world); world.traverse(o => o.geometry?.dispose()); }
+  const V = VARIANTS[key];
+  NEAR.h = V.deep ? GROUND.deep : GROUND.bake;
+  world = new THREE.Group();
+  const sky = new THREE.Color(V.far ? 0xb9c9d6 : 0xa9cde0);
+  scene.background = sky;
+  scene.fog = V.far ? new THREE.Fog(sky, 900, 16000) : new THREE.Fog(sky, 375, 1500);
+  camera.far = V.far ? 40000 : 2000; camera.updateProjectionMatrix();
+
+  world.add(gridMesh(NEAR.n, NEAR.step, NEAR.size, (x, z) => groundY(x, z, V), () => 0));
+  if (V.far) world.add(gridMesh(FAR.n, FAR.step, FAR.size, (x, z) => { const n = sample(FAR, x, z); return V.relief !== 1 ? meanY + (n - meanY) * V.relief : n; },
+    (x, z) => (Math.abs(x) < NEAR.size / 2 - 60 && Math.abs(z) < NEAR.size / 2 - 60 ? 60 : 0)));
+
+  // road ribbon (+ yellow centre line in today's look)
+  const rp = [], rc = [], line = [];
+  for (let k = 1; k < route.length; k++) {
+    const [ax, ay, az] = route[k - 1], [bx, by, bz] = route[k], L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L, nz = (bx - ax) / L;
+    rp.push(ax + nx * HALF, ay + 0.05, az + nz * HALF, ax - nx * HALF, ay + 0.05, az - nz * HALF, bx + nx * HALF, by + 0.05, bz + nz * HALF,
+      bx + nx * HALF, by + 0.05, bz + nz * HALF, ax - nx * HALF, ay + 0.05, az - nz * HALF, bx - nx * HALF, by + 0.05, bz - nz * HALF);
+    if (V.centreLine) line.push(ax + nx * 0.06, ay + 0.07, az + nz * 0.06, ax - nx * 0.06, ay + 0.07, az - nz * 0.06, bx + nx * 0.06, by + 0.07, bz + nz * 0.06,
+      bx + nx * 0.06, by + 0.07, bz + nz * 0.06, ax - nx * 0.06, ay + 0.07, az - nz * 0.06, bx - nx * 0.06, by + 0.07, bz - nz * 0.06);
+  }
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); rg.computeVertexNormals();
+  world.add(new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ color: 0x5d5a55, side: THREE.DoubleSide })));
+  if (line.length) { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(line, 3)); world.add(new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ color: 0xe8c21a, side: THREE.DoubleSide }))); }
+
+  // parapets: black-and-white painted walls where the valley side drops ≥ 4 m within 12 m
+  let parapetM = 0; viewpoint = null; let bestDrop = 0;
+  const pp = [], pc = [], BLACK = new THREE.Color(0x1d1d1d), WHITE = new THREE.Color(0xf2f2ee);
+  for (let k = 2; k < route.length; k += 1) {
+    const [ax, ay, az] = route[k - 1], [bx, by, bz] = route[k], L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L, nz = (bx - ax) / L;
+    for (const s of [-1, 1]) {
+      const drop = ay - groundY(ax + s * nx * 12, az + s * nz * 12, V), far = ay - groundY(ax + s * nx * 120, az + s * nz * 120, V);
+      if (far > bestDrop && k > 40 && k < route.length - 40) { bestDrop = far; viewpoint = { k, s, nx, nz }; }
+      if (!V.edges || drop < 4) continue;
+      const o = HALF + 0.5, c = (k % 2 ? BLACK : WHITE), y0 = ay - 0.1, y1 = ay + 0.6;
+      const A0 = [ax + s * nx * o, y0, az + s * nz * o], A1 = [ax + s * nx * o, y1, az + s * nz * o], B0 = [bx + s * nx * o, by - 0.1, bz + s * nz * o], B1 = [bx + s * nx * o, by + 0.6, bz + s * nz * o];
+      for (const v of [A0, A1, B1, A0, B1, B0]) { pp.push(...v); pc.push(c.r, c.g, c.b); }
+      parapetM += L;
+    }
+  }
+  if (pp.length) { const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); pg.setAttribute('color', new THREE.Float32BufferAttribute(pc, 3)); pg.computeVertexNormals(); world.add(new THREE.Mesh(pg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }))); }
+
+  // forest: the same trees in every variant (vegetation isn't this ticket's question)
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const cone = new THREE.ConeGeometry(2.6, 1, 6); cone.translate(0, 0.5, 0);
+  const trees = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: 0x2f5a2a, flatShading: true }), 9000);
+  const m = new THREE.Matrix4(); let t = 0;
+  while (t < 9000) {
+    const x = (rnd() - 0.5) * NEAR.size * 0.96, z = (rnd() - 0.5) * NEAR.size * 0.96, [cd] = coarse(x, z);
+    if (cd > 700 || (cd < 60 && nearest(x, z).d < 9)) continue;
+    const h = 7 + rnd() * 9, sc = 0.7 + rnd() * 0.6;
+    m.makeScale(sc, h, sc).setPosition(x, groundY(x, z, V) - 0.5, z); trees.setMatrixAt(t++, m);
+  }
+  world.add(trees);
+  scene.add(world);
+  world.userData = { parapetM, bestDrop };
+}
+
+// ---------- UI ----------
+const label = document.getElementById('label');
+function setVariant(k) { key = k; const u = new URL(location.href); u.searchParams.set('variant', k); history.replaceState(null, '', u); label.textContent = `${k} (${VARIANTS[k].name})`; build(); }
+const stepV = d => setVariant(KEYS[(KEYS.indexOf(key) + d + KEYS.length) % KEYS.length]);
+document.getElementById('prev').onclick = () => stepV(-1);
+document.getElementById('next').onclick = () => stepV(1);
+addEventListener('keydown', e => { if (e.key === 'ArrowLeft') stepV(-1); if (e.key === 'ArrowRight') stepV(1); if (e.key === ' ') paused = !paused; });
+const VIEWS = { drive: 'Cab, driving', viewpoint: 'Biggest drop, looking out', above: 'From above' };
+const vbar = document.getElementById('view');
+for (const [k, tt] of Object.entries(VIEWS)) { const b = document.createElement('button'); b.textContent = tt; b.onclick = () => { view = k; [...vbar.children].forEach(c => c.classList.toggle('on', c === b)); }; if (k === view) b.classList.add('on'); vbar.append(b); }
+let paused = false, time = 0, last = performance.now();
+const stats = document.getElementById('stats');
+setVariant(key);
+
+const cum = [0]; for (let k = 1; k < route.length; k++) cum.push(cum[k - 1] + Math.hypot(route[k][0] - route[k - 1][0], route[k][2] - route[k - 1][2]));
+const at = s => { s = ((s % cum.at(-1)) + cum.at(-1)) % cum.at(-1); let k = 1; while (cum[k] < s) k++; const t = (s - cum[k - 1]) / (cum[k] - cum[k - 1] || 1), a = route[k - 1], b = route[k]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; };
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; if (!paused) time += dt;
+  if (view === 'drive') { const s = time * 9, p = at(s), q = at(s + 25); camera.position.set(p[0] - 1.2 * Math.sign(1), p[1] + 2.6, p[2]); camera.lookAt(q[0], q[1] + 2.0, q[2]); }
+  else if (view === 'viewpoint' && viewpoint) { const p = route[viewpoint.k], s = viewpoint.s; camera.position.set(p[0], p[1] + 2.6, p[2]); const yaw = Math.sin(time * 0.15) * 0.6, dx = s * viewpoint.nx, dz = s * viewpoint.nz, cx = dx * Math.cos(yaw) - dz * Math.sin(yaw), cz = dx * Math.sin(yaw) + dz * Math.cos(yaw); camera.lookAt(p[0] + cx * 100, p[1] - 12, p[2] + cz * 100); }
+  else { camera.position.set(-2600, 1400, 2600); camera.lookAt(0, 400, 0); }
+  renderer.render(scene, camera);
+  const i = renderer.info, u = world.userData;
+  stats.innerHTML = `variant <b>${key}</b> · ${VARIANTS[key].name}<br>visibility ${VARIANTS[key].far ? '~16 km (fog), backdrop 36 km' : '1.5 km (today)'}<br>triangles ${i.render.triangles.toLocaleString()} · draw calls ${i.render.calls}<br>parapets ${Math.round(u.parapetM)} m of 6.7 km<br>biggest drop at 120 m: ${u.bestDrop.toFixed(0)} m<br><small>space: pause · ← →: variant</small>`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
