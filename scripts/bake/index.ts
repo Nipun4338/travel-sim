@@ -16,6 +16,7 @@ import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
 import { bakeLine, buildStations, buildViaduct, type MetroBake } from './metro';
 import { pbfRegionData } from './pbfQuery';
 import { OpenBuildings, utm46 } from './heights';
+import { BUSY, MEDIUM, buildStreetLife, type DensityAt } from './streetlife';
 
 const CREDITS = [
   'Map data © OpenStreetMap contributors, ODbL (openstreetmap.org/copyright)',
@@ -155,9 +156,29 @@ async function main() {
     p75: ring => google.p75(ring.map(p => { const [lat, lon] = proj.toLatLon(p.x, p.y); return utm46(lat, lon); })),
     cap: (x, z) => (capAt && region.heightCap && Math.hypot(x - capAt[0], z - capAt[1]) > region.heightCap.radiusM ? region.heightCap.maxM : Infinity),
   };
-  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared, heights);
+  // Street life is busy (D) on commercial land or beside commercial buildings, medium (C) elsewhere.
+  let densityAt: DensityAt | undefined;
+  if (region.streetLife) {
+    const commercialLand = new PolygonIndex<true>(50);
+    for (const lw of landuse.ways) if (/^(commercial|retail)$/.test(lw.tags?.landuse ?? '') && lw.nodes[0] === lw.nodes[lw.nodes.length - 1])
+      commercialLand.add(lw.nodes.slice(0, -1).map(nid => landuse.nodes.get(nid)).filter(Boolean).map(nd => ({ x: nd!.x, y: nd!.z })), true);
+    const shops = new PointGrid(50);
+    for (const bw of blds.ways) {
+      const bt = bw.tags ?? {};
+      if (!/^(commercial|retail|office|mixed_use|supermarket|hotel)$/.test(bt.building ?? '') && !bt.shop && !bt.amenity) continue;
+      const pts = bw.nodes.map(nid => blds.nodes.get(nid)).filter(Boolean);
+      if (pts.length) shops.add(pts.reduce((sum, nd) => sum + nd!.x, 0) / pts.length, pts.reduce((sum, nd) => sum + nd!.z, 0) / pts.length);
+    }
+    densityAt = (x, z) => (commercialLand.at(x, z) || shops.near(x, z, 40) ? BUSY : MEDIUM);
+  }
+  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared, heights, densityAt);
   lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
+  if (densityAt) {
+    const sl = buildStreetLife(geo, roads, h, junctions, nearRoute, densityAt);
+    lap('street life');
+    console.log(`      street life: ${sl.poles} poles, ${sl.stalls} stalls, ${sl.people} people, ${sl.rickshaws} rickshaws`);
+  }
   let forest: { buildings: PointGrid } | undefined;
   if (region.forest) {
     const buildings = new PointGrid(40);

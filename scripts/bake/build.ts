@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from '../../src/shared/region';
 import { ChunkGeometry, color, densify, hash01, type UV, type V3 } from './geometry';
+import { frontage, type DensityAt } from './streetlife';
 import { DRIVABLE, isElevated, isOneway, roadRank, roadWidth, type Indexed } from './osm';
 import { PointGrid, PolygonIndex, SegmentIndex } from './spatial';
 import { crownRadius, pickSpecies, plantTree, type TreeSetting } from './trees';
@@ -374,7 +375,7 @@ export interface HeightSource { p75: (ring: THREE.Vector2[]) => number | null | 
 export function buildBuildings(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean,
   onRoad: (x: number, z: number) => boolean, majorRoads: SegmentIndex, footprints?: PolygonIndex<true>,
-  cleared: (x: number, z: number) => boolean = () => false, heights?: HeightSource,
+  cleared: (x: number, z: number) => boolean = () => false, heights?: HeightSource, street?: DensityAt,
 ): { built: number; droppedOnRoad: number; signs: number; billboards: number } {
   let count = 0, dropped = 0, signs = 0, billboards = 0;
   for (const w of idx.ways) {
@@ -413,6 +414,11 @@ export function buildBuildings(
       const mx = (a.x + b.x) / 2, mz = (a.y + b.y) / 2;
       const road = majorRoads.nearest(mx, mz);
       if (!road || road.dist > road.half + 18 || (road.px - mx) * nx + (road.pz - mz) * nz < 0) continue;
+      if (street) {
+        const added = frontage(geo, a, b, base, height, w.id, i, street(mx, mz));
+        signs += added.signs; billboards += added.billboards;
+        continue;
+      }
       const boards = Math.max(1, Math.floor(len / 6));
       for (let k = 0; k < boards; k++) {
         const s0 = (k / boards) * len + 0.3, s1 = ((k + 1) / boards) * len - 0.3;

@@ -28,6 +28,8 @@ export interface RegionDef {
   footpaths: boolean;
   /** Painted lane markings (default on; Bandarban's hill road is one unmarked lane). */
   markings?: boolean;
+  /** The street-life kit (polish spec §3): painted boards, wires, stalls, rickshaws and people. */
+  streetLife?: boolean;
   /** Buildings farther than `radiusM` from this point are capped at `maxM` unless OSM tags a height. */
   heightCap?: { lat: number; lon: number; radiusM: number; maxM: number };
   /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
@@ -54,6 +56,7 @@ export const DHAKA: RegionDef = {
     { name: 'Airport',           osmNode: 3572490148,  lat: 23.85160, lon: 90.40734 },
   ],
   legEnds: ['Farmgate', 'Mohakhali', 'Kuril Bishwa Road', 'Airport'],
+  streetLife: true,
   terrainFilter: { minPx: 3, blurPx: 4 }, // strips Dhaka's buildings out of the surface model
   terrainSpacing: { near: 20, far: 20, lod1: 50, lod2: 100 },
   defaultGround: 0xa39b8a,
