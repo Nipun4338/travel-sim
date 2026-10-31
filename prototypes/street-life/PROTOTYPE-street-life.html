@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PROTOTYPE · Street life</title>
+<!--
+  THROWAWAY PROTOTYPE for polish ticket 009 "Choose how street life is made and how dense it is".
+  Question: should signboards, billboards, wires, stalls and crowds be flat-colour blocks or carry
+  painted Bangla text (one texture atlas), and how dense should they be per block?
+  One 200 m Dhaka block seen from the bus cab. Switch variant with the bottom bar or ← →.
+  A: today's bake   B: flat colour, dense   C: Bangla atlas, medium   D: Bangla atlas, dense
+  Run: double-click this file (needs internet for the Three.js CDN import).
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font:13px/1.35 system-ui,sans-serif;color:#111}
+  canvas{display:block}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:5;white-space:nowrap}
+  #stats{position:fixed;top:30px;left:8px;background:rgba(255,255,255,.88);padding:6px 9px;border-radius:8px;font-variant-numeric:tabular-nums;min-width:190px}
+  #stats .big{font-size:20px;font-weight:700}
+  #bar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:6px 10px;background:#111;color:#fff;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5}
+  #bar button{background:#333;color:#fff;border:0;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer}
+  #bar span{min-width:250px;text-align:center;font-weight:600}
+  #view{position:fixed;right:8px;top:30px;display:flex;gap:4px}
+  #view button{padding:5px 9px;border:1px solid #888;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+  #view button.on{background:#222;color:#fff}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: street life (throwaway)</div>
+<div id="stats"></div>
+<div id="view"></div>
+<div id="bar"><button id="prev">←</button><span id="label"></span><button id="next">→</button></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+const VARIANTS = {
+  A: { name: "Today's bake", text: false, stack: 0, blade: 0, wires: 0, stalls: 0, people: 0, rickshaws: 0, billboards: 0.12, poleBoards: 0 },
+  B: { name: 'Flat colour, dense', text: false, stack: 3, blade: 0.5, wires: 12, stalls: 1 / 25, people: 80, rickshaws: 10, billboards: 0.45, poleBoards: 3 },
+  C: { name: 'Bangla atlas, medium', text: true, stack: 2, blade: 0.25, wires: 6, stalls: 1 / 45, people: 35, rickshaws: 4, billboards: 0.25, poleBoards: 1 },
+  D: { name: 'Bangla atlas, dense', text: true, stack: 3, blade: 0.5, wires: 12, stalls: 1 / 25, people: 80, rickshaws: 10, billboards: 0.45, poleBoards: 3 },
+};
+const KEYS = Object.keys(VARIANTS);
+let key = new URLSearchParams(location.search).get('variant') ?? 'A';
+if (!VARIANTS[key]) key = 'A';
+let view = 'drive';
+
+// ---------- deterministic random ----------
+let seed = 1;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+const pick = a => a[Math.floor(rnd() * a.length)];
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd9d3c3);
+scene.fog = new THREE.Fog(0xd9d3c3, 60, 260);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 600);
+scene.add(new THREE.HemisphereLight(0xfff4e0, 0x6b6250, 1.15));
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.4); sun.position.set(-60, 120, 40); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// ---------- atlas: Bangla shop signs + billboards on one 1024² canvas ----------
+const SHOPS = ['মায়ের দোয়া স্টোর', 'নিউ ঢাকা ফার্মেসী', 'বিসমিল্লাহ হোটেল', 'রহিম টেলিকম', 'ফ্লেক্সিলোড বিকাশ', 'আল-আমিন ট্রেডার্স', 'জননী ফ্যাশন', 'সততা মেডিকেল হল',
+  'নিউ মডেল টেইলার্স', 'বাংলা রেস্তোরাঁ', 'ফটোকপি কম্পিউটার', 'চা পান সিগারেট', 'লাকী ইলেকট্রনিক্স', 'হাজী বিরিয়ানি ঘর', 'রূপসী বিউটি পার্লার', 'নূর হার্ডওয়্যার',
+  'কোচিং সেন্টার', 'ডায়াগনস্টিক সেন্টার', 'শাহজালাল জুয়েলার্স', 'মোবাইল সার্ভিসিং', 'ফুচকা চটপটি', 'আমানত শাহ ক্লথ', 'স্বপ্ন ডেন্টাল কেয়ার', 'ভাই ভাই স্টোর'];
+const BG = ['#c62828', '#1b7f3b', '#1f4fa8', '#f2c200', '#e8710a', '#b0186e', '#f3efe3', '#138a8a', '#222222', '#6a1b9a'];
+const atlas = document.createElement('canvas'); atlas.width = atlas.height = 1024;
+const g = atlas.getContext('2d');
+const CELL_W = 256, CELL_H = 64, COLS = 4, ROWS = 12; // signs in the top 768 px
+for (let i = 0; i < COLS * ROWS; i++) {
+  const x = (i % COLS) * CELL_W, y = Math.floor(i / COLS) * CELL_H, bg = BG[i % BG.length];
+  g.fillStyle = bg; g.fillRect(x, y, CELL_W, CELL_H);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x, y + CELL_H - 6, CELL_W, 6);
+  const light = ['#f2c200', '#f3efe3'].includes(bg);
+  g.fillStyle = light ? '#b3121b' : (i % 3 ? '#ffffff' : '#ffe14d');
+  g.font = `700 ${i % 4 ? 30 : 26}px "Noto Sans Bengali","Nirmala UI",sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(SHOPS[i % SHOPS.length], x + CELL_W / 2, y + CELL_H / 2 - (i % 2 ? 0 : 6), CELL_W - 12);
+  if (i % 2 === 0) { g.font = '600 13px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.fillText('মোবাইল: ০১৭১১-' + (100000 + i * 7391).toString().slice(0, 6).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]), x + CELL_W / 2, y + CELL_H - 14); }
+}
+const BB = [['#0b5394', 'নতুন ফ্ল্যাট বুকিং চলছে', '#ffd84d'], ['#c62828', 'মিষ্টি দই ও রসমালাই', '#fff'], ['#1b7f3b', 'ভর্তি চলছে! কোচিং', '#fff'], ['#f2c200', 'সাশ্রয়ী মূল্যে টাইলস', '#7a0d0d']];
+BB.forEach(([bg, txt, fg], i) => {
+  const x = (i % 2) * 512, y = 768 + Math.floor(i / 2) * 128;
+  g.fillStyle = bg; g.fillRect(x, y, 512, 128);
+  g.fillStyle = 'rgba(255,255,255,.2)'; g.beginPath(); g.arc(x + 450, y + 64, 70, 0, 7); g.fill();
+  g.fillStyle = fg; g.font = '800 46px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillText(txt, x + 18, y + 64, 400);
+});
+const atlasTex = new THREE.CanvasTexture(atlas);
+atlasTex.colorSpace = THREE.SRGBColorSpace; atlasTex.anisotropy = 4;
+const signUV = i => { const c = i % (COLS * ROWS); const u0 = (c % COLS) * CELL_W / 1024, v1 = 1 - Math.floor(c / COLS) * CELL_H / 1024; return [u0, v1 - CELL_H / 1024, u0 + CELL_W / 1024, v1]; };
+const bbUV = i => { const u0 = (i % 2) * 0.5, v1 = 1 - (768 + Math.floor(i / 2) * 128) / 1024; return [u0, v1 - 0.125, u0 + 0.5, v1]; };
+const FLAT = [0xd62828, 0x2a9d4b, 0x1f5fbf, 0xf2c200, 0xf07f13, 0xc2187a, 0xf4f1e8, 0x16a3a3].map(c => new THREE.Color(c));
+
+// ---------- a tiny merged-geometry builder (like the bake: one mesh per material) ----------
+class Geo {
+  constructor() { this.p = []; this.c = []; this.uv = []; }
+  quad(a, b, c, d, col, uv = [0, 0, 0, 0]) { // a bottom-left, b top-left, c top-right, d bottom-right
+    const [u0, v0, u1, v1] = uv;
+    for (const [v, t] of [[a, [u0, v0]], [b, [u0, v1]], [c, [u1, v1]], [a, [u0, v0]], [c, [u1, v1]], [d, [u1, v0]]]) { this.p.push(...v); this.c.push(col.r, col.g, col.b); this.uv.push(...t); }
+  }
+  box(x, z, w, d, y0, y1, col) {
+    const [l, r, n, f] = [x - w / 2, x + w / 2, z - d / 2, z + d / 2];
+    this.quad([l, y0, f], [l, y1, f], [r, y1, f], [r, y0, f], col); this.quad([r, y0, n], [r, y1, n], [l, y1, n], [l, y0, n], col);
+    this.quad([r, y0, f], [r, y1, f], [r, y1, n], [r, y0, n], col); this.quad([l, y0, n], [l, y1, n], [l, y1, f], [l, y0, f], col);
+    this.quad([l, y1, f], [l, y1, n], [r, y1, n], [r, y1, f], col);
+  }
+  mesh(mat) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, mat);
+  }
+}
+const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const signMat = new THREE.MeshLambertMaterial({ map: atlasTex, side: THREE.DoubleSide });
+const col = h => new THREE.Color(h);
+const WHITE = col(0xffffff);
+
+// ---------- the block ----------
+const LEN = 220, ROAD = 7, WALK = 3.2; // road half-width, footpath width
+const WALLS = [0xd8cdb6, 0xc9b79a, 0xe3ded2, 0xb9b2a4, 0xd2c3a8, 0xa9a397, 0xe6e1d6, 0xcbbfa8].map(col);
+const AWN = [0x2e6e9e, 0x2a8a4b, 0xb0302f, 0xd9a21b, 0x6a4c9c].map(col);
+
+function frontages() { // buildings on both sides, real-ish heights (Google p75 spread: mostly 2–6 floors, some towers)
+  const out = [];
+  for (const side of [-1, 1]) {
+    let x = -LEN / 2;
+    while (x < LEN / 2) {
+      const w = 6 + rnd() * 9, r = rnd();
+      const floors = r < 0.06 ? 14 + Math.floor(rnd() * 8) : r < 0.25 ? 7 + Math.floor(rnd() * 4) : 2 + Math.floor(rnd() * 5);
+      out.push({ side, x0: x, x1: x + w - 0.4, h: floors * 3.2 + 1, floors, depth: 10 + rnd() * 8, wall: pick(WALLS) });
+      x += w;
+    }
+  }
+  return out;
+}
+
+let world = null;
+function build() {
+  if (world) { scene.remove(world); world.traverse(o => o.geometry?.dispose()); }
+  seed = 7; // same buildings in every variant
+  const V = VARIANTS[key];
+  world = new THREE.Group();
+  const base = new Geo(), signs = new Geo(), people = new Geo();
+  const gray = col(0x6e6a63), walk = col(0xa8a091), kerb = col(0xcfc7b4);
+  base.quad([-LEN, 0, -ROAD], [-LEN, 0, ROAD], [LEN, 0, ROAD], [LEN, 0, -ROAD], gray);
+  for (const s of [-1, 1]) {
+    const z0 = s * ROAD, z1 = s * (ROAD + WALK);
+    base.quad([-LEN, 0.15, Math.min(z0, z1)], [-LEN, 0.15, Math.max(z0, z1)], [LEN, 0.15, Math.max(z0, z1)], [LEN, 0.15, Math.min(z0, z1)], walk);
+    base.quad([-LEN, 0, z0], [-LEN, 0.15, z0], [LEN, 0.15, z0], [LEN, 0, z0], kerb);
+  }
+  for (let x = -LEN / 2; x < LEN / 2; x += 6) base.quad([x, 0.01, -0.08], [x, 0.01, 0.08], [x + 3, 0.01, 0.08], [x + 3, 0.01, -0.08], col(0xe8e2d0));
+
+  const fr = frontages();
+  let signCount = 0;
+  for (const b of fr) {
+    const zf = b.side * (ROAD + WALK), zb = zf + b.side * b.depth, out = -b.side; // out = towards road
+    const z0 = Math.min(zf, zb), z1 = Math.max(zf, zb);
+    base.box((b.x0 + b.x1) / 2, (z0 + z1) / 2, b.x1 - b.x0, z1 - z0, 0, b.h, b.wall);
+    // window bands so floors read
+    for (let f = 1; f < b.floors; f++) base.quad([b.x0 + 0.5, f * 3.2 + 1.1, zf + out * 0.02], [b.x0 + 0.5, f * 3.2 + 2.3, zf + out * 0.02], [b.x1 - 0.5, f * 3.2 + 2.3, zf + out * 0.02], [b.x1 - 0.5, f * 3.2 + 1.1, zf + out * 0.02], col(0x4a5560));
+    if (rnd() < 0.65 && b.h > 8) base.box(b.x0 + 2, (z0 + z1) / 2, 1, 1, b.h, b.h + 1.5, col(0x1f1f1f)); // water tank
+    const w = b.x1 - b.x0, n = Math.max(1, Math.floor(w / 4.5));
+    const P = (x, y, o) => [x, y, zf + out * o];
+    const face = (x0, x1, y0, y1, o, c, uv) => b.side > 0 ? signs.quad(P(x0, y0, o), P(x0, y1, o), P(x1, y1, o), P(x1, y0, o), c, uv) : signs.quad(P(x1, y0, o), P(x1, y1, o), P(x0, y1, o), P(x0, y0, o), c, uv);
+    // ground-floor shop boards + awnings (A has exactly this, flat colour)
+    for (let k = 0; k < n; k++) {
+      const s0 = b.x0 + (k / n) * w + 0.2, s1 = b.x0 + ((k + 1) / n) * w - 0.2, i = Math.floor(rnd() * 999);
+      face(s0, s1, 3.0, 4.3, 0.12, V.text ? WHITE : pick(FLAT), V.text ? signUV(i) : undefined);
+      const a = pick(AWN); base.quad(P(s0, 2.8, 0.05), P(s1, 2.8, 0.05), P(s1, 2.35, 1.3), P(s0, 2.35, 1.3), a); base.quad(P(s1, 2.8, 0.05), P(s0, 2.8, 0.05), P(s0, 2.35, 1.3), P(s1, 2.35, 1.3), a);
+      signCount++;
+    }
+    // boards stacked up the façade, uneven sizes
+    for (let f = 1; f <= Math.min(V.stack, b.floors - 1); f++) {
+      let x = b.x0 + 0.3;
+      while (x < b.x1 - 1.5) {
+        const sw = Math.min(b.x1 - 0.3 - x, 2.5 + rnd() * 5), y = f * 3.2 + 2.4 + rnd() * 0.3;
+        if (rnd() < 0.75) { face(x, x + sw, y, y + 0.8 + rnd() * 0.5, 0.15, V.text ? WHITE : pick(FLAT), V.text ? signUV(Math.floor(rnd() * 999)) : undefined); signCount++; }
+        x += sw + 0.3;
+      }
+    }
+    // blade signs sticking out over the footpath
+    if (V.blade && b.floors >= 2) for (let k = 0; k < n; k++) if (rnd() < V.blade) {
+      const x = b.x0 + (k + 0.5) * w / n, y0 = 4.6 + rnd() * 3, uv = V.text ? signUV(Math.floor(rnd() * 999)) : undefined, c = V.text ? WHITE : pick(FLAT);
+      const L = [x, y0, zf + out * 0.2], T = [x, y0 + 0.7, zf + out * 0.2], T2 = [x, y0 + 0.7, zf + out * 2.0], L2 = [x, y0, zf + out * 2.0];
+      signs.quad(L, T, T2, L2, c, uv); signs.quad(L2, T2, T, L, c, uv); signCount++;
+    }
+    // rooftop billboards facing the road
+    if (b.h >= 12 && rnd() < V.billboards) {
+      const cx = (b.x0 + b.x1) / 2, bw = Math.min(10, w), y0 = b.h + 1.2, i = Math.floor(rnd() * 4);
+      face(cx - bw / 2, cx + bw / 2, y0, y0 + bw * 0.28, 0.6, V.text ? WHITE : pick(FLAT), V.text ? bbUV(i) : undefined);
+      base.box(cx - bw / 3, zf + out * 0.4, 0.15, 0.15, b.h, y0, col(0x555555)); base.box(cx + bw / 3, zf + out * 0.4, 0.15, 0.15, b.h, y0, col(0x555555));
+    }
+  }
+
+  // electric poles + sagging wire bundles along both kerbs
+  const lines = [];
+  if (V.wires) for (const s of [-1, 1]) {
+    const z = s * (ROAD + 0.5);
+    for (let x = -LEN / 2; x <= LEN / 2; x += 30) {
+      base.box(x, z, 0.3, 0.3, 0, 9, col(0x8d877b));
+      base.box(x, z, 0.12, 2.4, 7.5, 7.7, col(0x5a554c));
+      if (rnd() < 0.6) for (let k = 0; k < 3; k++) base.box(x + 0.25, z + (k - 1) * 0.3, 0.35, 0.25, 6 + k * 0.4, 6.35 + k * 0.4, col(0x2b2b2b)); // junction boxes
+      if (x + 30 > LEN / 2) continue;
+      for (let k = 0; k < V.wires; k++) {
+        const zo = (rnd() - 0.5) * 2.2, y = 6.2 + rnd() * 1.6, sag = 0.4 + rnd() * 1.1;
+        for (let t = 0; t < 12; t++) {
+          const u0 = t / 12, u1 = (t + 1) / 12, f = u => y - sag * 4 * u * (1 - u);
+          lines.push(x + u0 * 30, f(u0), z + zo, x + u1 * 30, f(u1), z + zo + (rnd() - 0.5) * 0.05);
+        }
+      }
+      if (V.wires > 8 && rnd() < 0.5) { // a tangled coil hanging off a pole
+        for (let t = 0; t < 20; t++) { const a0 = t * 0.9, a1 = (t + 1) * 0.9, r = 0.35; lines.push(x + 0.4 + Math.cos(a0) * r, 6.5 + Math.sin(a0) * r - t * 0.03, z, x + 0.4 + Math.cos(a1) * r, 6.5 + Math.sin(a1) * r - (t + 1) * 0.03, z); }
+      }
+      // poster boards strapped to poles
+      for (let k = 0; k < V.poleBoards; k++) {
+        const y0 = 2.2 + k * 1.1, x0 = x - 0.5, x1 = x + 0.5, zz = z - s * 0.2, uv = V.text ? signUV(Math.floor(rnd() * 999)) : undefined, c = V.text ? WHITE : pick(FLAT);
+        signs.quad([x0, y0, zz], [x0, y0 + 0.9, zz], [x1, y0 + 0.9, zz], [x1, y0, zz], c, uv); signs.quad([x1, y0, zz], [x1, y0 + 0.9, zz], [x0, y0 + 0.9, zz], [x0, y0, zz], c, uv);
+      }
+    }
+  }
+
+  // tea stalls on the footpath: box counter, tarp, bench, kettle
+  let stalls = 0;
+  if (V.stalls) for (const s of [-1, 1]) for (let x = -LEN / 2 + 10; x < LEN / 2; x += 1 / V.stalls * (0.6 + rnd() * 0.8)) {
+    const z = s * (ROAD + WALK - 1.2);
+    base.box(x, z, 1.6, 1.0, 0.15, 1.1, col(0x7a5230));
+    base.box(x, z, 2.2, 1.8, 2.3, 2.38, pick([col(0x1f5fbf), col(0xd9a21b), col(0x2a8a4b)]));
+    for (const dx of [-1, 1]) base.box(x + dx, z, 0.06, 0.06, 0.15, 2.3, col(0x555555));
+    base.box(x - 1.6, z - s * 0.9, 1.4, 0.35, 0.5, 0.6, col(0x8b5a2b));
+    base.box(x + 0.4, z, 0.25, 0.25, 1.1, 1.45, col(0xb0b0b0));
+    stalls++;
+  }
+
+  // rickshaws parked at the kerb: frame + bright hood
+  for (let k = 0; k < V.rickshaws; k++) {
+    const s = rnd() < 0.5 ? -1 : 1, x = (rnd() - 0.5) * LEN * 0.9, z = s * (ROAD - 0.8);
+    base.box(x, z, 1.6, 0.9, 0.3, 0.9, col(0x2c2c2c));
+    base.box(x + 0.3, z, 0.8, 1.0, 0.9, 1.9, pick([col(0xd62828), col(0x1f5fbf), col(0xf2c200), col(0xc2187a)]));
+    base.box(x - 0.9, z, 0.5, 0.06, 0.15, 1.0, col(0x444444));
+  }
+
+  // people: 12-tri low-poly figures, clustered at stalls and the bus stop, some walking
+  const SKIN = [0x8d5524, 0xa0673a, 0x6b4423].map(col), SHIRT = [0xf4f1e8, 0x2e6e9e, 0x9e2b25, 0x2a8a4b, 0xd9a21b, 0x5a4a7a, 0x222222].map(col);
+  for (let k = 0; k < V.people; k++) {
+    const s = rnd() < 0.5 ? -1 : 1, x = k < V.people * 0.25 ? 30 + (rnd() - 0.5) * 8 : (rnd() - 0.5) * LEN * 0.95;
+    const z = s * (ROAD + 0.6 + rnd() * (WALK - 1.0)), h = 1.5 + rnd() * 0.25;
+    people.box(x, z, 0.4, 0.28, 0.15, 0.15 + h * 0.5, pick([col(0x3a3a3a), col(0x5b4a32), col(0x2e4a6e)]));
+    people.box(x, z, 0.46, 0.3, 0.15 + h * 0.5, 0.15 + h * 0.86, pick(SHIRT));
+    people.box(x, z, 0.24, 0.24, 0.15 + h * 0.86, 0.15 + h, pick(SKIN));
+  }
+  // a bus-stop shelter at x=30 on one side
+  if (V.people) { base.box(30, -(ROAD + 1.0), 6, 0.1, 0.15, 2.6, col(0x666666)); base.box(30, -(ROAD + 1.6), 6, 1.6, 2.6, 2.7, col(0x1b7f3b)); }
+
+  world.add(base.mesh(flatMat));
+  if (signs.p.length) world.add(signs.mesh(V.text ? signMat : flatMat));
+  if (people.p.length) world.add(people.mesh(flatMat));
+  if (lines.length) { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3)); world.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x1a1a1a }))); }
+  scene.add(world);
+  world.userData = { signCount, stalls, wires: lines.length / 6 };
+}
+
+// ---------- UI ----------
+const label = document.getElementById('label');
+function setVariant(k) {
+  key = k; const u = new URL(location.href); u.searchParams.set('variant', k); history.replaceState(null, '', u);
+  label.textContent = `${k} (${VARIANTS[k].name})`; build();
+}
+const step = d => setVariant(KEYS[(KEYS.indexOf(key) + d + KEYS.length) % KEYS.length]);
+document.getElementById('prev').onclick = () => step(-1);
+document.getElementById('next').onclick = () => step(1);
+addEventListener('keydown', e => { if (e.key === 'ArrowLeft') step(-1); if (e.key === 'ArrowRight') step(1); if (e.key === ' ') paused = !paused; });
+const VIEWS = { drive: 'Cab, driving', stop: 'Cab, at the stop', look: 'Look at shops', high: 'From above' };
+const vbar = document.getElementById('view');
+for (const [k, t] of Object.entries(VIEWS)) { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { view = k; [...vbar.children].forEach(c => c.classList.toggle('on', c === b)); }; if (k === view) b.classList.add('on'); vbar.append(b); }
+let paused = false;
+
+// ---------- loop ----------
+const stats = document.getElementById('stats');
+let t = 0, last = performance.now(), frames = 0, fps = 0, fpsT = 0;
+setVariant(key);
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (!paused) t += dt;
+  const busZ = ROAD / 2;
+  if (view === 'drive') { const x = -LEN / 2 + ((t * 9) % LEN); camera.position.set(x, 2.6, busZ); camera.lookAt(x + 30, 2.4, busZ - 1.5); }
+  else if (view === 'stop') { camera.position.set(22, 2.6, -busZ + 1); camera.lookAt(34, 2.2, -ROAD - 3); }
+  else if (view === 'look') { camera.position.set(-10 + Math.sin(t * 0.2) * 20, 2.6, busZ); camera.lookAt(camera.position.x + 6, 4.5, ROAD + WALK); }
+  else { camera.position.set(-90, 45, 60); camera.lookAt(0, 0, 0); }
+  renderer.render(scene, camera);
+  frames++; fpsT += dt; if (fpsT > 0.5) { fps = frames / fpsT; frames = 0; fpsT = 0; }
+  const i = renderer.info, u = world.userData;
+  stats.innerHTML = `<div class="big">${fps.toFixed(0)} fps</div>variant <b>${key}</b> · ${VARIANTS[key].name}<br>triangles ${i.render.triangles.toLocaleString()}<br>draw calls ${i.render.calls}<br>signs ${u.signCount} · stalls ${u.stalls}<br>wire segments ${u.wires}<br>textures ${i.memory.textures} ${VARIANTS[key].text ? '(1024² atlas, ~4 MB GPU)' : ''}<br><small>space: pause · ← →: variant</small>`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

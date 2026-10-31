@@ -28,6 +28,7 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Capture in-game vs real side-by-side comparisons](tickets/005-capture-side-by-side-comparisons.md): 30 cab shots with notes (agent-judged, user-delegated); the headline gaps are generic Line 6 stations, a flat uniform Dhaka skyline with no street life, and Bandarban's wrong centre line and missing ridge views.
 - [Rank the fidelity gaps and pick what each place fixes](tickets/006-rank-fidelity-gaps.md): real heights as a shared first-release base; Line 6 leads with station models, Dhaka with the skyline, Bandarban with route correctness; the last item per place waits on the budget.
 - [Spot-check the Open Buildings heights against known towers](tickets/008-spot-check-building-heights.md): good enough. Against 12,462 OSM-tagged buildings, p75 is off by 1.6 floors on average (the flat default by 2.6). Use it unscaled; buildings with no pixel become 1 floor; mid-rise reads ~1.7 floors low.
+- [Choose how street life is made and how dense it is](tickets/009-choose-street-life-approach.md): procedural low-poly with painted Bangla signs from one atlas; dense on commercial stretches, medium elsewhere and on Line 6, stalls and signs only in Bandarban.
 
 ## Not yet specified
 
