@@ -25,6 +25,7 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Check street-level imagery coverage for the three places](tickets/002-check-street-level-imagery.md): no current free coverage (KartaView 2019 central Dhaka only; Street View banned by its terms), so the user's own photos are the main reference.
 - [Research how the Line 6 stations really differ](tickets/003-research-line6-stations.md): four station types (standard, arched, Uttara North, Farmgate); side platforms, ~180 m, shared terracotta-and-grey-roof look; current roof and Farmgate model are off.
 - [Ground-truth the Bandarban road and its Stops](tickets/004-ground-truth-bandarban-road.md): the Route takes a 1 km shortcut off the Thanchi Road and Chimbuk sits ~100 m off the summit; the road width holds; Thanchi buses are missing from traffic.
+- [Capture in-game vs real side-by-side comparisons](tickets/005-capture-side-by-side-comparisons.md): 30 cab shots with notes (agent-judged, user-delegated); the headline gaps are generic Line 6 stations, a flat uniform Dhaka skyline with no street life, and Bandarban's wrong centre line and missing ridge views.
 
 ## Not yet specified
 

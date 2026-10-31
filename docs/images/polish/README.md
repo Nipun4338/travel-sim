@@ -61,3 +61,31 @@ Every row above is marked 📷, because no free reference is current: the Dhaka 
 - **Line 6:** at stations, stand at the Motijheel end of the Motijheel-bound platform and look along the track, then take one photo of the station from the street below. For viaduct points, take one from the train's front window if you can see out, and one from the street underneath.
 - Name each file like the in-game shot (`dhaka-05-real.jpg`, `line6-08-real.jpg`, `line6-08-street.jpg`) and drop it in this folder. Phone photos are fine, and near the point is close enough.
 - If you can't reach a spot, a sentence from memory on what's wrong in the in-game shot (too tall, too empty, wrong colour, missing flyover…) also works for ranking.
+
+## Notes on the shots (2026-10-31)
+
+The user handed this judgement to the agent ("go with best and recommendation"), so these notes compare the shots with the research docs and the coordinates. Nobody has checked them on the ground. The user's photos or rider's notes can still overrule any line here. In every shot the traffic and passengers are missing because the bus or train was teleported there. That isn't a fidelity gap.
+
+### Line 6
+
+- **The stations are all one generic model** (01, 03, 05, 06, 08, 10): the same flat dark-olive roof, grey walls and yellow "6" board. The real stations have an arched grey steel roof with a green edge, terracotta wall panels, white entrance fascias with the DMTCL logo and green roundels ([line6-stations.md](../../research/line6-stations.md)). Farmgate's real roof is teal. This is the biggest gap on the line, because the player stops at a station every 1–2 minutes.
+- **The view from the viaduct** (04, 07): the density reads about right, but every building is a uniform 4–6 storey box. There's no rooftop clutter (water tanks, rails, dish antennas), no billboards facing the viaduct, and the road underneath is empty.
+- **02, Uttara Center to Uttara South:** open sand and water. The Diabari stretch is genuinely open, so this is plausible; keep it, and add the depot-area fencing and lake edges if references show them.
+- **09, Dhaka University to the Secretariat:** a flat open field. It should read as dense campus and park trees (Suhrawardy Udyan, Ramna) rather than bare ground.
+- **03, Pallabi:** the block in the platform is the train ahead, parked there by the teleport. That's a capture artifact.
+
+### Dhaka bus Route
+
+- **Heights and skyline:** everything is a 4–6 storey box of the same width. The Banani/Kakoli and Mohakhali stretch (03–06) should have commercial towers of 15–25+ floors, and ordinary side buildings should be lower and narrower ([building-heights.md](../../research/building-heights.md): median about 12 m, p99 47–55 m). This is the biggest gap on the Route.
+- **Street life:** shop awnings exist (01, 03, 04), but there are no shop signboards stacked up the façades, no billboards, no bus-company counters, no tangle of overhead power and cable lines, and no tea stalls. Footpaths are wide, clean and empty.
+- **09–10, Kuril to the Airport:** almost empty flat ground with flyovers. The airport side is genuinely open, but Khilkhet and Kuril Bishwa Road are built up and busy, and the Kuril interchange (a hero landmark in the v1 plan) doesn't read here.
+- **Road surface:** too clean and uniform: no patching, no worn markings, no medians with railings, no dust.
+- **Colours:** pastel and evenly lit. Real Dhaka is dustier and more weathered, with a lot of white-tile and glass façades on the newer towers.
+
+### Bandarban road
+
+- **Road markings:** a yellow centre line runs the whole way, but the real road is one unmarked paved lane of about 4–6 m ([bandarban-road.md](../../research/bandarban-road.md)). It's an easy fix and noticeable in every shot.
+- **Terrain feel:** the road winds over gentle green slopes. The real road runs along ridges, with steep drops and wide views across ranges. Long views and steep road edges are missing, and there are no safety parapets (the black-and-white painted roadside walls) at the drops.
+- **08:** a lone 8-storey tower block stands in the hills. That's the default height applied to a small OSM building, and real heights will fix it (Bandarban median about 5 m).
+- **Vegetation:** the tree-and-bamboo mix reads right, but it's too sparse and too evenly spaced. There's no undergrowth, and no jhum (slash-and-burn) patches on the slopes.
+- **Roadside life:** missing the stalls at Shoilo Propat (03 has huts but no stalls), the Bawm village houses on stilts, Chimbuk's army checkpoint and canteen, and the Thanchi buses and chander gari jeeps.
