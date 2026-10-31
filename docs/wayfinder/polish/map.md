@@ -32,11 +32,11 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Shape the four Line 6 station models](tickets/010-shape-line6-station-models.md): detailed type A for 12 stations, arch ends at Uttara Center and Bijoy Sarani, Uttara North as two side platforms plus depot track (unconfirmed), and a Farmgate rebuild that replaces the hero.
 - [Choose how the Bandarban road gets its ridge drops and long views](tickets/011-ridge-feel-bandarban.md): the canopy in GLO-30 made the slopes gentle; strip it deeper (±60 m), drop the valley side steeply, add parapets only at ≥ 8 m drops, ~16 km visibility with a Flight Zone backdrop, no exaggeration.
 - [Measure what the chosen fixes cost on the minimum phone](tickets/012-measure-budget-cost.md): downloads stay well under 60 MB (worst case Line 6 ~45 MB), so the budget isn't raised; viaduct traffic and Dhaka weathering fit, Bandarban gets jhum patches but no undergrowth; the backdrop is cut to 240 m; real-phone fps is still owed in the build.
+- [Order the per-place releases and fix what goes in each](tickets/013-order-the-releases.md): v1.2.2 Bandarban correctness patch now; v1.3 Dhaka (with real heights for every Region and Zone); v1.4 Line 6; v1.5 Bandarban; voices ship whenever they arrive.
 
 ## Not yet specified
 
-- **Landmark additions and upgrades**: beyond the Line 6 stations and the Kuril interchange, which corridor and Line 6 places deserve a model (or an upgrade from simple to hero), and which existing ones are wrong in shape or position.
-- **Flight Zone skyline**: whether district height bands or river and lake shapes are needed, judged from air shots once the real heights land.
+Nothing. The route to the destination is decided; what's left is building the releases in [Order the per-place releases](tickets/013-order-the-releases.md) and delivering the voice recordings.
 
 ## Out of scope
 
@@ -45,3 +45,4 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - Photorealism, or exceeding the SPEC §2 budgets.
 - Full detail across the whole 30 km / 40 km Flight Zones: it doesn't fit the per-Region-mode budget.
 - A closer pass on the existing vehicles, and time-of-day traffic and haze: the comparisons didn't flag them, so [Rank the fidelity gaps](tickets/006-rank-fidelity-gaps.md) left them as they are.
+- Other landmark models (beyond the Line 6 stations and the Kuril interchange), and whether the Flight Zone skyline needs more than real heights: a short follow-up map after v1.3, judged from air shots and street views ([Order the per-place releases](tickets/013-order-the-releases.md)).
