@@ -46,4 +46,4 @@ The bus Helper (হেল্পার) shouts each Stop and a few everyday lines
 | `rain` | বৃষ্টি নামছে, জানালা বন্ধ করেন। | It's raining, close the windows. | rain |
 | `hill` | ধরে বসেন, সামনে বাঁক! | Hold on, bend ahead! | Bandarban hairpins |
 
-That's 26 lines. Send the files (or a shared folder link) when they're ready, and they'll be wired in with the M9 sound pass.
+That's 26 lines. Put the files in `data/audio-src/voice/helper/`, or send a shared folder link, and they'll be wired into the build. The Line 6 announcements have their own script: [line6-announcements.md](line6-announcements.md).
