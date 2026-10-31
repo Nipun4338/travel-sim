@@ -1,6 +1,7 @@
 # Wayfinder tracker (local markdown)
 
 - The map is `map.md` (label `wayfinder:map`). Tickets are its children in `tickets/NNN-slug.md`.
+- Each later effort gets its own folder with the same layout: `polish/map.md` and `polish/tickets/` (making the current places exact, charted 2026-10-31).
 - Each ticket's frontmatter holds `labels` (`wayfinder:<type>`), `status` (`open` | `closed`), `assignee` (the claim) and `blocked_by` (ticket ids).
 - **Frontier** = tickets with `status: open`, an empty `assignee`, and every `blocked_by` ticket closed.
 - **Claim**: set `assignee` before starting any work.
