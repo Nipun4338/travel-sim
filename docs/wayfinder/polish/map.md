@@ -7,6 +7,8 @@ labels: [wayfinder:map]
 
 A build-ready polish spec that makes the places already in the game faithful to the real ones: the Dhaka bus corridor (Farmgate → Airport), the Bandarban road (town → Chimbuk) and MRT Line 6, plus skyline and landmarks only for the two Flight Zones. One section per place, each shippable as its own release (for example v1.3 Dhaka corridor, v1.4 Line 6, v1.5 Bandarban), with nothing left to decide before building.
 
+**Reached 2026-10-31:** [docs/polish-spec.md](../../polish-spec.md) is the build spec.
+
 ## Notes
 
 - Domain: the glossary is `/CONTEXT.md` (Region, Route, Stop, Leg, Run, Flight Zone, Helper…); the v1 decisions are in `/SPEC.md` and the [v1 map](../map.md).
