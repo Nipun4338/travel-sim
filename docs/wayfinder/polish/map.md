@@ -31,6 +31,7 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Choose how street life is made and how dense it is](tickets/009-choose-street-life-approach.md): procedural low-poly with painted Bangla signs from one atlas; dense on commercial stretches, medium elsewhere and on Line 6, stalls and signs only in Bandarban.
 - [Shape the four Line 6 station models](tickets/010-shape-line6-station-models.md): detailed type A for 12 stations, arch ends at Uttara Center and Bijoy Sarani, Uttara North as two side platforms plus depot track (unconfirmed), and a Farmgate rebuild that replaces the hero.
 - [Choose how the Bandarban road gets its ridge drops and long views](tickets/011-ridge-feel-bandarban.md): the canopy in GLO-30 made the slopes gentle; strip it deeper (±60 m), drop the valley side steeply, add parapets only at ≥ 8 m drops, ~16 km visibility with a Flight Zone backdrop, no exaggeration.
+- [Measure what the chosen fixes cost on the minimum phone](tickets/012-measure-budget-cost.md): downloads stay well under 60 MB (worst case Line 6 ~45 MB), so the budget isn't raised; viaduct traffic and Dhaka weathering fit, Bandarban gets jhum patches but no undergrowth; the backdrop is cut to 240 m; real-phone fps is still owed in the build.
 
 ## Not yet specified
 
