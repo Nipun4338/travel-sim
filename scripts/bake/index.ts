@@ -11,12 +11,13 @@ import { DRIVABLE, buildGraph, cutUturnLoops, indexOsm, isElevated, isOneway, ro
 import { landmarksFor, type LandmarkPlace } from '../../src/shared/landmarks';
 import { flyoverProfiles } from './flyovers';
 import { REGIONS, projection } from './regions';
-import { PointGrid, PolygonIndex } from './spatial';
+import { PointGrid, PolygonIndex, SegmentIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
 import { bakeLine, buildStations, buildViaduct, type MetroBake } from './metro';
 import { pbfRegionData } from './pbfQuery';
 import { OpenBuildings, utm46 } from './heights';
 import { BUSY, MEDIUM, buildStreetLife, type DensityAt } from './streetlife';
+import { infillFrontage } from './infill';
 
 const CREDITS = [
   'Map data © OpenStreetMap contributors, ODbL (openstreetmap.org/copyright)',
@@ -156,6 +157,17 @@ async function main() {
     p75: ring => google.p75(ring.map(p => { const [lat, lon] = proj.toLatLon(p.x, p.y); return utm46(lat, lon); })),
     cap: (x, z) => (capAt && region.heightCap && Math.hypot(x - capAt[0], z - capAt[1]) > region.heightCap.radiusM ? region.heightCap.maxM : Infinity),
   };
+  if (region.infill) {
+    const elevated = new SegmentIndex(50);
+    for (const ew of roads.ways) {
+      if (!ew.tags?.highway || !isElevated(ew, roads)) continue;
+      for (let i = 1; i < ew.nodes.length; i++) {
+        const a = roads.nodes.get(ew.nodes[i - 1]), b = roads.nodes.get(ew.nodes[i]);
+        if (a && b) elevated.add(a.x, a.z, b.x, b.z, roadWidth(ew.tags) / 2);
+      }
+    }
+    console.log(`      infill: ${infillFrontage(blds, routeXZ, region.infill, allRoads, elevated, ground, cleared)} roadside lots`);
+  }
   // Street life is busy (D) on commercial land or beside commercial buildings, medium (C) elsewhere.
   let densityAt: DensityAt | undefined;
   if (region.streetLife) {

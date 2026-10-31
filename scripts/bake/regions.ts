@@ -30,6 +30,8 @@ export interface RegionDef {
   markings?: boolean;
   /** The street-life kit (polish spec §3): painted boards, wires, stalls, rickshaws and people. */
   streetLife?: boolean;
+  /** Route stretches where OSM lacks the roadside buildings: gaps get low-rise retail lots. */
+  infill?: Array<{ fromKm: number; toKm: number }>;
   /** Buildings farther than `radiusM` from this point are capped at `maxM` unless OSM tags a height. */
   heightCap?: { lat: number; lon: number; radiusM: number; maxM: number };
   /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
@@ -57,6 +59,7 @@ export const DHAKA: RegionDef = {
   ],
   legEnds: ['Farmgate', 'Mohakhali', 'Kuril Bishwa Road', 'Airport'],
   streetLife: true,
+  infill: [{ fromKm: 8.6, toKm: 11 }], // Kuril Bishwa Road and Khilkhet: OSM has the blocks, not the shophouses
   terrainFilter: { minPx: 3, blurPx: 4 }, // strips Dhaka's buildings out of the surface model
   terrainSpacing: { near: 20, far: 20, lod1: 50, lod2: 100 },
   defaultGround: 0xa39b8a,
