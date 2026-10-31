@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PROTOTYPE · Line 6 stations</title>
+<!--
+  THROWAWAY PROTOTYPE for polish ticket 010 "Shape the four Line 6 station models".
+  Question: how much detail does each station type get in the flat-shaded low-poly style?
+  Variants (bottom bar or ← →): today's generic station, type A simple, type A detailed,
+  type B (Uttara Center arch end), type C (Uttara North, 4 tracks, layout unconfirmed), type D (Farmgate rebuild).
+  Reference photos: docs/research/line6-stations.md (Wikimedia Commons links).
+  Run: python -m http.server 5173 --directory prototypes, then open /line6-stations/PROTOTYPE-line6-stations.html
+-->
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font:13px/1.35 system-ui,sans-serif;color:#111}
+  canvas{display:block}
+  #banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:#b00020;color:#fff;padding:3px 10px;font-weight:600;border-radius:0 0 6px 6px;z-index:5;white-space:nowrap}
+  #stats{position:fixed;top:30px;left:8px;background:rgba(255,255,255,.88);padding:6px 9px;border-radius:8px;font-variant-numeric:tabular-nums;max-width:260px}
+  #bar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:6px 10px;background:#111;color:#fff;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5}
+  #bar button{background:#333;color:#fff;border:0;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer}
+  #bar span{min-width:300px;text-align:center;font-weight:600}
+  #view{position:fixed;right:8px;top:30px;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
+  #view button{padding:5px 9px;border:1px solid #888;border-radius:5px;background:#fff;cursor:pointer;font:inherit}
+  #view button.on{background:#222;color:#fff}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: Line 6 stations (throwaway)</div>
+<div id="stats"></div>
+<div id="view"></div>
+<div id="bar"><button id="prev">←</button><span id="label"></span><button id="next">→</button></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+const VARIANTS = {
+  today: { name: "Today's generic station", type: 'today', bn: 'কারওয়ান বাজার', en: 'Karwan Bazar' },
+  A1: { name: 'Type A, simple', type: 'A', detail: 1, bn: 'কারওয়ান বাজার', en: 'Karwan Bazar' },
+  A2: { name: 'Type A, detailed', type: 'A', detail: 2, bn: 'কারওয়ান বাজার', en: 'Karwan Bazar' },
+  B: { name: 'Type B, Uttara Center arch end', type: 'B', detail: 2, bn: 'উত্তরা সেন্টার', en: 'Uttara Center' },
+  C: { name: 'Type C, Uttara North (guess)', type: 'C', detail: 2, bn: 'উত্তরা উত্তর', en: 'Uttara North' },
+  D: { name: 'Type D, Farmgate rebuild', type: 'D', detail: 2, bn: 'ফার্মগেট', en: 'Farmgate' },
+};
+const KEYS = Object.keys(VARIANTS);
+let key = new URLSearchParams(location.search).get('variant') ?? 'A2';
+if (!VARIANTS[key]) key = 'A2';
+let view = 'arrive';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xcfd8dc);
+scene.fog = new THREE.Fog(0xcfd8dc, 120, 520);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 900);
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0x6e6658, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.5); sun.position.set(-80, 140, 60); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+const col = h => new THREE.Color(h);
+const C = {
+  terracotta: col(0xa9533a), terraDark: col(0x8a4130), cream: col(0xe9dfc7), pilaster: col(0x9a9a94), roof: col(0x8c9196), roofUnder: col(0xd4d8dc),
+  green: col(0x1f7a3e), skylight: col(0xc9dde2), concrete: col(0xb8b3a8), deck: col(0xa39e94), platform: col(0xc4bfb3), edge: col(0xf2c200),
+  psd: col(0xc9ced2), rail: col(0x555555), ballast: col(0x7c776e), road: col(0x6e6a63), red: col(0xb3262c), teal: col(0x2f8f86), glass: col(0x7d9aa6),
+  todayRoof: col(0x4f5a3a), todayWall: col(0xa3a39c), todayConc: col(0xcfc6b2), yellow: col(0xf2c200), white: col(0xf4f2ec), dark: col(0x2b2b2b),
+};
+
+// ---------- signage atlas (redrawn per station) ----------
+const atlas = document.createElement('canvas'); atlas.width = 1024; atlas.height = 512;
+const atlasTex = new THREE.CanvasTexture(atlas); atlasTex.colorSpace = THREE.SRGBColorSpace; atlasTex.anisotropy = 4;
+function drawAtlas(V) {
+  const g = atlas.getContext('2d');
+  g.clearRect(0, 0, 1024, 512);
+  // fascia 0..1024 x 0..128: white panel, Bangla left, DMTCL-style mark centre, English right
+  g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, 1024, 128);
+  g.fillStyle = '#1f7a3e'; g.fillRect(0, 118, 1024, 10);
+  g.fillStyle = '#1b5e34'; g.font = '700 54px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'center';
+  g.fillText(V.bn, 260, 62, 440);
+  g.fillStyle = '#1b5e34'; g.font = '700 50px system-ui,sans-serif'; g.fillText(V.en, 780, 62, 440);
+  g.fillStyle = '#1f7a3e'; g.beginPath(); g.arc(512, 60, 40, 0, 7); g.fill(); g.fillStyle = '#c62828'; g.beginPath(); g.arc(512, 60, 22, 0, 7); g.fill();
+  // roundel 0..512 x 128..384: green ring with white bar
+  g.fillStyle = '#ffffff'; g.fillRect(0, 128, 512, 256);
+  g.strokeStyle = '#1f7a3e'; g.lineWidth = 34; g.beginPath(); g.arc(256, 256, 96, 0, 7); g.stroke();
+  g.fillStyle = '#1f7a3e'; g.fillRect(24, 220, 464, 72); g.fillStyle = '#fff'; g.font = '700 40px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.fillText(V.bn, 256, 246, 430);
+  g.font = '600 22px system-ui,sans-serif'; g.fillText(V.en.toUpperCase(), 256, 278, 430);
+  // street entrance sign 512..1024 x 128..256: green with white text + exit letter
+  g.fillStyle = '#1f7a3e'; g.fillRect(512, 128, 512, 128);
+  g.fillStyle = '#fff'; g.font = '700 40px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.fillText('মেট্রো ' + V.bn, 740, 168, 380);
+  g.font = '600 26px system-ui,sans-serif'; g.fillText('Metro ' + V.en, 740, 218, 380);
+  g.fillStyle = '#fff'; g.fillRect(952, 150, 56, 84); g.fillStyle = '#1f7a3e'; g.font = '800 54px system-ui'; g.fillText('A', 980, 194);
+  // today's board 512..1024 x 256..384: green with red stripe and a yellow 6
+  g.fillStyle = '#1f7a3e'; g.fillRect(512, 256, 512, 128); g.fillStyle = '#c62828'; g.fillRect(512, 360, 512, 24);
+  g.fillStyle = '#f2c200'; g.beginPath(); g.arc(580, 308, 38, 0, 7); g.fill(); g.fillStyle = '#111'; g.font = '800 50px system-ui'; g.fillText('6', 580, 310);
+  g.fillStyle = '#fff'; g.font = '700 40px "Noto Sans Bengali","Nirmala UI",sans-serif'; g.fillText(V.bn, 800, 308, 360);
+  atlasTex.needsUpdate = true;
+}
+const UV = { fascia: [0, 0.75, 1, 1], roundel: [0, 0.25, 0.5, 0.75], entrance: [0.5, 0.5, 1, 0.75], today: [0.5, 0.25, 1, 0.5] };
+
+// ---------- merged-geometry builder ----------
+class Geo {
+  constructor() { this.p = []; this.c = []; this.uv = []; }
+  quad(a, b, c, d, cl, uv = [0, 0, 0, 0]) {
+    const [u0, v0, u1, v1] = uv;
+    for (const [v, t] of [[a, [u0, v0]], [b, [u0, v1]], [c, [u1, v1]], [a, [u0, v0]], [c, [u1, v1]], [d, [u1, v0]]]) { this.p.push(...v); this.c.push(cl.r, cl.g, cl.b); this.uv.push(...t); }
+  }
+  box(x0, x1, y0, y1, z0, z1, cl) {
+    this.quad([x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [x1, y0, z1], cl); this.quad([x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z0], cl);
+    this.quad([x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0], cl); this.quad([x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1], cl);
+    this.quad([x0, y1, z1], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], cl); this.quad([x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0], cl);
+  }
+  mesh(mat) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, mat);
+  }
+}
+const flatMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide });
+const signMat = new THREE.MeshLambertMaterial({ map: atlasTex, side: THREE.DoubleSide });
+
+// ---------- layout (x along the line, z across, y up; rail top at 13 m like the bake) ----------
+const RAIL = 13, L = 180, HALF = L / 2;
+
+function surroundings(g, tracks) {
+  g.quad([-400, 0, -60], [-400, 0, 60], [400, 0, 60], [400, 0, -60], col(0x9a927f));
+  g.quad([-400, 0.02, -8], [-400, 0.02, 8], [400, 0.02, 8], [400, 0.02, -8], C.road);
+  // viaduct beyond the station: deck + piers every 30 m
+  const zs = tracks, dz = Math.max(...zs.map(Math.abs)) + 2.2;
+  for (const s of [-1, 1]) {
+    const x0 = s < 0 ? -400 : HALF + 2, x1 = s < 0 ? -HALF - 2 : 400;
+    g.box(x0, x1, RAIL - 2.2, RAIL - 0.6, -dz, dz, C.deck);
+    for (let x = s < 0 ? -HALF - 20 : HALF + 20; Math.abs(x) < 400; x += s * 30) g.box(x - 1, x + 1, 0, RAIL - 2.2, -1.5, 1.5, C.concrete);
+  }
+  for (const z of zs) { g.box(-400, 400, RAIL - 0.6, RAIL - 0.3, z - 1.4, z + 1.4, C.ballast); for (const r of [-0.75, 0.75]) g.box(-400, 400, RAIL - 0.3, RAIL - 0.15, z + r - 0.04, z + r + 0.04, C.rail); }
+  // a few city blocks either side
+  let seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (const s of [-1, 1]) for (let x = -380; x < 380; x += 14 + rnd() * 10) {
+    const h = 6 + rnd() * 22, z0 = s * (14 + rnd() * 6);
+    g.box(x, x + 10 + rnd() * 6, 0, h, Math.min(z0, z0 + s * 14), Math.max(z0, z0 + s * 14), [col(0xd8cdb6), col(0xc9b79a), col(0xe3ded2), col(0xb9b2a4)][Math.floor(rnd() * 4)]);
+  }
+}
+
+function arch(g, x0, x1, zHalf, yEdge, rise, segs, cl, under, skylight) {
+  const pt = i => { const z = -zHalf + (2 * zHalf * i) / segs, u = z / zHalf; return [z, yEdge + rise * (1 - u * u)]; };
+  for (let i = 0; i < segs; i++) {
+    const [za, ya] = pt(i), [zb, yb] = pt(i + 1);
+    const c = skylight && (i === Math.floor(segs / 2) - 1 || i === Math.floor(segs / 2)) ? C.skylight : cl;
+    g.quad([x0, ya, za], [x0, yb, zb], [x1, yb, zb], [x1, ya, za], c);
+    g.quad([x1, ya - 0.25, za], [x1, yb - 0.25, zb], [x0, yb - 0.25, zb], [x0, ya - 0.25, za], under);
+  }
+  // end gables (thin rims)
+  for (const x of [x0, x1]) for (let i = 0; i < segs; i++) { const [za, ya] = pt(i), [zb, yb] = pt(i + 1); g.quad([x, ya - 0.5, za], [x, ya, za], [x, yb, zb], [x, yb - 0.5, zb], C.green); }
+  // green edge along both eaves
+  for (const s of [-1, 1]) g.box(x0, x1, yEdge - 0.6, yEdge + 0.1, s * zHalf - 0.25, s * zHalf + 0.25, C.green);
+}
+
+function sidePlatforms(g, signs, tracks, pw, detail, psd = true) {
+  const roundels = [];
+  for (const [i, z] of tracks.entries()) {
+    const s = Math.sign(z) || (i % 2 ? 1 : -1);
+    const zi = z + s * 1.6, zo = zi + s * pw, top = RAIL + 1.1;
+    g.box(-HALF, HALF, RAIL - 1, top, Math.min(zi, zo), Math.max(zi, zo), C.platform);
+    g.box(-HALF, HALF, top, top + 0.01, Math.min(zi, zi + s * 0.5), Math.max(zi, zi + s * 0.5), C.edge);
+    if (psd && detail >= 2) for (let x = -HALF + 2; x < HALF - 2; x += 4.5) {
+      g.box(x, x + 3.6, top, top + 1.55, zi + s * 0.6 - 0.05, zi + s * 0.6 + 0.05, C.psd);
+      g.box(x + 3.6, x + 4.5, top, top + 1.7, zi + s * 0.6 - 0.12, zi + s * 0.6 + 0.12, C.dark);
+    }
+    if (detail >= 2) for (let x = -HALF + 20; x < HALF; x += 40) roundels.push([x, top + 3.2, zo - s * 0.3, s]);
+    if (detail >= 2) { // stairs + escalator boxes down to the concourse
+      for (const x of [-30, 25]) { g.box(x, x + 14, top - 0.2, top + 1.2, zo - s * 3.2 - 1.3, zo - s * 3.2 + 1.3, C.concrete); g.box(x, x + 14, top + 1.0, top + 1.15, zo - s * 3.2 - 1.4, zo - s * 3.2 + 1.4, C.dark); }
+      for (let x = -HALF + 10; x < HALF; x += 15) g.box(x, x + 1.6, top, top + 0.45, zo - s * 1.0 - 0.3, zo - s * 1.0 + 0.3, C.green); // benches
+    }
+  }
+  for (const [x, y, z, s] of roundels) signs.quad([x - 1.4, y - 0.7, z], [x - 1.4, y + 0.7, z], [x + 1.4, y + 0.7, z], [x + 1.4, y - 0.7, z], C.white, UV.roundel);
+}
+
+function terracottaWalls(g, zWall, y0, y1, detail, x0 = -HALF, x1 = HALF) {
+  for (const s of [-1, 1]) {
+    const z = s * zWall;
+    if (detail === 1) { g.box(x0, x1, y0, y1, z - 0.2, z + 0.2, C.terracotta); continue; }
+    for (let x = x0; x < x1; x += 9) {
+      g.box(x, x + 0.8, y0, y1 + 0.3, z - 0.35, z + 0.35, C.pilaster);
+      g.box(x + 0.8, x + 9, y0, y1, z - 0.2, z + 0.2, C.terracotta);
+      for (let y = y0 + 1.6; y < y1; y += 1.6) g.box(x + 0.8, x + 9, y, y + 0.12, z - 0.24, z + 0.24, C.cream);
+      g.box(x + 2.2, x + 7.6, y1 - 1.6, y1 - 0.5, z - 0.26, z + 0.26, C.terraDark); // louvre band
+    }
+  }
+}
+
+function concourse(g, signs, zHalf, detail, V, x0 = -40, x1 = 40) {
+  // the box straddling the road on piers, street → concourse → platform
+  const y0 = 6.2, y1 = RAIL - 1;
+  for (const x of [x0 + 4, 0, x1 - 4]) for (const s of [-1, 1]) g.box(x - 1.2, x + 1.2, 0, y0, s * 7 - 1.2, s * 7 + 1.2, C.concrete);
+  g.box(x0, x1, y0, y1, -zHalf, zHalf, detail >= 2 ? C.terracotta : C.terracotta);
+  if (detail >= 2) {
+    for (const s of [-1, 1]) for (let x = x0 + 2; x < x1 - 2; x += 6) g.box(x, x + 4, y0 + 1.5, y1 - 1.2, s * zHalf - 0.05, s * zHalf + 0.05, C.glass);
+    g.box(x0 - 0.3, x1 + 0.3, y0 - 0.3, y0 + 0.4, -zHalf - 0.3, zHalf + 0.3, C.cream);
+    // fascia over the road opening on both ends
+    for (const x of [x0 - 0.35, x1 + 0.35]) signs.quad([x, y0 + 1.2, -zHalf * 0.7], [x, y0 + 4.4, -zHalf * 0.7], [x, y0 + 4.4, zHalf * 0.7], [x, y0 + 1.2, zHalf * 0.7], C.white, UV.fascia);
+    // street entrances with green canopies
+    for (const s of [-1, 1]) {
+      const z = s * (zHalf + 6);
+      g.box(x0 + 6, x0 + 12, 0, y0, z - 1.6, z + 1.6, C.concrete);
+      g.box(x0 + 4, x0 + 14, 3.2, 3.5, z - 2.4, z + 2.4, C.green);
+      signs.quad([x0 + 3.9, 2.2, z - 2.0], [x0 + 3.9, 3.2, z - 2.0], [x0 + 3.9, 3.2, z + 2.0], [x0 + 3.9, 2.2, z + 2.0], C.white, UV.entrance);
+    }
+  }
+}
+
+// ---------- station types ----------
+function today(g, signs, V) {
+  const tracks = [-2, 2];
+  surroundings(g, tracks);
+  sidePlatforms(g, signs, tracks, 4.4, 1, false);
+  for (const s of [-1, 1]) { const zo = s * (2 + 1.6 + 4.4 + 0.1); g.box(-HALF, HALF, RAIL + 1.1, RAIL + 3.7, zo - 0.1, zo + 0.1, C.todayWall); for (let x = -HALF; x <= HALF; x += 15) g.box(x - 0.09, x + 0.09, RAIL + 1.1, RAIL + 7.4, zo - s * 0.35 - 0.09, zo - s * 0.35 + 0.09, C.todayWall); }
+  g.box(-HALF - 5, HALF + 5, RAIL + 7.4, RAIL + 7.85, -8.2, 8.2, C.todayRoof);
+  g.box(-65, 65, RAIL - 1.7 - 5.2, RAIL - 1.7, -8.6, 8.6, C.todayConc);
+  for (const s of [-1, 1]) for (let x = -60; x <= 60; x += 40) signs.quad([x - 2, RAIL + 4.2, s * 7.8], [x - 2, RAIL + 5.2, s * 7.8], [x + 2, RAIL + 5.2, s * 7.8], [x + 2, RAIL + 4.2, s * 7.8], C.white, UV.today);
+}
+
+function typeA(g, signs, V, detail) {
+  const tracks = [-2.5, 2.5], pw = 6, zWall = 2.5 + 1.6 + pw + 0.4;
+  surroundings(g, tracks);
+  sidePlatforms(g, signs, tracks, pw, detail);
+  terracottaWalls(g, zWall, RAIL + 1.1, RAIL + 6.0, detail);
+  arch(g, -HALF - 4, HALF + 4, zWall + 1.2, RAIL + 6.0, 3.2, detail >= 2 ? 12 : 6, C.roof, C.roofUnder, detail >= 2);
+  if (detail >= 2) for (let x = -HALF; x <= HALF; x += 9) { // curved trusses under the roof
+    for (let i = 0; i < 12; i++) { const za = -(zWall + 1.2) + (2 * (zWall + 1.2) * i) / 12, zb = za + (2 * (zWall + 1.2)) / 12, f = z => RAIL + 6.0 + 3.2 * (1 - (z / (zWall + 1.2)) ** 2) - 0.6; g.quad([x, f(za) - 0.5, za], [x, f(za), za], [x, f(zb), zb], [x, f(zb) - 0.5, zb], C.pilaster); }
+  }
+  concourse(g, signs, zWall + 0.5, detail, V);
+  return zWall;
+}
+
+function typeB(g, signs, V) {
+  const zWall = typeA(g, signs, V, 2), zH = zWall + 1.2, y0 = RAIL + 6.0;
+  // Uttara Center: a big arch at each roof end of alternating green and red curved panels
+  for (const x of [-HALF - 4, HALF + 4]) {
+    const segs = 14, R = zH + 1.5;
+    for (let i = 0; i < segs; i++) {
+      const a0 = Math.PI * i / segs, a1 = Math.PI * (i + 1) / segs, c = i % 2 ? C.red : C.green;
+      const p = (a, r) => [x, y0 - 2 + Math.sin(a) * r * 0.75, -Math.cos(a) * r];
+      g.quad(p(a0, R - 2.2), p(a0, R), p(a1, R), p(a1, R - 2.2), c);
+    }
+  }
+}
+
+function typeC(g, signs, V) {
+  // Uttara North as OSM suggests: 4 tracks (−15.7, +1.2, +8.6, +20 m), widest building, branching columns, open sides.
+  const tracks = [-15.7, 1.2, 8.6, 20.0].map(z => z - 2.5);
+  surroundings(g, tracks);
+  const top = RAIL + 1.1;
+  // island between the middle pair, side platforms on the outer tracks (layout to be confirmed by a rider)
+  g.box(-HALF, HALF, RAIL - 1, top, tracks[1] + 1.6, tracks[2] - 1.6, C.platform);
+  g.box(-HALF, HALF, RAIL - 1, top, tracks[0] - 1.6 - 6, tracks[0] - 1.6, C.platform);
+  g.box(-HALF, HALF, RAIL - 1, top, tracks[3] + 1.6, tracks[3] + 1.6 + 6, C.platform);
+  g.box(-HALF, HALF, RAIL - 1, top, tracks[0] + 1.6, tracks[1] - 1.6, C.deck);
+  const zA = tracks[0] - 8, zB = tracks[3] + 8, zc = (zA + zB) / 2, zh = (zB - zA) / 2;
+  for (const z of [zA + 0.3, zB - 0.3]) g.box(-HALF, HALF, top, top + 1.1, z - 0.2, z + 0.2, C.terracotta); // low parapet, open above
+  for (let x = -HALF + 6; x < HALF; x += 18) for (const z of [tracks[0] - 4, (tracks[1] + tracks[2]) / 2, tracks[3] + 4]) { // tree-like branching columns
+    g.box(x - 0.3, x + 0.3, top, top + 4.5, z - 0.3, z + 0.3, C.pilaster);
+    for (const [dx, dz] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]]) g.quad([x, top + 4.5, z - 0.15], [x + dx, top + 7.4, z + dz - 0.15], [x + dx, top + 7.4, z + dz + 0.15], [x, top + 4.5, z + 0.15], C.pilaster);
+  }
+  const off = new Geo(); arch(off, -HALF - 4, HALF + 4, zh + 1, RAIL + 8.5, 3.5, 16, C.roof, C.roofUnder, true);
+  for (let i = 0; i < off.p.length; i += 3) off.p[i + 2] += zc; g.p.push(...off.p); g.c.push(...off.c); g.uv.push(...off.uv);
+  for (let x = -HALF + 20; x < HALF; x += 40) for (const z of [zA + 0.5, zB - 0.5]) signs.quad([x - 1.4, top + 2.4, z], [x - 1.4, top + 3.8, z], [x + 1.4, top + 3.8, z], [x + 1.4, top + 2.4, z], C.white, UV.roundel);
+  const gc = new Geo(), sc = new Geo(); concourse(gc, sc, zh, 2, V);
+  for (const [src, dst] of [[gc, g], [sc, signs]]) { for (let i = 0; i < src.p.length; i += 3) src.p[i + 2] += zc; dst.p.push(...src.p); dst.c.push(...src.c); dst.uv.push(...src.uv); }
+}
+
+function typeD(g, signs, V) {
+  // Farmgate: longer-looking box, full-height cream grid façade over terracotta, low teal roof, skywalks with green roofs.
+  const tracks = [-3.1, 3.1], pw = 6.5, zWall = 3.1 + 1.6 + pw + 0.4;
+  surroundings(g, tracks);
+  sidePlatforms(g, signs, tracks, pw, 2);
+  const y0 = 6.2, y1 = RAIL + 7.0;
+  for (const s of [-1, 1]) {
+    const z = s * zWall;
+    g.box(-HALF, HALF, y0, y1, z - 0.2, z + 0.2, C.terracotta);
+    for (let x = -HALF; x <= HALF; x += 3) g.box(x, x + 0.35, y0, y1, z - 0.5, z + 0.5, C.cream);
+    for (let y = y0; y <= y1; y += 2.4) g.box(-HALF, HALF, y, y + 0.3, z - 0.5, z + 0.5, C.cream);
+  }
+  g.box(-HALF - 2, HALF + 2, y1, y1 + 0.5, -zWall - 1.2, zWall + 1.2, C.teal); // low teal roof
+  arch(g, -HALF - 2, HALF + 2, zWall + 0.6, y1 + 0.5, 1.4, 8, C.teal, C.roofUnder, true);
+  for (const x of [-HALF, HALF]) { g.quad([x, y0, -zWall], [x, y1, -zWall], [x, y1, zWall], [x, y0, zWall], C.terracotta); for (let z = -zWall; z <= zWall; z += 3) g.box(x - 0.4, x + 0.4, y0, y1, z, z + 0.35, C.cream); }
+  for (const x of [-HALF + 0.5, HALF - 0.5]) for (const s of [1]) void s; // ends stay closed in this guess
+  for (const x of [-HALF - 0.6, HALF + 0.6]) signs.quad([x, y0 + 0.6, -zWall * 0.6], [x, y0 + 3.4, -zWall * 0.6], [x, y0 + 3.4, zWall * 0.6], [x, y0 + 0.6, zWall * 0.6], C.white, UV.fascia);
+  for (const x of [-60, 0, 60]) for (const s of [-1, 1]) g.box(x - 1.3, x + 1.3, 0, y0, s * 7 - 1.3, s * 7 + 1.3, C.concrete);
+  // skywalks out to both pavements and along the road: green roof on terracotta trusses
+  for (const [xa, xb, za, zb] of [[-20, -16, zWall, zWall + 40], [16, 20, -zWall - 40, -zWall], [HALF, HALF + 60, -2, 2]]) {
+    g.box(xa, xb, y0 + 0.5, y0 + 0.9, za, zb, C.concrete);
+    for (const s of [0, 1]) { const x = s ? xb : xa; for (let z = za; z < zb; z += 2.5) g.box(x - 0.1, x + 0.1, y0 + 0.9, y0 + 3.3, z, z + 0.2, C.terracotta); }
+    g.box(xa - 0.4, xb + 0.4, y0 + 3.3, y0 + 3.6, za, zb, C.green);
+    const lx = xb - xa > 8; for (let k = 0.2; k < 1; k += 0.4) { const x = lx ? xa + (xb - xa) * k : (xa + xb) / 2, z = lx ? 0 : za + (zb - za) * k; g.box(x - 0.8, x + 0.8, 0, y0 + 0.5, z - 0.8, z + 0.8, C.concrete); }
+  }
+}
+
+// ---------- a train at the platform ----------
+function train(g, z, x0) {
+  for (let k = 0; k < 6; k++) {
+    const a = x0 + k * 22.5, b = a + 22;
+    g.box(a, b, RAIL + 0.9, RAIL + 4.1, z - 1.5, z + 1.5, C.white);
+    g.box(a, b, RAIL + 1.3, RAIL + 1.6, z - 1.52, z + 1.52, C.red);
+    g.box(a, b, RAIL + 1.6, RAIL + 1.85, z - 1.52, z + 1.52, C.green);
+    g.box(a + 1, b - 1, RAIL + 2.3, RAIL + 3.3, z - 1.53, z + 1.53, C.glass);
+  }
+}
+
+let world = null;
+function build() {
+  if (world) { scene.remove(world); world.traverse(o => o.geometry?.dispose()); }
+  const V = VARIANTS[key];
+  drawAtlas(V);
+  world = new THREE.Group();
+  const g = new Geo(), signs = new Geo();
+  if (V.type === 'today') today(g, signs, V);
+  else if (V.type === 'A') typeA(g, signs, V, V.detail);
+  else if (V.type === 'B') typeB(g, signs, V);
+  else if (V.type === 'C') typeC(g, signs, V);
+  else typeD(g, signs, V);
+  const station = g.p.length / 9;
+  train(g, V.type === 'C' ? 6.1 : V.type === 'D' ? 3.1 : V.type === 'today' ? 2 : 2.5, -66);
+  world.add(g.mesh(flatMat));
+  world.add(signs.mesh(signMat));
+  scene.add(world);
+  world.userData.tris = station;
+}
+
+// ---------- UI ----------
+const label = document.getElementById('label');
+function setVariant(k) {
+  key = k; const u = new URL(location.href); u.searchParams.set('variant', k); history.replaceState(null, '', u);
+  label.textContent = `${k} (${VARIANTS[k].name})`; build();
+}
+const stepV = d => setVariant(KEYS[(KEYS.indexOf(key) + d + KEYS.length) % KEYS.length]);
+document.getElementById('prev').onclick = () => stepV(-1);
+document.getElementById('next').onclick = () => stepV(1);
+addEventListener('keydown', e => { if (e.key === 'ArrowLeft') stepV(-1); if (e.key === 'ArrowRight') stepV(1); if (e.key === ' ') paused = !paused; });
+const VIEWS = { arrive: 'Cab, arriving', platform: 'On the platform', street: 'From the street', aerial: 'From above' };
+const vbar = document.getElementById('view');
+for (const [k, t] of Object.entries(VIEWS)) { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { view = k; t0 = time; [...vbar.children].forEach(c => c.classList.toggle('on', c === b)); }; if (k === view) b.classList.add('on'); vbar.append(b); }
+let paused = false, time = 0, t0 = 0;
+
+const stats = document.getElementById('stats');
+let last = performance.now();
+setVariant(key);
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (!paused) time += dt;
+  const t = time - t0, V = VARIANTS[key], tz = V.type === 'C' ? -18.2 : V.type === 'D' ? -3.1 : V.type === 'today' ? -2 : -2.5;
+  if (view === 'arrive') { const x = -260 + Math.min(1, t / 14) * 200 - Math.max(0, Math.min(1, t / 14) - 1); const xx = -260 + 240 * (1 - Math.pow(1 - Math.min(1, t / 16), 2)); camera.position.set(xx, RAIL + 2.6, tz); camera.lookAt(xx + 40, RAIL + 2.2, tz); void x; if (t > 22) t0 = time; }
+  else if (view === 'platform') { const s = V.type === 'C' ? 1 : 1, z = V.type === 'C' ? 4.9 - 2.5 : (V.type === 'D' ? 3.1 : V.type === 'today' ? 2 : 2.5) + 1.6 + 3; camera.position.set(-50 + Math.sin(t * 0.15) * 30, RAIL + 2.8, s * z); camera.lookAt(camera.position.x + 30, RAIL + 4, -s * 2); }
+  else if (view === 'street') { camera.position.set(-70 + Math.sin(t * 0.1) * 10, 1.7, 5); camera.lookAt(-35, 9, 0); }
+  else { camera.position.set(-105, 42, 75); camera.lookAt(-10, 12, 0); }
+  renderer.render(scene, camera);
+  const i = renderer.info;
+  stats.innerHTML = `variant <b>${key}</b> · ${V.name}<br>station model ≈ ${Math.round(world.userData.tris).toLocaleString()} triangles<br>scene: ${i.render.triangles.toLocaleString()} tris, ${i.render.calls} draw calls<br><small>space: pause · ← →: variant</small>`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

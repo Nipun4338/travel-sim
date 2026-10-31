@@ -29,6 +29,7 @@ A build-ready polish spec that makes the places already in the game faithful to 
 - [Rank the fidelity gaps and pick what each place fixes](tickets/006-rank-fidelity-gaps.md): real heights as a shared first-release base; Line 6 leads with station models, Dhaka with the skyline, Bandarban with route correctness; the last item per place waits on the budget.
 - [Spot-check the Open Buildings heights against known towers](tickets/008-spot-check-building-heights.md): good enough. Against 12,462 OSM-tagged buildings, p75 is off by 1.6 floors on average (the flat default by 2.6). Use it unscaled; buildings with no pixel become 1 floor; mid-rise reads ~1.7 floors low.
 - [Choose how street life is made and how dense it is](tickets/009-choose-street-life-approach.md): procedural low-poly with painted Bangla signs from one atlas; dense on commercial stretches, medium elsewhere and on Line 6, stalls and signs only in Bandarban.
+- [Shape the four Line 6 station models](tickets/010-shape-line6-station-models.md): detailed type A for 12 stations, arch ends at Uttara Center and Bijoy Sarani, Uttara North as two side platforms plus depot track (unconfirmed), and a Farmgate rebuild that replaces the hero.
 
 ## Not yet specified
 
