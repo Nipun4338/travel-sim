@@ -311,7 +311,7 @@ async function main() {
     }
     const ci = Math.floor((cx + H) / ZONE_CHUNK), cj = Math.floor((cz + H) / ZONE_CHUNK);
     const key = `${ci}_${cj}`, lx = cx - (-H + ci * ZONE_CHUNK), lz = cz - (-H + cj * ZONE_CHUNK);
-    const c = pickWall(w.id);
+    const c = pickWall(w.id, height);
     const rgb = (Math.round(c.r * 31) << 11) | (Math.round(c.g * 63) << 5) | Math.round(c.b * 31);
     const rot = ((rect.angle % Math.PI) + Math.PI) % Math.PI;
     const q = (v: number) => Math.max(0, Math.min(65535, Math.round(v)));

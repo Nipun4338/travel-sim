@@ -13,6 +13,7 @@ const C = {
   ground: color(0xa39b8a), green: color(0x6f8f4a), leafy: color(0x7d9455), paved: color(0x8f8c86), sand: color(0xb3a17f),
   road: color(0x3f3f42), roadMajor: color(0x37373a), rail: color(0x5a4a3f), ballast: color(0x7d7468), sleeper: color(0x8a847a),
   steel: color(0x8d9196), girder: color(0x4a5a6a), white: color(0xe8e8e2), yellow: color(0xe0b52a),
+  wornWhite: color(0xcfcac0), wornYellow: color(0xc9a33a), patch: [0x2c2c2e, 0x4a4947, 0x56534e].map(color), railing: color(0x7a8b62),
   kerb: color(0xb9b2a5), kerbSide: color(0x8d877c),
   deck: color(0xb8b4ab), deckSide: color(0x8f8b83), pillar: color(0x9a968e), water: color(0x3f7fa8),
   roofTank: color(0x1f1f1f), trunk: color(0x5b4632),
@@ -23,15 +24,22 @@ const WALLS: [number, number][] = [
   [0xe9e4d8, 20], [0xe8d9b0, 15], [0xa9a6a0, 15], [0x8c8478, 12], [0xb5654a, 10], [0xe9d27a, 8], [0xe0a990, 8],
   [0x9cc3d5, 6], [0xa9cfb5, 6],
 ];
+// Newer towers (30 m and up): white tile, blue or green glass, pale grey cladding.
+const TOWERS: [number, number][] = [[0xeeeeea, 35], [0x5e7f91, 25], [0x6f8f8a, 15], [0xc8c8c4, 25]];
+const DUST = color(0xb8ab94);
 const SIGNS = [0xd62828, 0x2a9d4b, 0x1f5fbf, 0xf2c200, 0xf07f13, 0xc2187a, 0xf4f1e8, 0x16a3a3].map(color);
 const AWNINGS = [0x2e6e9e, 0x2a8a4b, 0xb0302f, 0xd9a21b, 0x6a4c9c].map(color);
 const ALL = [0, 1, 2];
 
-export function pickWall(id: number): THREE.Color {
-  const total = WALLS.reduce((s, [, w]) => s + w, 0);
-  let r = hash01(id + 7) * total;
-  for (const [hex, w] of WALLS) { if ((r -= w) < 0) return color(hex); }
-  return color(WALLS[0][0]);
+/** A facade colour: dusty and weathered for ordinary buildings, tile or glass for towers ≥ 30 m. */
+export function pickWall(id: number, height = 0): THREE.Color {
+  const list = height >= 30 ? TOWERS : WALLS;
+  const total = list.reduce((s, [, w]) => s + w, 0);
+  let r = hash01(id + 7) * total, hex = list[0][0];
+  for (const [hx, w] of list) { if ((r -= w) < 0) { hex = hx; break; } }
+  if (height >= 30) return color(hex);
+  // Dhaka dust: every facade drifts towards it, some more than others, and ages a little darker.
+  return color(hex).lerp(DUST, 0.12 + hash01(id + 11) * 0.18).multiplyScalar(0.92 + hash01(id + 13) * 0.1);
 }
 
 // ---------- shared indices ----------
@@ -307,20 +315,50 @@ export function buildRoads(
     const lanes = Math.max(1, parseInt(t.lanes ?? '', 10) || Math.round(width / 3.2));
     const oneway = isOneway(t) !== 0;
     for (const run of runs) {
+      // City markings are worn: dimmer paint, and about one dash in six gone.
+      const white = footpaths ? C.wornWhite : C.white, yellow = footpaths ? C.wornYellow : C.yellow;
       const mark = (off: number, c: THREE.Color, dashed: boolean, wdt = 0.15) => {
         const line = offsetLine(run, off);
-        for (const seg of dashed ? dashes(line, 3, 6) : [line]) geo.ribbon(at(seg, y + 0.02), wdt, c, 'marking', [0]);
+        const segs = dashed ? dashes(line, 3, 6).filter((_, k) => !footpaths || hash01(w.id * 7 + k * 13 + Math.round(off * 10)) > 0.17) : [line];
+        for (const seg of segs) geo.ribbon(at(seg, y + 0.02), wdt, c, 'marking', [0]);
       };
       // lane dividers
       for (let i = 1; markings && i < lanes; i++) {
         const off = -width / 2 + (i * width) / lanes;
-        if (!oneway && i === lanes / 2) mark(off, C.yellow, false, 0.3); // centre line on two-way roads
-        else mark(off, C.white, true);
+        if (!oneway && i === lanes / 2) mark(off, yellow, false, 0.3); // centre line on two-way roads
+        else mark(off, white, true);
       }
-      if (markings && rank >= 4) { mark(-width / 2 + 0.3, C.white, false); mark(width / 2 - 0.3, C.white, false); }
+      if (markings && rank >= 4) { mark(-width / 2 + 0.3, white, false); mark(width / 2 - 0.3, white, false); }
+      // Patched city asphalt: fresh dark patches and worn pale ones, about one every 15 m.
+      if (footpaths) {
+        const along = run.reduce((s, p, k) => (k ? s + Math.hypot(p[0] - run[k - 1][0], p[1] - run[k - 1][1]) : 0), 0);
+        for (let k = 0; k < along / 15; k++) {
+          const r = (j: number) => hash01(w.id * 3 + k * 29 + j * 7);
+          const i0 = Math.floor(r(1) * (run.length - 1)), [ax, az] = run[i0], [bx, bz] = run[i0 + 1];
+          const len = Math.hypot(bx - ax, bz - az) || 1, tx = (bx - ax) / len, tz = (bz - az) / len;
+          const cx = ax + (bx - ax) * r(2) - tz * (r(3) - 0.5) * (width - 2), cz = az + (bz - az) * r(2) + tx * (r(3) - 0.5) * (width - 2);
+          const pl = 1.5 + r(4) * 3, pw = 1 + r(5) * 1.5, yy = h(cx, cz) + y + 0.01;
+          const q = (u: number, v: number): V3 => [cx + tx * u - tz * v, yy, cz + tz * u + tx * v];
+          geo.quad(q(-pl, -pw), q(-pl, pw), q(pl, pw), q(pl, -pw), C.patch[Math.floor(r(6) * C.patch.length)], 'marking', [0]);
+        }
+      }
       // Raised footpaths both sides; on dual carriageways the inner one reads as the median kerb.
       const fw = rank >= 4 ? 2.5 : 1.8;
       if (footpaths) for (const side of [-1, 1]) geo.ribbon(at(offsetLine(run, side * (width / 2 + fw / 2)), 0.3), fw, C.kerb, 'kerb', [0, 1], 0.18, C.kerbSide);
+      // A steel railing along the median of a dual carriageway (a one-way way's right side: traffic keeps left).
+      if (footpaths && oneway && rank >= 3) {
+        const rail = offsetLine(run, isOneway(t) * (width / 2 + fw / 2));
+        let acc = 0;
+        for (let k = 1; k < rail.length; k++) {
+          const [ax, az] = rail[k - 1], [bx, bz] = rail[k], ya = h(ax, az) + 0.48, yb = h(bx, bz) + 0.48;
+          for (const top of [0.55, 0.95]) {
+            const a0: V3 = [ax, ya + top - 0.05, az], a1: V3 = [ax, ya + top, az], b1: V3 = [bx, yb + top, bz], b0: V3 = [bx, yb + top - 0.05, bz];
+            geo.quad(a0, a1, b1, b0, C.railing, 'prop', [0]); geo.quad(b0, b1, a1, a0, C.railing, 'prop', [0]); // seen from both carriageways
+          }
+          acc += Math.hypot(bx - ax, bz - az);
+          if (acc >= 3) { acc = 0; geo.box(bx, bz, 0.03, 0.03, yb, yb + 0.95, C.railing, 'prop', [0]); }
+        }
+      }
     }
   }
 
@@ -394,7 +432,7 @@ export function buildBuildings(
     const lods = height >= 30 ? ALL : height >= 15 || area > 600 ? [0, 1] : [0];
     const base = Math.min(...ring.map(p => h(p.x, p.y)));
     const top = base + height;
-    const wall = pickWall(w.id);
+    const wall = pickWall(w.id, height);
     const roof = wall.clone().lerp(color(0x9a958c), 0.45); // flat concrete roofs, tinted by the facade
     const parapet = wall.clone().multiplyScalar(0.9);
 
