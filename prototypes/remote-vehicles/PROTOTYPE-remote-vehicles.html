@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROTOTYPE · Remote vehicles</title>
+<!--
+  THROWAWAY PROTOTYPE for multiplayer ticket 004 "Prototype how other players' vehicles move".
+  Run: double-click this file (no server, no internet needed).
+-->
+<style>
+  html,body{margin:0;background:#1d2126;color:#eee;font:14px/1.4 system-ui,sans-serif}
+  #banner{background:#b00020;color:#fff;text-align:center;padding:4px;font-weight:600}
+  #intro{max-width:980px;margin:10px auto;padding:0 12px;color:#cfd6dd}
+  #wrap{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:0 10px}
+  canvas{background:#6f7a5c;border-radius:8px;max-width:100%}
+  #panel{width:300px;background:#2a2f36;border-radius:8px;padding:10px 12px}
+  label{display:block;margin:8px 0 2px;font-weight:600}
+  input[type=range]{width:100%}
+  .val{float:right;font-weight:400;color:#ffd84d}
+  .strat button{display:block;width:100%;text-align:left;margin:3px 0;padding:6px 8px;border:1px solid #555;border-radius:5px;background:#353b43;color:#eee;cursor:pointer}
+  .strat button.on{background:#ffd84d;color:#111;border-color:#ffd84d}
+  #stats{margin-top:10px;background:#1d2126;border-radius:6px;padding:8px;font-variant-numeric:tabular-nums}
+  #stats b{color:#ffd84d}
+  .key span{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  .presets button{margin:2px 2px 0 0;padding:4px 7px;border:1px solid #555;border-radius:5px;background:#353b43;color:#eee;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="banner">PROTOTYPE: how other players' vehicles move (throwaway)</div>
+<div id="intro">
+  <b>The question:</b> your friend's bus sends its position a few times a second over a mobile connection, with delay, uneven timing and lost messages.
+  How should your game move their bus between messages so it looks natural, and how often must it send?
+  Pick a <b>network</b> (or a preset), then flip between the <b>smoothing</b> methods and watch the close-up on the right:
+  the <span style="color:#ffd84d">yellow bus</span> is what you would see; the white outline is where your friend really is.
+  It drives a loop with a stop, a hard brake and tight corners.
+</div>
+<div id="wrap">
+  <canvas id="map" width="460" height="460"></canvas>
+  <canvas id="close" width="460" height="460"></canvas>
+  <div id="panel">
+    <div class="presets">Network presets:<br>
+      <button data-p="wifi">Home Wi-Fi</button><button data-p="4g">Good 4G</button><button data-p="3g">Patchy 3G</button><button data-p="bad">Bad signal</button>
+    </div>
+    <label>Updates per second <span class="val" id="rateV"></span></label><input id="rate" type="range" min="2" max="20" step="1" value="10">
+    <label>Delay <span class="val" id="latV"></span></label><input id="lat" type="range" min="20" max="600" step="10" value="120">
+    <label>Jitter (uneven timing) <span class="val" id="jitV"></span></label><input id="jit" type="range" min="0" max="300" step="10" value="40">
+    <label>Lost messages <span class="val" id="lossV"></span></label><input id="loss" type="range" min="0" max="40" step="1" value="3">
+    <label>Smoothing</label>
+    <div class="strat" id="strat"></div>
+    <label>Buffer for interpolation <span class="val" id="bufV"></span></label><input id="buf" type="range" min="0.5" max="4" step="0.25" value="2">
+    <div id="stats"></div>
+    <p class="key"><span style="background:#ffd84d"></span>what you see &nbsp; <span style="border:2px solid #fff;box-sizing:border-box"></span>where it really is</p>
+  </div>
+</div>
+
+<!-- ===== The portable logic: lift this into the game. No DOM in here. ===== -->
+<script>
+/**
+ * Rebuilds another player's vehicle from the updates it sends.
+ * push(sample) as messages arrive; poseAt(now) every frame.
+ * sample: { t: sender clock (s), x, z, yaw (rad), v: speed (m/s) }
+ */
+class RemoteVehicle {
+  constructor(opts) { this.o = { method: 'hybrid', bufferUpdates: 2, rate: 10, maxExtrapolate: 0.5, snapDistance: 30, ...opts }; this.buf = []; this.offset = null; this.shown = null; }
+  push(s, arrivedAt) {
+    // Estimate the clock offset from the smallest observed delay, so jitter doesn't drag the timeline.
+    const off = arrivedAt - s.t;
+    this.offset = this.offset === null ? off : Math.min(off, this.offset + 0.002);
+    if (this.buf.length && s.t <= this.buf[this.buf.length - 1].t) return; // late duplicate or reordered
+    this.buf.push(s);
+    if (this.buf.length > 60) this.buf.shift();
+  }
+  poseAt(now) {
+    const b = this.buf, o = this.o;
+    if (!b.length) return null;
+    const last = b[b.length - 1];
+    let pose;
+    if (o.method === 'snap') pose = { ...last };
+    else if (o.method === 'extrapolate') pose = advance(last, Math.min(o.maxExtrapolate * 2, now - this.offset - last.t));
+    else {
+      // Interpolate at a render time a little behind the newest update.
+      const delay = o.bufferUpdates / o.rate, rt = now - this.offset - delay;
+      let i = b.length - 1;
+      while (i > 0 && b[i - 1].t > rt) i--;
+      if (i > 0 && b[i].t >= rt) {
+        const a = b[i - 1], c = b[i], k = (rt - a.t) / (c.t - a.t || 1);
+        pose = { x: a.x + (c.x - a.x) * k, z: a.z + (c.z - a.z) * k, yaw: lerpAngle(a.yaw, c.yaw, k), v: a.v + (c.v - a.v) * k };
+      } else if (rt > last.t && o.method === 'hybrid') pose = advance(last, Math.min(o.maxExtrapolate, rt - last.t)); // ran out: guess ahead briefly
+      else pose = { ...(rt > last.t ? last : b[0]) };
+    }
+    // Ease small corrections; snap only after a long gap.
+    if (this.shown && o.method !== 'snap') {
+      const d = Math.hypot(pose.x - this.shown.x, pose.z - this.shown.z);
+      if (d < o.snapDistance) { const k = o.method === 'extrapolate' ? 0.25 : 1; pose = { ...pose, x: this.shown.x + (pose.x - this.shown.x) * k, z: this.shown.z + (pose.z - this.shown.z) * k, yaw: lerpAngle(this.shown.yaw, pose.yaw, k) }; }
+    }
+    this.shown = pose;
+    return pose;
+  }
+}
+const advance = (s, dt) => ({ x: s.x + Math.sin(s.yaw) * s.v * dt, z: s.z - Math.cos(s.yaw) * s.v * dt, yaw: s.yaw, v: s.v });
+const lerpAngle = (a, b, k) => { let d = ((b - a + Math.PI) % (2 * Math.PI)) - Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return a + d * k; };
+</script>
+
+<!-- ===== Throwaway page: a driven bus, a fake network, two views ===== -->
+<script>
+const METHODS = {
+  snap: 'Jump to each update (no smoothing)',
+  extrapolate: 'Guess ahead from speed (dead reckoning)',
+  interpolate: 'Play slightly behind and blend between updates',
+  hybrid: 'Blend between updates, guess ahead briefly if they stop',
+};
+const PRESETS = { wifi: [10, 40, 10, 0], '4g': [10, 120, 40, 3], '3g': [10, 280, 120, 10], bad: [10, 450, 250, 25] };
+let method = 'hybrid';
+const $ = id => document.getElementById(id);
+const strat = $('strat');
+for (const [k, label] of Object.entries(METHODS)) { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { method = k; reset(); }; b.dataset.k = k; strat.append(b); }
+document.querySelectorAll('.presets button').forEach(b => b.onclick = () => { const [r, l, j, s] = PRESETS[b.dataset.p]; $('rate').value = r; $('lat').value = l; $('jit').value = j; $('loss').value = s; reset(); });
+['rate', 'lat', 'jit', 'loss', 'buf'].forEach(id => $(id).oninput = () => reset());
+
+// The route: a closed loop with a straight, a stop, two tight corners and a long bend (metres).
+const ROUTE = [];
+for (let i = 0; i < 400; i++) {
+  const a = (i / 400) * Math.PI * 2;
+  const r = 140 + 45 * Math.sin(3 * a) + 20 * Math.cos(5 * a);
+  ROUTE.push([Math.cos(a) * r, Math.sin(a) * r * 0.8]);
+}
+const cum = [0]; for (let i = 1; i <= ROUTE.length; i++) { const a = ROUTE[i - 1], b = ROUTE[i % ROUTE.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+const LOOP = cum[cum.length - 1];
+const at = s => { s = ((s % LOOP) + LOOP) % LOOP; let i = 1; while (cum[i] < s) i++; const a = ROUTE[i - 1], b = ROUTE[i % ROUTE.length], k = (s - cum[i - 1]) / (cum[i] - cum[i - 1]); return { x: a[0] + (b[0] - a[0]) * k, z: a[1] + (b[1] - a[1]) * k, yaw: Math.atan2(b[0] - a[0], -(b[1] - a[1])) }; };
+
+// The friend's bus: cruises, slows for corners, stops for 4 s once a lap, brakes hard once a lap.
+let truth, net, remote, simT, stats, rnd;
+function reset() {
+  for (const b of strat.children) b.classList.toggle('on', b.dataset.k === method);
+  $('rateV').textContent = $('rate').value + '/s'; $('latV').textContent = $('lat').value + ' ms'; $('jitV').textContent = '±' + $('jit').value + ' ms';
+  $('lossV').textContent = $('loss').value + '%'; $('bufV').textContent = $('buf').value + ' updates (' + Math.round(+$('buf').value / +$('rate').value * 1000) + ' ms)';
+  let seed = 7; rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  truth = { s: 0, v: 0, stopT: 0 }; net = { next: 0, inFlight: [] }; simT = 0;
+  remote = new RemoteVehicle({ method, rate: +$('rate').value, bufferUpdates: +$('buf').value });
+  stats = { err: 0, n: 0, max: 0, jumps: 0, prev: null, prevTrue: null, time: 0 };
+}
+function stepTruth(dt) {
+  const lap = truth.s % LOOP, ahead = at(truth.s + 25), here = at(truth.s);
+  const turn = Math.abs(lerpAngle(here.yaw, ahead.yaw, 1) - here.yaw);
+  let target = turn > 0.5 ? 6 : turn > 0.25 ? 9 : 14;
+  if (lap > 300 && lap < 330) target = Math.max(2, (330 - lap) * 0.5);           // braking for the stop
+  if (lap >= 330 && truth.stopT < 4) { target = 0; truth.stopT += dt; } else if (lap < 300) truth.stopT = 0;
+  if (lap > 600 && lap < 612) target = 0;                                          // a hard brake
+  const acc = target > truth.v ? 1.2 : (lap > 600 && lap < 612 ? -7 : -3);
+  truth.v = Math.max(0, Math.min(target > truth.v ? target : truth.v, truth.v + acc * dt));
+  if (target < truth.v) truth.v = Math.max(target, truth.v + acc * dt);
+  truth.s += truth.v * dt;
+}
+function stepNet(dt) {
+  const rate = +$('rate').value, lat = +$('lat').value / 1000, jit = +$('jit').value / 1000, loss = +$('loss').value / 100;
+  net.next -= dt;
+  if (net.next <= 0) {
+    net.next += 1 / rate;
+    const p = at(truth.s);
+    if (rnd() >= loss) net.inFlight.push({ arrive: simT + Math.max(0.005, lat + (rnd() * 2 - 1) * jit), s: { t: simT, x: p.x, z: p.z, yaw: p.yaw, v: truth.v } });
+  }
+  net.inFlight.sort((a, b) => a.arrive - b.arrive);
+  while (net.inFlight.length && net.inFlight[0].arrive <= simT) { const m = net.inFlight.shift(); remote.push(m.s, m.arrive); }
+}
+
+const map = $('map').getContext('2d'), close = $('close').getContext('2d');
+function bus(g, x, z, yaw, fill, scale) {
+  g.save(); g.translate(x, z); g.rotate(yaw); g.scale(scale, scale);
+  if (fill) { g.fillStyle = fill; g.fillRect(-1.25, -6, 2.5, 12); g.fillStyle = '#222'; g.fillRect(-1.1, -6, 2.2, 1.4); }
+  else { g.strokeStyle = '#fff'; g.lineWidth = 0.3; g.strokeRect(-1.25, -6, 2.5, 12); }
+  g.restore();
+}
+function road(g) { g.strokeStyle = '#3f3f42'; g.lineWidth = 9; g.beginPath(); ROUTE.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z))); g.closePath(); g.stroke(); }
+
+let last = performance.now();
+reset();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  simT += dt; stepTruth(dt); stepNet(dt);
+  const t = at(truth.s), shown = remote.poseAt(simT);
+  if (shown) {
+    const e = Math.hypot(shown.x - t.x, shown.z - t.z); stats.err += e; stats.n++; stats.max = Math.max(stats.max, e); stats.time += dt;
+    if (stats.prev) { const seen = Math.hypot(shown.x - stats.prev.x, shown.z - stats.prev.z) / dt, real = truth.v; if (seen > real * 2 + 4) stats.jumps++; }
+    stats.prev = shown;
+  }
+  // Overview
+  map.setTransform(1, 0, 0, 1, 0, 0); map.clearRect(0, 0, 460, 460); map.setTransform(1.1, 0, 0, 1.1, 230, 230); road(map);
+  if (shown) bus(map, shown.x, shown.z, shown.yaw, '#ffd84d', 1.6);
+  bus(map, t.x, t.z, t.yaw, null, 1.6);
+  // Close-up that follows what you see, about 60 m across, like a chase view
+  const c = shown || t;
+  close.setTransform(1, 0, 0, 1, 0, 0); close.clearRect(0, 0, 460, 460); close.setTransform(7, 0, 0, 7, 230 - c.x * 7, 230 - c.z * 7); road(close);
+  close.strokeStyle = '#e8e2d0'; close.lineWidth = 0.15; close.setLineDash([3, 6]); close.beginPath(); ROUTE.forEach(([x, z], i) => (i ? close.lineTo(x, z) : close.moveTo(x, z))); close.closePath(); close.stroke(); close.setLineDash([]);
+  bus(close, t.x, t.z, t.yaw, null, 1);
+  if (shown) bus(close, shown.x, shown.z, shown.yaw, '#ffd84d', 1);
+  const mins = Math.max(stats.time / 60, 1 / 60);
+  $('stats').innerHTML = `Friend's speed <b>${(truth.v * 3.6).toFixed(0)} km/h</b><br>Average gap to the real bus <b>${(stats.err / Math.max(1, stats.n)).toFixed(1)} m</b><br>Worst gap <b>${stats.max.toFixed(1)} m</b><br>Visible jumps per minute <b>${(stats.jumps / mins).toFixed(0)}</b><br>Seen ${(simT).toFixed(0)} s after ${method === 'snap' || method === 'extrapolate' ? '' : 'a ' + Math.round(+$('buf').value / +$('rate').value * 1000) + ' ms buffer and '}${$('lat').value} ms delay`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

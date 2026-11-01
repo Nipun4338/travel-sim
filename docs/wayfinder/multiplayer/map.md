@@ -26,10 +26,12 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Research hosting Rooms on Cloudflare](tickets/001-research-cloudflare-room-server.md): Workers Free with Durable Objects meets $0 (errors, never a bill, at the limit); only ~9 Room-hours a day at 10 updates/s or ~18 at 5, so rate and caps matter; a separate Worker is needed.
 - [Measure what each mode would need to send](tickets/002-measure-what-each-mode-sends.md): ~30 bytes per bus or plane update and 12 for the Metro in binary; ~11–22 MB per player-hour (JSON would be ~52), so binary; data use isn't the constraint, the free quota is; time and weather must be Room-wide.
 - [Define what a Room is and who can join](tickets/003-define-the-room.md): 4-character code plus share link, 6 players, one Region and mode per Room, join or leave any time on your own Leg, names from a bilingual list, the creator is Host (time and weather, removing players), closes 5 min after it empties.
+- [Prototype how other players' vehicles move](tickets/004-prototype-remote-vehicle-feel.md): dead reckoning with eased corrections at 5 updates a second (≈18 free Room-hours a day); other players' vehicles use the full, realistic models (mirrors, windscreen, lights, doors, wheels), not ghosts.
 
 ## Not yet specified
 
-- **Presentation of other players:** name tags, which livery or plane colour each player gets, how other players show on the minimap, and what happens when two players are on the same spot (no collisions, but they overlap).
+- **Presentation of other players:** name tags, which livery or plane colour each player gets, how other players show on the minimap, and what happens when two players are on the same spot (no collisions, but they overlap). The models themselves are decided: full and realistic, like your own.
+- **Exterior wipers:** the bus model has no wipers on the outside today (rain on the windscreen is a cab-only overlay), so other players' buses in rain would show none. Whether to add working exterior wipers to the bus model for realism.
 - **Safety beyond the basics:** whether any form of communication exists at all (quick preset messages or emotes, or none; no free-text chat is the default), and what a removed player can do next.
 - **Offline and failure:** what the game does when the connection drops mid-trip, and how a PWA started offline offers Rooms.
 - **Release plan:** which version ships Rooms. User direction (2026-11-02): start with **one Region**, then open the others; which Region and mode go first is still open.
