@@ -74,6 +74,10 @@ _Avoid_: hoop, checkpoint, gate
 **Arcade-plus**:
 The realism target: believable handling and simple rules, with no detailed simulation (no ATC, no detailed cockpit).
 
+**Room**:
+A shared online session, joined with a short code, in which several players in the same **Region** and mode see each other's vehicles live. Each player still drives their own vehicle with their own AI traffic; nothing else is shared. (Its exact rules are still being decided on the multiplayer map.)
+_Avoid_: lobby, server, match, multiplayer game
+
 ## Relationships
 
 - **Bus Mode** and **Flight Mode** are independent; neither leads into the other
@@ -82,3 +86,4 @@ The realism target: believable handling and simple rules, with no detailed simul
 - A **Route** has an ordered list of **Stops**
 - A **Route** is divided into **Legs**; adjacent Legs share their boundary **Stop**
 - A **Run** covers one **Leg** or a **Full Route** and has one **Timetable**
+- A **Room** is optional: a **Run** or **Challenge** plays the same with or without one
