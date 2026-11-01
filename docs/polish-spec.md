@@ -20,7 +20,7 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 - **Every release** bumps `package.json`, adds a Bangla and English entry to `src/config/changelog.ts`, retakes the README screenshots, and is checked at 30 fps on a Helio G99 / Snapdragon 680-class phone (§7).
 - **Voice recordings don't gate any release.** The Helper call-outs and the Line 6 announcements ship in the first release after their files arrive ([Record the Helper call-outs and Line 6 announcements](wayfinder/polish/tickets/007-record-voices.md)). Wiring them in needs a voice recipe in `scripts/audio/build.ts`: trim the silence, normalise loudness, and write mono AAC to `public/audio/voice/`.
 
-## 2. Real building heights (v1.3, every Region and both Flight Zones)
+## 2. Real building heights (v1.3, every Region and both Flight Zones; built 2026-11-01)
 
 [Find how to get real building heights](wayfinder/polish/tickets/001-get-real-building-heights.md), [Spot-check the Open Buildings heights](wayfinder/polish/tickets/008-spot-check-building-heights.md), [research](research/building-heights.md)
 
@@ -38,7 +38,7 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 - **Bandarban:** cap anything more than about 2 km from the town centre at 10 m.
 - **Credit** in the credits screen and README: Google Open Buildings 2.5D Temporal, CC BY 4.0. It contains modified Copernicus Sentinel data (2016–2023) processed by ESA; cite Sirko et al. 2023.
 
-## 3. The street-life kit (built in v1.3, reused in v1.4 and v1.5)
+## 3. The street-life kit (built in v1.3, reused in v1.4 and v1.5; built 2026-11-01 for Dhaka)
 
 [Choose how street life is made](wayfinder/polish/tickets/009-choose-street-life-approach.md), [prototype](../prototypes/street-life/PROTOTYPE-street-life.html)
 
@@ -57,7 +57,9 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 - **Density C (medium):** 2 floors, a quarter of the frontages, 6 wires, a stall every ~45 m, about 35 people and 4 rickshaws per 200 m, and billboards on 25% of buildings.
 - **Where each density applies:** D on commercial stretches (OSM shop or commercial tagging along the frontage) and C elsewhere on the Dhaka corridor. C along Line 6. Bandarban gets only stalls and hand-painted roadside signs: no wires and no stacked boards.
 
-## 4. Dhaka bus corridor (v1.3)
+## 4. Dhaka bus corridor (v1.3, built 2026-11-01)
+
+As built: the bake code is `scripts/bake/heights.ts`, `streetlife.ts` and `infill.ts`; Kuril and Khilkhet got 343 infill lots (km 8.6–11) because OSM lacks the roadside shophouses there; the sign atlas is painted in the browser (`src/render/signAtlas.ts`), so it adds nothing to the download. Dhaka's Region is 28 MB.
 
 [Rank the fidelity gaps](wayfinder/polish/tickets/006-rank-fidelity-gaps.md), [comparison shots](images/polish/README.md)
 

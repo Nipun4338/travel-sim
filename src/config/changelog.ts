@@ -11,6 +11,23 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.3.0',
+    date: '2026-11-01',
+    image: '1.3.0.jpg',
+    bn: [
+      'ঢাকার ভবনগুলো এখন আসল উচ্চতায়: বনানী আর মহাখালীতে উঁচু টাওয়ার, পাশের রাস্তায় নিচু দালান।',
+      'রাস্তা জুড়ে প্রাণ: বাংলা দোকানের সাইনবোর্ড, বিলবোর্ড, বিদ্যুতের তারের জট, চায়ের দোকান, রিকশা আর মানুষ।',
+      'কুড়িল আর খিলক্ষেতের রাস্তার পাশ এখন দোকানপাটে ভরা।',
+      'ধুলোমাখা দেয়াল, কাচ আর টাইলসের টাওয়ার, তালি দেওয়া রাস্তা আর মাঝের রেলিং।',
+    ],
+    en: [
+      'Dhaka’s buildings now stand at their real heights: towers at Banani and Mohakhali, low blocks on the side streets.',
+      'Street life all along the road: Bangla shop signs, billboards, tangled overhead wires, tea stalls, rickshaws and people.',
+      'Kuril and Khilkhet are lined with shops on both sides of the road.',
+      'Dusty walls, glass and tiled towers, patched asphalt and railings down the median.',
+    ],
+  },
+  {
     version: '1.2.2',
     date: '2026-10-31',
     image: '1.2.2.jpg',

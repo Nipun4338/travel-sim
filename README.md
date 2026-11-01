@@ -8,7 +8,7 @@ A relaxing bus, metro and plane simulator set on the real streets of Dhaka, its 
 
 **[▶ Play now at travel-sim.pages.dev](https://travel-sim.pages.dev)**
 
-![A Dhaka city bus under the Farmgate flyover at midday](docs/images/hero-dhaka.jpg)
+![A Dhaka city bus near Farmgate at midday, Bangla shop signs stacked up the buildings](docs/images/hero-dhaka.jpg)
 
 </div>
 
@@ -22,8 +22,8 @@ Take a city bus up the Farmgate → Airport corridor in Dhaka, or wind up the Th
 
 | | |
 |:-:|:-:|
-| ![Driver's cab view on a Dhaka road, Bangla speedometer](docs/images/cab-dhaka.jpg) | ![The bus on the forested hill road to Chimbuk](docs/images/bandarban-hills.jpg) |
-| *The cab is the default view: Bangla dashboard, indicators, mirrors* | *Bandarban: hairpins, bamboo and forest on the climb to Chimbuk* |
+| ![Driver's cab view at Kakoli: Bangla shop signs, towers, tea stalls and the median railing](docs/images/cab-dhaka.jpg) | ![The bus on the forested hill road to Chimbuk](docs/images/bandarban-hills.jpg) |
+| *The cab is the default view: Bangla dashboard, mirrors, and Kakoli's shops and towers outside* | *Bandarban: hairpins, bamboo and forest on the climb to Chimbuk* |
 
 ### ✈️ Plane: fly free or take a Challenge
 
@@ -50,6 +50,7 @@ Seven cameras: the cab, chasing, on the platform, alongside, from the air, a pas
 ## A living Dhaka
 
 - **Real places.** Roads, flyovers, the Elevated Expressway, railways and level crossings come from OpenStreetMap, the terrain from Copernicus GLO-30, and building heights from Google Open Buildings. Over 20 landmarks are hand-modelled, among them the Farmgate metro station, Jahangir Gate, Novo Theatre, Airport Terminal 3, Shoilo Propat and Chimbuk.
+- **Real heights, real street life** *(new in 1.3.0)*. Buildings stand at their real heights, so Banani and Mohakhali have their towers. Shopfronts carry painted Bangla signboards stacked up the walls, with billboards, tangled overhead wires, tea stalls, parked rickshaws and people on the footpaths, and the roads are patched and dusty.
 - **Dhaka traffic.** Buses, green CNGs, cars, motorbikes, painted trucks and rickshaws follow the lanes, change lanes, honk, and stop for traffic police at the big junctions. City buses carry Bangla company names, route boards and "ঢাকা মেট্রো" plates.
 - **Drivable flyovers.** Ramps climb at real flyover grades; take the bus up and along the deck.
 - **Trains.** Bangladesh Railway trains and Dhaka Metro sets run on the real lines; crossing booms come down as they pass.
@@ -130,7 +131,7 @@ The routes you've driven light up on the map, zoomed-in places name their landma
 |:-:|:-:|
 | ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
 
-**Current version: 1.2.2**: the Bandarban bus keeps to the Thanchi Road all the way, Chimbuk's summit complex stands where it really is, and the hill road loses its yellow centre line. 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
+**Current version: 1.3.0**: Dhaka at its real heights, with Bangla shop signs, wires, stalls and people along the road, a built-up Kuril and Khilkhet, and weathered streets. 1.2.2 kept the Bandarban bus on the Thanchi Road and moved Chimbuk's summit complex to where it really is; 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 
