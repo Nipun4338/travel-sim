@@ -24,6 +24,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 <!-- one line per closed ticket: [title](link): gist -->
 
 - [Research hosting Rooms on Cloudflare](tickets/001-research-cloudflare-room-server.md): Workers Free with Durable Objects meets $0 (errors, never a bill, at the limit); only ~9 Room-hours a day at 10 updates/s or ~18 at 5, so rate and caps matter; a separate Worker is needed.
+- [Measure what each mode would need to send](tickets/002-measure-what-each-mode-sends.md): ~30 bytes per bus or plane update and 12 for the Metro in binary; ~11–22 MB per player-hour (JSON would be ~52), so binary; data use isn't the constraint, the free quota is; time and weather must be Room-wide.
 
 ## Not yet specified
 
