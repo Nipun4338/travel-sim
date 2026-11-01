@@ -65,7 +65,7 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 2. **Street life:** the kit at D and C (§3).
 3. **Kuril and Khilkhet:** build up the Kuril Bishwa Road edge, which is busy and built up in reality, and make the Kuril interchange read as the hero landmark planned in v1.
 4. **Weathering:** a palette and texture pass with no new geometry. Dustier, more weathered walls, white-tile and glass façades on the newer towers, a patched road surface, worn markings, and railings on the medians.
-5. **Route length:** the baked Route is 12.58 km against the 13.94 km routed in [landmarks.md](research/landmarks.md). Find the difference and fix it, or correct the documented figure.
+5. **Route length:** the baked Route is 12.58 km against the 13.94 km routed in [landmarks.md](research/landmarks.md). *Checked in v1.3:* the bake is right (trunk and primary roads, no loops; stop to stop in straight lines is 12.0 km); the OSRM figure carried snapping and via-point detours, so SPEC §5 now gives the baked km.
 
 ## 5. Bandarban road
 

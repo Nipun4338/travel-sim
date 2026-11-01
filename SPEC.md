@@ -89,23 +89,23 @@ A **custom TypeScript bake script** runs at build time and writes, per Region:
 ## 5. Regions, Routes and Flight Zones
 [012](docs/wayfinder/tickets/012-adjust-region-bounds.md) as amended by [015](docs/wayfinder/tickets/015-revise-chimbuk-and-landmarks.md); Legs from [005](docs/wayfinder/tickets/005-define-bus-scoring-and-passengers.md)
 
-### Dhaka Route: Farmgate → Airport (~14 km, outbound only)
+### Dhaka Route: Farmgate → Airport (~12.6 km as baked, outbound only)
 
 The path runs along Old Airport Road and Bijoy Sarani, then Bir Uttam Ziaur Rahman Road to Mohakhali, then New Airport Road, which runs under the Elevated Expressway north of Banani. The bus stays on the arterials, with no detours into terminals.
 
-| # | Stop | Lat, Lon (OSM node) | km (routed) | Leg |
+| # | Stop | Lat, Lon (OSM node) | km (baked) | Leg |
 |---|---|---|---|---|
 | 1 | Farmgate | 23.75722, 90.39024 (2320379589) | 0 | Leg 1 start |
-| 2 | Bijoy Sarani | 23.76494, 90.38917 (11934785542) | 1.1 | |
-| 3 | Jahangir Gate | 23.77526, 90.38977 (12009429417) | 2.4 | |
-| 4 | Mohakhali | 23.77818, 90.39815 (3499295181) | 4.6 | Leg 1 end / Leg 2 start |
-| 5 | Chairman Bari | 23.78786, 90.40010 (12073083676) | 6.0 | |
-| 6 | Kakoli | 23.79523, 90.40090 (12078090908) | 7.0 | |
-| 7 | Kuril Bishwa Road | 23.82136, 90.41887 (3498521660) | 11.1 | Leg 2 end / Leg 3 start |
-| 8 | Khilkhet | 23.82936, 90.41975 (3556399554) | 12.0 | |
-| 9 | Airport | 23.85160, 90.40734 (3572490148) | 14.8 | Leg 3 end |
+| 2 | Bijoy Sarani | 23.76494, 90.38917 (11934785542) | 0.9 | |
+| 3 | Jahangir Gate | 23.77526, 90.38977 (12009429417) | 2.0 | |
+| 4 | Mohakhali | 23.77818, 90.39815 (3499295181) | 2.9 | Leg 1 end / Leg 2 start |
+| 5 | Chairman Bari | 23.78786, 90.40010 (12073083676) | 4.0 | |
+| 6 | Kakoli | 23.79523, 90.40090 (12078090908) | 4.8 | |
+| 7 | Kuril Bishwa Road | 23.82136, 90.41887 (3498521660) | 8.8 | Leg 2 end / Leg 3 start |
+| 8 | Khilkhet | 23.82936, 90.41975 (3556399554) | 9.7 | |
+| 9 | Airport | 23.85160, 90.40734 (3572490148) | 12.6 | Leg 3 end |
 
-The routed km figures include short detours; staying on the arterials comes to ~13.5–14.8 km.
+The km figures are the baked Route's (v1.3 check): it runs on trunk and primary roads the whole way with no loops. Stop to stop in straight lines is 12.0 km. The earlier OSRM figures (14.8 km, then 13.94 km in [landmarks.md](docs/research/landmarks.md)) were inflated by snapping every Stop to the northbound carriageway, via points and a terminal detour.
 
 ### Bandarban Route: Bandarban Bus Stand → Chimbuk (~22.8 km as baked, outbound only)
 
