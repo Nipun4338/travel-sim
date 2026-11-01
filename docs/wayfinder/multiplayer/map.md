@@ -25,12 +25,12 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 
 - [Research hosting Rooms on Cloudflare](tickets/001-research-cloudflare-room-server.md): Workers Free with Durable Objects meets $0 (errors, never a bill, at the limit); only ~9 Room-hours a day at 10 updates/s or ~18 at 5, so rate and caps matter; a separate Worker is needed.
 - [Measure what each mode would need to send](tickets/002-measure-what-each-mode-sends.md): ~30 bytes per bus or plane update and 12 for the Metro in binary; ~11–22 MB per player-hour (JSON would be ~52), so binary; data use isn't the constraint, the free quota is; time and weather must be Room-wide.
+- [Define what a Room is and who can join](tickets/003-define-the-room.md): 4-character code plus share link, 6 players, one Region and mode per Room, join or leave any time on your own Leg, names from a bilingual list, the creator is Host (time and weather, removing players), closes 5 min after it empties.
 
 ## Not yet specified
 
 - **Presentation of other players:** name tags, which livery or plane colour each player gets, how other players show on the minimap, and what happens when two players are on the same spot (no collisions, but they overlap).
-- **Menu and flow:** where Create Room and Join sit in the map menu, sharing the code (copy, share sheet), what a joiner sees while the host picks a Leg, and starting a trip together or freely.
-- **Room lifetime and safety:** how long a Room lives, what happens when the host leaves, kicking, and whether any text chat exists at all (none is the default for a family-friendly game).
+- **Safety beyond the basics:** whether any form of communication exists at all (quick preset messages or emotes, or none; no free-text chat is the default), and what a removed player can do next.
 - **Offline and failure:** what the game does when the connection drops mid-trip, and how a PWA started offline offers Rooms.
 - **Release plan:** which version ships Rooms. User direction (2026-11-02): start with **one Region**, then open the others; which Region and mode go first is still open.
 - **Moving between Regions in a Room:** once Rooms span several Regions, a Room that moves on (for example Dhaka → Bandarban) plays a striking flying transition, such as the planes taking off and the camera sweeping over the Bangladesh map to the next Region. It's a cut-scene between Regions, not a flyable journey (SPEC §1 still rules out one continuous world). Open: who triggers the move, whether everyone travels together, and how long the animation runs while the next Region loads.

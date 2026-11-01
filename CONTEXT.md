@@ -75,8 +75,16 @@ _Avoid_: hoop, checkpoint, gate
 The realism target: believable handling and simple rules, with no detailed simulation (no ATC, no detailed cockpit).
 
 **Room**:
-A shared online session, joined with a short code, in which several players in the same **Region** and mode see each other's vehicles live. Each player still drives their own vehicle with their own AI traffic; nothing else is shared. (Its exact rules are still being decided on the multiplayer map.)
+A shared online session for up to 6 players in one **Region** and mode, where each sees the others' vehicles live. Each player still drives their own vehicle, on their own **Leg**, with their own AI traffic; only positions, the time of day and the weather are shared.
 _Avoid_: lobby, server, match, multiplayer game
+
+**Room code**:
+The 4-character code (letters and digits without 0/O or 1/I, such as `K7QM`) that players type or follow as a link to join a **Room**.
+_Avoid_: room ID, invite key, password
+
+**Host**:
+The player who created a **Room**, or the next to join after them if they leave. The Host chooses the Room's time of day and weather and can remove a player.
+_Avoid_: owner, admin, leader
 
 ## Relationships
 
@@ -87,3 +95,4 @@ _Avoid_: lobby, server, match, multiplayer game
 - A **Route** is divided into **Legs**; adjacent Legs share their boundary **Stop**
 - A **Run** covers one **Leg** or a **Full Route** and has one **Timetable**
 - A **Room** is optional: a **Run** or **Challenge** plays the same with or without one
+- A **Room** has exactly one **Host** and one **Room code**; it is fixed to one **Region** and mode, and its players may each be on a different **Leg**
