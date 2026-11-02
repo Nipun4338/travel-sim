@@ -1,4 +1,6 @@
-# Travel Sim: polish spec (v1.2.2 – v1.5)
+# Travel Sim: polish spec (v1.2.2 – v1.6)
+
+*Renumbered 2026-11-02: multiplayer Rooms ship as v1.4 ([multiplayer map](wayfinder/multiplayer/map.md)), so Line 6 moved from v1.4 to v1.5 and Bandarban from v1.5 to v1.6.*
 
 This spec makes the places already in the game faithful to the real ones: the Dhaka bus corridor (Farmgate → Airport), MRT Line 6, and the Bandarban road (town → Chimbuk). Their skylines carry into the Flight Zones. It consolidates the [polish map](wayfinder/polish/map.md) as of 2026-10-31 and gives only the final decisions. Each section links the tickets that hold the reasoning. Domain terms (**Region**, **Route**, **Stop**, **Leg**, **Flight Zone**, **Helper**, …) are defined in [CONTEXT.md](../CONTEXT.md). The v1 rules in [SPEC.md](../SPEC.md) still hold unless a section here changes them.
 
@@ -14,8 +16,8 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 |---|---|---|
 | **v1.2.2** (patch) | Bandarban correctness fixes | §5.1 |
 | **v1.3**, Dhaka corridor | real heights everywhere, the street-life kit, the Dhaka fixes | §2, §3, §4 |
-| **v1.4**, Line 6 | stations, the viaduct view, the corridor under it | §6 |
-| **v1.5**, Bandarban | the ridge treatment, roadside life | §5.2–§5.4 |
+| **v1.5**, Line 6 | stations, the viaduct view, the corridor under it | §6 |
+| **v1.6**, Bandarban | the ridge treatment, roadside life | §5.2–§5.4 |
 
 - **Every release** bumps `package.json`, adds a Bangla and English entry to `src/config/changelog.ts`, retakes the README screenshots, and is checked at 30 fps on a Helio G99 / Snapdragon 680-class phone (§7).
 - **Voice recordings don't gate any release.** The Helper call-outs and the Line 6 announcements ship in the first release after their files arrive ([Record the Helper call-outs and Line 6 announcements](wayfinder/polish/tickets/007-record-voices.md)). Wiring them in needs a voice recipe in `scripts/audio/build.ts`: trim the silence, normalise loudness, and write mono AAC to `public/audio/voice/`.
@@ -38,7 +40,7 @@ This spec makes the places already in the game faithful to the real ones: the Dh
 - **Bandarban:** cap anything more than about 2 km from the town centre at 10 m.
 - **Credit** in the credits screen and README: Google Open Buildings 2.5D Temporal, CC BY 4.0. It contains modified Copernicus Sentinel data (2016–2023) processed by ESA; cite Sirko et al. 2023.
 
-## 3. The street-life kit (built in v1.3, reused in v1.4 and v1.5; built 2026-11-01 for Dhaka)
+## 3. The street-life kit (built in v1.3, reused in v1.5 and v1.6; built 2026-11-01 for Dhaka)
 
 [Choose how street life is made](wayfinder/polish/tickets/009-choose-street-life-approach.md), [prototype](../prototypes/street-life/PROTOTYPE-street-life.html)
 
@@ -82,7 +84,7 @@ As built: the Route is 22.82 km (Stops at 0, 2.2, 5.7 and 22.8 km). The summit c
 - **Update SPEC §5:** the Stop km figures. The baked Route puts the intermediate Stops at 2.22 and 5.46 km, against SPEC's stale 3.2 and 6.6; recompute them after the reroute.
 - **Remove the yellow centre line.** The real road is one unmarked paved lane of about 4–6 m. The baked 5.5 m width stays.
 
-### 5.2 Ridge drops and long views (v1.5)
+### 5.2 Ridge drops and long views (v1.6)
 
 [Choose how the Bandarban road gets its ridge drops](wayfinder/polish/tickets/011-ridge-feel-bandarban.md), [prototype](../prototypes/bandarban-ridge/PROTOTYPE-bandarban-ridge.html)
 
@@ -96,7 +98,7 @@ GLO-30 includes the forest canopy. The current filter (min ±30 m, blur ±30 m) 
 - **Backdrop:** a distant terrain mesh from the Bandarban Flight Zone DEM at **240 m** spacing (about 45k triangles), 36 km across and sunk below the near terrain. Chunk LOD distances stay as they are (350, 1100 and 2800 m).
 - **No relief exaggeration.**
 
-### 5.3 Roadside life and traffic (v1.5)
+### 5.3 Roadside life and traffic (v1.6)
 
 - Stalls at Shoilo Propat.
 - The army canteen and registration point at Chimbuk.
@@ -104,12 +106,12 @@ GLO-30 includes the forest canopy. The current filter (min ±30 m, blur ±30 m) 
 - Hand-painted roadside signs (§3).
 - Thanchi buses and chander gari jeeps join the Bandarban AI traffic (SPEC §7).
 
-### 5.4 Vegetation (v1.5)
+### 5.4 Vegetation (v1.6)
 
 - **Jhum patches** (slash-and-burn clearings) on the slopes, as ground colour only.
 - **No undergrowth.** Bandarban's chunks are already the heaviest (287k triangles at LOD 0).
 
-## 6. MRT Line 6 (v1.4)
+## 6. MRT Line 6 (v1.5)
 
 [Research how the Line 6 stations really differ](wayfinder/polish/tickets/003-research-line6-stations.md), [Shape the four station models](wayfinder/polish/tickets/010-shape-line6-station-models.md), [prototype](../prototypes/line6-stations/PROTOTYPE-line6-stations.html), [research](research/line6-stations.md)
 
@@ -151,7 +153,7 @@ These replace the generic platform in `buildStations` (`scripts/bake/metro.ts`) 
 - **Expected worst-case downloads** after all releases, counting the GLBs as uncompressed in transit: Dhaka ~22 MB, Line 6 ~45 MB, Bandarban ~35 MB.
 - **Line 6 has the least headroom.** Serving `lanes.*.json` compressed (it shrinks 20.6 → 8.9 MB) or trimming it for metro wins most of it back.
 - **Each release, verify:**
-  - 30 fps at Low and Medium on a Helio G99 / Snapdragon 680-class phone, on the busiest stretch (Banani for v1.3, Farmgate and Karwan Bazar for v1.4, the Chimbuk ridge for v1.5);
+  - 30 fps at Low and Medium on a Helio G99 / Snapdragon 680-class phone, on the busiest stretch (Banani for v1.3, Farmgate and Karwan Bazar for v1.5, the Chimbuk ridge for v1.6);
   - the Region download size from the manifest;
   - fresh in-game vs real comparison shots at the spots in [the comparison sheet](images/polish/README.md).
 

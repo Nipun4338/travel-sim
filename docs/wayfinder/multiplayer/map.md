@@ -33,6 +33,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Decide how other players are shown and told apart](tickets/008-present-other-players.md): name tags within ~300 m plus edge arrows; own liveries plus six seat colours; coloured minimap dots and a "👥 3/6" chip; overlapping vehicles turn see-through; exterior wipers on every bus.
 - [Decide whether players can communicate in a Room](tickets/009-decide-communication.md): horn, flash and indicators shared; six preset bilingual quick messages (one per 5 s); no emotes or free text; removed players can't rejoin that Room.
 - [Decide how Rooms behave offline and when a player reconnects](tickets/010-offline-and-reconnecting.md): greyed "Play with friends" offline that wakes on reconnect; 2 minutes of quiet auto-reconnect to the same seat; dropped vehicles park dimmed with ⟳; the Host keeps the role meanwhile; Room links never dead-end.
+- [Plan which release ships Rooms and in what order](tickets/011-plan-the-releases.md): Rooms ship as v1.4 with Bus in Dhaka (polish Line 6 → v1.5, Bandarban → v1.6), then Dhaka Plane, Line 6 Metro, Bandarban, and Region moves last; tested on a preview Room server with two phones and a desktop.
 
 ## Not yet specified
 
