@@ -29,7 +29,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Prototype how other players' vehicles move](tickets/004-prototype-remote-vehicle-feel.md): dead reckoning with eased corrections at 5 updates a second (≈18 free Room-hours a day); other players' vehicles use the full, realistic models (mirrors, windscreen, lights, doors, wheels), not ghosts.
 - [Choose how the Room server is deployed beside the site](tickets/005-choose-the-deployment-shape.md): a separate free Worker on workers.dev reached directly (no Pages Functions), code in `server/rooms/`, deployed by its own `npm run deploy:rooms`, `wrangler dev` locally, only the game's origins accepted.
 - [Choose how Rooms stay inside the free daily quota](tickets/006-stay-inside-the-free-quota.md): stopped vehicles send 1 update/s instead of 5, paused players stop sending and leave after 10 min, a budget tally closes new Rooms at ~90% of the day's quota while running ones finish, friendly "full for today" and "driving solo" messages, no other caps.
-- [Prototype creating and joining a Room from the map menu](tickets/007-prototype-the-room-menu.md): a "With friends" strip on the destination card above the Leg list (create, join by code, Room panel with code, share and players); generated vehicle names; a sheet is the phone fallback.
+- [Prototype creating and joining a Room from the map menu](tickets/007-prototype-the-room-menu.md): a "Play with friends" button on the destination card opens a sheet over the map with the whole flow (create, join by code, Room panel with code, share and players); closing it leaves a Room chip on the card so you can pick your Leg; generated vehicle names.
 
 ## Not yet specified
 
