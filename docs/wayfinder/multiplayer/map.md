@@ -31,6 +31,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Choose how Rooms stay inside the free daily quota](tickets/006-stay-inside-the-free-quota.md): stopped vehicles send 1 update/s instead of 5, paused players stop sending and leave after 10 min, a budget tally closes new Rooms at ~90% of the day's quota while running ones finish, friendly "full for today" and "driving solo" messages, no other caps.
 - [Prototype creating and joining a Room from the map menu](tickets/007-prototype-the-room-menu.md): a "Play with friends" button on the destination card opens a sheet over the map with the whole flow (create, join by code, Room panel with code, share and players); closing it leaves a Room chip on the card so you can pick your Leg; generated vehicle names.
 - [Decide how other players are shown and told apart](tickets/008-present-other-players.md): name tags within ~300 m plus edge arrows; own liveries plus six seat colours; coloured minimap dots and a "👥 3/6" chip; overlapping vehicles turn see-through; exterior wipers on every bus.
+- [Decide whether players can communicate in a Room](tickets/009-decide-communication.md): horn, flash and indicators shared; six preset bilingual quick messages (one per 5 s); no emotes or free text; removed players can't rejoin that Room.
 
 ## Not yet specified
 
