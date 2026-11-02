@@ -28,13 +28,14 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Define what a Room is and who can join](tickets/003-define-the-room.md): 4-character code plus share link, 6 players, one Region and mode per Room, join or leave any time on your own Leg, names from a bilingual list, the creator is Host (time and weather, removing players), closes 5 min after it empties.
 - [Prototype how other players' vehicles move](tickets/004-prototype-remote-vehicle-feel.md): dead reckoning with eased corrections at 5 updates a second (≈18 free Room-hours a day); other players' vehicles use the full, realistic models (mirrors, windscreen, lights, doors, wheels), not ghosts.
 - [Choose how the Room server is deployed beside the site](tickets/005-choose-the-deployment-shape.md): a separate free Worker on workers.dev reached directly (no Pages Functions), code in `server/rooms/`, deployed by its own `npm run deploy:rooms`, `wrangler dev` locally, only the game's origins accepted.
+- [Choose how Rooms stay inside the free daily quota](tickets/006-stay-inside-the-free-quota.md): stopped vehicles send 1 update/s instead of 5, paused players stop sending and leave after 10 min, a budget tally closes new Rooms at ~90% of the day's quota while running ones finish, friendly "full for today" and "driving solo" messages, no other caps.
 
 ## Not yet specified
 
 - **Presentation of other players:** name tags, which livery or plane colour each player gets, how other players show on the minimap, and what happens when two players are on the same spot (no collisions, but they overlap). The models themselves are decided: full and realistic, like your own.
 - **Exterior wipers:** the bus model has no wipers on the outside today (rain on the windscreen is a cab-only overlay), so other players' buses in rain would show none. Whether to add working exterior wipers to the bus model for realism.
 - **Safety beyond the basics:** whether any form of communication exists at all (quick preset messages or emotes, or none; no free-text chat is the default), and what a removed player can do next.
-- **Offline and failure:** what the game does when the connection drops mid-trip, and how a PWA started offline offers Rooms.
+- **Offline and reconnecting:** how a PWA started offline offers Rooms (hidden, or shown greyed), and whether a dropped player reconnects to the same Room automatically. The mid-trip drop itself is decided: the trip carries on solo.
 - **Release plan:** which version ships Rooms. User direction (2026-11-02): start with **one Region**, then open the others; which Region and mode go first is still open.
 - **Moving between Regions in a Room:** once Rooms span several Regions, a Room that moves on (for example Dhaka → Bandarban) plays a striking flying transition, such as the planes taking off and the camera sweeping over the Bangladesh map to the next Region. It's a cut-scene between Regions, not a flyable journey (SPEC §1 still rules out one continuous world). Open: who triggers the move, whether everyone travels together, and how long the animation runs while the next Region loads.
 
