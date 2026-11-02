@@ -7,6 +7,8 @@ labels: [wayfinder:map]
 
 A build-ready spec for **Rooms**: a player creates a Room and shares a short code, friends join it, and everyone in the same Region and mode sees each other's buses, trains or planes moving live. Each player keeps their own vehicle, physics and AI traffic. Nothing is left to decide before building.
 
+**Reached 2026-11-02:** [docs/rooms-spec.md](../../rooms-spec.md) is the build spec.
+
 ## Notes
 
 - Domain: the glossary is `/CONTEXT.md` (Region, Route, Stop, Leg, Run, Flight Zone, **Room**…); v1 rules are in `/SPEC.md`. SPEC §1 put multiplayer out of scope for v1; this map scopes the first version of it (user, 2026-11-02: option (a), "see each other", not racing or riding together).
