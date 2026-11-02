@@ -34,6 +34,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Decide whether players can communicate in a Room](tickets/009-decide-communication.md): horn, flash and indicators shared; six preset bilingual quick messages (one per 5 s); no emotes or free text; removed players can't rejoin that Room.
 - [Decide how Rooms behave offline and when a player reconnects](tickets/010-offline-and-reconnecting.md): greyed "Play with friends" offline that wakes on reconnect; 2 minutes of quiet auto-reconnect to the same seat; dropped vehicles park dimmed with ⟳; the Host keeps the role meanwhile; Room links never dead-end.
 - [Plan which release ships Rooms and in what order](tickets/011-plan-the-releases.md): Rooms ship as v1.4 with Bus in Dhaka (polish Line 6 → v1.5, Bandarban → v1.6), then Dhaka Plane, Line 6 Metro, Bandarban, and Region moves last; tested on a preview Room server with two phones and a desktop.
+- [Design the flying transition when a Room moves to another Region](tickets/012-design-region-transition.md): each player's own vehicle in their livery travels together over the Bangladesh map (buses in convoy along the highway, planes in a V) and lands with a passport stamp; the Host triggers it with a 10 s countdown; everyone travels or leaves with "Stay here"; ~4 s of flight plus holding while loading.
 
 ## Not yet specified
 
