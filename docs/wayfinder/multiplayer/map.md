@@ -27,6 +27,7 @@ A build-ready spec for **Rooms**: a player creates a Room and shares a short cod
 - [Measure what each mode would need to send](tickets/002-measure-what-each-mode-sends.md): ~30 bytes per bus or plane update and 12 for the Metro in binary; ~11–22 MB per player-hour (JSON would be ~52), so binary; data use isn't the constraint, the free quota is; time and weather must be Room-wide.
 - [Define what a Room is and who can join](tickets/003-define-the-room.md): 4-character code plus share link, 6 players, one Region and mode per Room, join or leave any time on your own Leg, names from a bilingual list, the creator is Host (time and weather, removing players), closes 5 min after it empties.
 - [Prototype how other players' vehicles move](tickets/004-prototype-remote-vehicle-feel.md): dead reckoning with eased corrections at 5 updates a second (≈18 free Room-hours a day); other players' vehicles use the full, realistic models (mirrors, windscreen, lights, doors, wheels), not ghosts.
+- [Choose how the Room server is deployed beside the site](tickets/005-choose-the-deployment-shape.md): a separate free Worker on workers.dev reached directly (no Pages Functions), code in `server/rooms/`, deployed by its own `npm run deploy:rooms`, `wrangler dev` locally, only the game's origins accepted.
 
 ## Not yet specified
 
