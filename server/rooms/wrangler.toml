@@ -1,0 +1,14 @@
+# The Room server (docs/rooms-spec.md §2): a separate Worker on the free plan, one Durable Object per
+# Room code. Deploy with `npm run deploy:rooms`; run locally with `npm run dev:rooms`.
+name = "travel-sim-rooms"
+main = "src/index.ts"
+compatibility_date = "2025-10-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
