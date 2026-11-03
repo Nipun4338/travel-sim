@@ -60,6 +60,9 @@ atmosphere.enableShadows(renderer);
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
 const regionId = params.get('world') ?? 'dhaka';
+// A Room (v1.4): take back the seat the menu held. Other players' buses arrive in a later step.
+const roomCode = params.get('room');
+if (roomCode) void import('./ui/roomBadge').then(m => m.joinTripRoom(roomCode, regionId));
 loader.stage('loadMap', 0, 0.1);
 if (regionId !== 'test') {
   region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, world);

@@ -382,3 +382,26 @@ button.app-version.link:hover, button.app-version.link:focus-visible { opacity: 
 .passport-head > span:last-child { margin-left: auto; }
 .passport-head { justify-content: flex-start; }
 
+
+/* Rooms (v1.4, docs/rooms-spec.md §9): the card's entry, and the sheet over the map. */
+.dest-card .room-play, .dest-card .room-chip { display: block; width: 100%; margin: 0 0 8px; }
+.dest-card .room-play.off { opacity: .6; }
+.dest-card .room-chip { background: var(--plum); color: var(--yellow); border: 2px solid var(--yellow); }
+.room-back { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 12px; }
+.room-sheet { position: relative; width: min(440px, 100%); max-height: 86vh; overflow: auto; box-sizing: border-box; background: rgba(46,26,71,.97); border: 3px solid var(--yellow); border-radius: 18px; padding: 14px 16px; color: #fff; }
+.room-sheet h2 { margin: 0 34px 8px 0; }
+.room-sheet .room-x { position: absolute; right: 10px; top: 10px; }
+.room-sheet .room-name { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.room-sheet .room-name b { color: var(--yellow); }
+.room-sheet .room-code { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.room-sheet .room-code span { font: 800 34px/1 var(--art-font); letter-spacing: 6px; color: var(--yellow); margin-right: auto; }
+.room-sheet .room-code-in { font: 800 30px var(--art-font); letter-spacing: 8px; text-transform: uppercase; width: 8ch; text-align: center; border-radius: 12px; border: 2px solid var(--yellow); background: rgba(0,0,0,.3); color: #fff; padding: 4px; margin: 6px 0; }
+.room-sheet .room-players { list-style: none; padding: 0; margin: 6px 0; }
+.room-sheet .room-players li { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 6px; }
+.room-sheet .room-players li i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.room-sheet .room-players li.empty { opacity: .45; font-style: italic; }
+.room-sheet .room-players li .chip { margin-left: auto; }
+.room-sheet .room-hint { font-size: 13px; opacity: .85; margin: 4px 0; }
+.room-sheet .room-note { color: #ffd2a8; margin: 6px 0; }
+.room-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; background: rgba(46,26,71,.85); color: var(--yellow); border: 2px solid var(--yellow); border-radius: 999px; padding: 2px 12px; font: 700 14px var(--art-font); pointer-events: none; }
+.room-pill.ended { color: #fff; }

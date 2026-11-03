@@ -121,6 +121,16 @@ const EN: Dict = {
   saveCodeHelp: 'Keep this code to move your progress to another device, or to restore it if the browser clears its storage.',
   importDone: 'Save loaded', importFailed: 'That code did not work', pasteCode: 'Paste a save code here', speedLabel: 'Speed', altitudeLabel: 'Altitude', airspeedLabel: 'Airspeed', glidePath: 'Glide path', glideHigh: '▼ high {m} m', glideLow: '▲ low {m} m', glideOn: '● on the path', boardHintShort: 'Open the doors (F) to board.', ringsCount: '{n} Rings',
   zoneNotBaked: 'Flight Zone "{id}" is not baked: run npm run bake:flight -- {id}', offField: 'off-field',
+  // Rooms (v1.4, docs/rooms-spec.md)
+  roomPlay: 'Play with friends', roomCreate: 'Create a Room', roomJoin: 'Join with a code', roomNew: 'New Room', roomYourName: 'Your name',
+  roomAnother: 'Another', roomSameSky: 'Everyone in the Room sees the same time and weather.', roomCreateGo: 'Create the Room',
+  roomJoinTitle: 'Join a Room', roomJoinGo: 'Join', roomTitle: 'Room', roomShare: 'Share', roomShareHint: 'Friends join by typing the code or opening the link.',
+  roomYou: 'you', roomRemove: 'Remove', roomFreeSeat: 'Free seat', roomPickLeg: 'Pick your Leg', roomLeave: 'Leave the Room',
+  roomOffline: 'Rooms need the internet. Playing solo works as always.', roomFull: 'That Room has 6 players already.',
+  roomClosed: 'No open Room has that code.', roomQuota: 'Rooms are full for today, back at 6 am', roomRemoved: 'The Host removed you from this Room',
+  roomMismatch: 'That Room is for a different place or mode.', roomReconnecting: 'Reconnecting…', roomLost: "Connection lost, you're driving solo",
+  roomJoinText: 'Join my Room: {code}', roomCodeLabel: 'Room code', roomConnecting: 'Connecting…', roomFailed: "Couldn't reach Rooms. Try again.",
+  roomOnlyHere: 'Rooms are open for Bus in Dhaka first; other places follow.',
 };
 const BN: Dict = {
   kmh: 'কিমি/ঘণ্টা', next: 'পরবর্তী', dueIn: '{t} পরে', late: '{t} দেরি', departsIn: 'ছাড়বে {t} পরে',
@@ -183,6 +193,16 @@ const BN: Dict = {
   saveCodeHelp: 'অন্য ডিভাইসে অগ্রগতি নিতে, বা ব্রাউজার স্টোরেজ মুছে ফেললে ফেরত আনতে এই কোডটি রেখে দিন।',
   importDone: 'সেভ লোড হয়েছে', importFailed: 'এই কোডটি কাজ করেনি', pasteCode: 'এখানে সেভ কোড পেস্ট করুন', speedLabel: 'গতি', altitudeLabel: 'উচ্চতা', airspeedLabel: 'গতি', glidePath: 'অবতরণ পথ', glideHigh: '▼ {m} মি উঁচুতে', glideLow: '▲ {m} মি নিচুতে', glideOn: '● ঠিক পথে', boardHintShort: 'যাত্রী তুলতে দরজা খুলুন (F)।', ringsCount: '{n}টি রিং',
   zoneNotBaked: '"{id}" ফ্লাইট এলাকা তৈরি হয়নি: npm run bake:flight -- {id} চালান', offField: 'রানওয়ের বাইরে',
+  // রুম (v1.4)
+  roomPlay: 'বন্ধুদের সাথে খেলুন', roomCreate: 'রুম খুলুন', roomJoin: 'কোড দিয়ে যোগ দিন', roomNew: 'নতুন রুম', roomYourName: 'আপনার নাম',
+  roomAnother: 'অন্য নাম', roomSameSky: 'সবাই একই সময় আর আবহাওয়া দেখবে।', roomCreateGo: 'রুম খুলুন',
+  roomJoinTitle: 'রুমে যোগ দিন', roomJoinGo: 'যোগ দিন', roomTitle: 'রুম', roomShare: 'শেয়ার', roomShareHint: 'বন্ধুরা কোড লিখে বা লিংক খুলে যোগ দিতে পারবে।',
+  roomYou: 'আপনি', roomRemove: 'বের করুন', roomFreeSeat: 'খালি জায়গা', roomPickLeg: 'আপনার লেগ বেছে নিন', roomLeave: 'রুম ছাড়ুন',
+  roomOffline: 'রুমের জন্য ইন্টারনেট লাগবে। একা খেলা চলবে যেমন চলছে।', roomFull: 'রুমে ৬ জন আছে, আর জায়গা নেই।',
+  roomClosed: 'এই কোডের কোনো রুম খোলা নেই।', roomQuota: 'আজকের রুম ভর্তি, সকাল ৬টায় আবার খুলবে', roomRemoved: 'হোস্ট আপনাকে এই রুম থেকে সরিয়ে দিয়েছেন',
+  roomMismatch: 'এই রুমটি অন্য জায়গা বা মোডের।', roomReconnecting: 'আবার যুক্ত হচ্ছে…', roomLost: 'সংযোগ বিচ্ছিন্ন, আপনি একা চালাচ্ছেন',
+  roomJoinText: 'আমার রুমে আসুন: {code}', roomCodeLabel: 'রুম কোড', roomConnecting: 'যুক্ত হচ্ছে…', roomFailed: 'রুমে পৌঁছানো গেল না। আবার চেষ্টা করুন।',
+  roomOnlyHere: 'রুম প্রথমে ঢাকার বাসে চালু হচ্ছে; অন্য জায়গা পরে আসবে।',
 };
 
 /** "Leg 2: Mohakhali → Kuril", or "Full Route: …" for the whole Route. */

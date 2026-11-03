@@ -17,6 +17,7 @@ import { SOUND_CREDITS } from '../audio/credits';
 import { CHANGELOG } from '../config/changelog';
 import { loader } from './loader';
 import { MenuMap, type MapProgress, type MapRegion } from './map/menuMap';
+import { mountRoomSheet, roomEntry, roomForTrip } from './roomSheet';
 import { APP_VERSION, showWhatsNew, versionLabel } from './whatsNew';
 
 type Mode = 'bus' | 'flight' | 'metro';
@@ -97,6 +98,9 @@ export async function showMenu(): Promise<void> {
     if (st.time !== 'random') q.set('time', st.time);
     if (st.weather !== 'random') q.set('weather', st.weather);
     updateSave(d => { d.lastTrip = { q: q.toString(), label }; });
+    // In a Room, the trip takes the Room's seat back and everyone shares its time and weather.
+    const room = roomForTrip();
+    if (room) { q.set('room', room.code); q.set('time', room.conditions.time); q.set('weather', room.conditions.weather); }
     location.href = `${location.pathname}?${q}`;
   }
 
@@ -188,6 +192,10 @@ export async function showMenu(): Promise<void> {
       try { await importCode(box.value); Object.assign(settings, loadSettings()); await render(); root.querySelector('.save-msg')!.textContent = t('importDone'); }
       catch { root.querySelector('.save-msg')!.textContent = t('importFailed'); }
     });
+    mountRoomSheet(root, {
+      mode: st.mode, region: st.region, livery: currentId('bus'), render: () => void render(),
+      openPlace: () => go({ screen: 'setup', place: 'dhaka', mode: 'bus', region: 'dhaka', trip: 1 }),
+    });
   }
 
   await render();
@@ -256,6 +264,7 @@ function destCard(st: State, setup: string): string {
     <div class="dest-head"><h2>📍 ${t(`region.${st.place}`)}</h2><button class="chip close" data-go='{"screen":"mode"}' aria-label="${t('back')}">✕</button></div>
     <div class="dest-tabs" role="tablist">${modes.map(m => `<button role="tab" aria-selected="${st.mode === m}" class="tab ${st.mode === m ? 'on' : ''}" data-go='${JSON.stringify({ mode: m, region: m === 'metro' ? 'line6' : st.place, trip: m === 'flight' ? 'free' : 1 })}'>${icon[m]} ${t(key[m])}</button>`).join('')}</div>
     <img class="dest-hero" src="${base}menu/${st.mode}-${st.place}.jpg" alt="" loading="lazy">
+    ${roomEntry(st.mode, st.region)}
     ${setup}
   </div>`;
 }

@@ -25,6 +25,13 @@ export const PLANE_LIVERIES: Array<Livery<PlaneLivery>> = [
 export const careerTaka = () => readSave().progress?.career.taka ?? 0;
 
 /** The chosen Livery if it's unlocked, else the default. */
+/** The chosen livery's id (or the first one if it isn't unlocked), as Rooms send it to other players. */
+export function currentLiveryId(kind: 'bus' | 'plane'): string {
+  const list = kind === 'bus' ? BUS_LIVERIES : PLANE_LIVERIES;
+  const id = readSave().liveries?.[kind];
+  return list.find(l => l.id === id && l.unlockTk <= careerTaka())?.id ?? list[0].id;
+}
+
 export function currentLivery<T>(kind: 'bus' | 'plane'): T {
   const list = (kind === 'bus' ? BUS_LIVERIES : PLANE_LIVERIES) as Array<Livery<T>>;
   const id = readSave().liveries?.[kind];
