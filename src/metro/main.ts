@@ -108,6 +108,8 @@ const junctions = new Junctions(lanes, region.route, scene);
 const farmgate = line.stations.find(st => st.name === 'Farmgate');
 const traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[tier as QualityTier] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null, TRAFFIC_STYLES.dhaka);
 if (atmosphere.rainy) traffic.speedScale = RAIN_TRAFFIC_FACTOR;
+traffic.view = camera;
+traffic.lights = atmosphere.night || atmosphere.rainy || atmosphere.foggy;
 const stationView = new StationView(scene, line);
 const passengers = new Passengers(scene);
 const ghostViews = [ahead, ...opposite].map(g => { const v = new TrainView(scene, g); v.setCabVisible(false); return v; });
