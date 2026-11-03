@@ -31,6 +31,8 @@ import { ResultsScreen } from '../ui/results';
 import type { LedgerEntry, RunResult } from '../bus/run/Run';
 import { FLOOR_M, PLATFORM_EDGE_M } from '../shared/train';
 import { Track } from './track';
+import { Junctions } from '../traffic/junctions';
+import { RAIN_TRAFFIC_FACTOR, TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from '../traffic/Traffic';
 
 await RAPIER.init();
 const params = new URLSearchParams(location.search);
@@ -46,7 +48,8 @@ atmosphere.enableWipers();
 atmosphere.enableShadows(renderer);
 
 loader.stage('loadMap', 0, 0.1);
-const region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, new RAPIER.World({ x: 0, y: -9.81, z: 0 }), false);
+const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+const region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, world, false);
 if (!(await region.init()) || !region.manifest.line) {
   loader.done();
   document.body.insertAdjacentHTML('beforeend', `<div class="hud-strip">${t('notBaked', { id: regionId })}</div>`);
@@ -67,7 +70,7 @@ const legStops = trackData.stops.slice(firstStop, lastStop + 1);
 const track = new Track(trackData);
 const train = new Train(track, legStops[0].stopS, line.trainLengthM);
 const view = new TrainView(scene, train);
-const tmpPos = new THREE.Vector3();
+const tmpPos = new THREE.Vector3(), groundPos = new THREE.Vector3();
 const sounds = new TrainSounds(train);
 // The train starts at the first station with its doors open; authority to each next station is
 // given when the doors are closed and locked there (dispatch).
@@ -97,7 +100,14 @@ view.sync();
 await region.prime(view.cars[0].position, p => loader.progress(p));
 loader.stage('loadPrepare', 0.85, 1);
 const minimap = new Minimap();
-minimap.setRegion(region.route, await region.loadLanes());
+const lanes = await region.loadLanes();
+minimap.setRegion(region.route, lanes);
+// AI road traffic on the streets under the viaduct (polish spec §6.2), centred on the ground below
+// the train; the train is up on the deck, so the traffic doesn't yield to it.
+const junctions = new Junctions(lanes, region.route, scene);
+const farmgate = line.stations.find(st => st.name === 'Farmgate');
+const traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[tier as QualityTier] ?? TRAFFIC_CAP.medium, farmgate ? { x: farmgate.x, z: farmgate.z } : null, TRAFFIC_STYLES.dhaka);
+if (atmosphere.rainy) traffic.speedScale = RAIN_TRAFFIC_FACTOR;
 const stationView = new StationView(scene, line);
 const passengers = new Passengers(scene);
 const ghostViews = [ahead, ...opposite].map(g => { const v = new TrainView(scene, g); v.setCabVisible(false); return v; });
@@ -372,11 +382,15 @@ startLoop(
     atp.update();
     train.update(dt);
     stepStation(dt);
+    track.at(train.s, groundPos);
+    junctions.update(dt);
+    traffic.update(dt, { x: groundPos.x, z: groundPos.z, hx: 1, hz: 0, speed: 0, ghost: true });
   },
   (frameDt, ahead) => {
     if (!paused) pad.poll();
     view.sync(paused ? 0 : ahead);
     for (const gv of ghostViews) gv.sync();
+    traffic.draw(paused ? 0 : ahead, frameDt);
     view.setCabVisible(camMode === 'cab');
     view.setInteriorVisible(camMode === 'passenger');
     updateCamera(frameDt);

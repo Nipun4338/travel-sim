@@ -42,7 +42,8 @@ interface Vehicle {
   yaw: number | null;    // drawn heading, eased so turns don't snap at road vertices
 }
 
-export interface BusObstacle { x: number; z: number; hx: number; hz: number; speed: number; }
+/** The player's vehicle; with `ghost` it only centres the traffic (Metro Mode's train is up on the viaduct). */
+export interface BusObstacle { x: number; z: number; hx: number; hz: number; speed: number; ghost?: boolean; }
 
 const tmp = { x: 0, y: 0, z: 0, hx: 1, hz: 0 }, back = { ...tmp }, front = { ...tmp };
 const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qp = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3(0, 0, 1), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
@@ -156,7 +157,7 @@ export class Traffic {
     }
     const bx = bus.x - tmp.x, bz = bus.z - tmp.z, along = bx * hx + bz * hz;
     const lat = Math.abs(-bx * hz + bz * hx - v.lateral); // bus offset to the right of the path, minus our lane's
-    if (along > 0 && along < 70 && lat < spec.width / 2 + 1.6) consider(along - spec.length / 2 - 5.5, Math.max(0, bus.speed * (bus.hx * hx + bus.hz * hz)));
+    if (!bus.ghost && along > 0 && along < 70 && lat < spec.width / 2 + 1.6) consider(along - spec.length / 2 - 5.5, Math.max(0, bus.speed * (bus.hx * hx + bus.hz * hz)));
     const j = this.junctions.ahead(tmp.x, tmp.z, hx, hz, 60);
     if (j && this.junctions.stateFor(j.j, hx, hz).stop) {
       const stopDist = (v.v * v.v) / (2 * spec.comfortDecel * 1.6);
@@ -189,7 +190,7 @@ export class Traffic {
     let want = this.network.laneOffset(v.path, v.lane);
     if (this.style.hillRoad && v.path.way.dir === 0) {
       // Meeting the bus head-on: pull in to the kerb and crawl past (the "squeeze past", SPEC §7).
-      const oncoming = along > 0 && along < 60 && bus.hx * hx + bus.hz * hz < -0.5 && lat < 6;
+      const oncoming = !bus.ghost && along > 0 && along < 60 && bus.hx * hx + bus.hz * hz < -0.5 && lat < 6;
       if (oncoming) { want -= 0.9; v.v = Math.min(v.v, 12 / 3.6); }
       // Otherwise hug the middle of the road on hairpins.
       else if (this.bendAhead(v) > 0.9) want *= 0.15;
