@@ -16,3 +16,23 @@ class_name = "Budget"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room", "Budget"]
+
+# The preview server for testing before players see a release (docs/rooms-spec.md §1):
+# `npm run deploy:rooms:preview`. Its daily quota is small, so the 90% wind-down can be tried in a
+# short session; raise or lower it with `--var DAILY_REQUESTS:<n>` on deploy.
+[env.preview]
+name = "travel-sim-rooms-preview"
+workers_dev = true
+vars = { DAILY_REQUESTS = "3000" }
+
+[[env.preview.durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[env.preview.durable_objects.bindings]]
+name = "BUDGET"
+class_name = "Budget"
+
+[[env.preview.migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room", "Budget"]

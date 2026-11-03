@@ -13,7 +13,8 @@
     "audio": "tsx scripts/audio/build.ts",
     "deploy": "npm run build && npx wrangler@4 pages deploy dist --project-name travel-sim --branch main",
     "dev:rooms": "wrangler dev --config server/rooms/wrangler.toml --port 8787 --var DEV:1",
-    "deploy:rooms": "wrangler deploy --config server/rooms/wrangler.toml"
+    "deploy:rooms": "wrangler deploy --config server/rooms/wrangler.toml",
+    "deploy:rooms:preview": "wrangler deploy --config server/rooms/wrangler.toml --env preview"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
