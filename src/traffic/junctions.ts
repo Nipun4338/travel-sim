@@ -25,13 +25,13 @@ export class Junctions {
 
   constructor(lanes: LaneData, route: RouteData, scene: THREE.Scene) {
     // Nodes where three or more main-road ends or pass-throughs meet.
-    const uses = new Map<number, number>(), pos = new Map<number, [number, number]>();
+    const uses = new Map<number, number>(), pos = new Map<number, [number, number, number]>();
     for (const w of lanes.ways) {
       if (w.elevated || !TRAFFIC_HIGHWAYS.has(w.highway)) continue;
       w.nodes.forEach((n, i) => {
         uses.set(n, (uses.get(n) ?? 0) + (i === 0 || i === w.nodes.length - 1 ? 1 : 2));
         const p = w.points[w.nodeAt[i]];
-        pos.set(n, [p[0], p[2]]);
+        pos.set(n, [p[0], p[2], p[1]]);
       });
     }
     const candidates = [...uses].filter(([, n]) => n >= 3).map(([id]) => pos.get(id)!);
@@ -52,7 +52,8 @@ export class Junctions {
       const axis: [number, number] = [(b[0] - a[0]) / len, (b[2] - a[2]) / len];
       const { figure, arm } = policeFigure();
       // Stand on the corner to the left of the Route, clear of the carriageways.
-      figure.position.set(x - axis[1] * -radius * 0.85, route.points[k][1], z + axis[0] * -radius * 0.85);
+      // At road level (the lane height): a metro Route runs up on the viaduct.
+      figure.position.set(x - axis[1] * -radius * 0.85, seed[2], z + axis[0] * -radius * 0.85);
       scene.add(figure);
       this.list.push({ name, x, z, radius, axis, offset: (name.length * 7) % CYCLE, figure, arm });
     }

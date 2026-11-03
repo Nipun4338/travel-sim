@@ -13,6 +13,7 @@ export const TRAFFIC_CAP: Record<QualityTier, number> = { low: 25, medium: 45, h
 
 const SPAWN_MIN = 140;
 const VIEW_MARGIN = 8;         // m added to a vehicle's bounding sphere, so it can't peek in at a frame edge
+const FAR_SPAWN_M = 320;       // beyond this from the camera a new vehicle is a few pixels: it may appear in view
 const MIN_GAP = 2.0;
 const RICKSHAW_ZONE_M = 700;   // rickshaws only in the kerb lane around Farmgate (SPEC §7)
 
@@ -156,7 +157,9 @@ export class Traffic {
       const v = this.vehicles[i];
       this.network.sample(v.path, v.s, tmp);
       const d = Math.hypot(tmp.x - bus.x, tmp.z - bus.z);
-      if (d > radius * 2 || (d > radius * 1.2 && this.hidden(tmp, SPECS[v.type].length))) this.remove(i);
+      // Out of sight, a vehicle goes as soon as it's past the radius (freeing its slot for the road
+      // ahead); in view it stays until twice that, when it's a speck.
+      if (d > radius * 2 || (d > radius && this.hidden(tmp, SPECS[v.type].length))) this.remove(i);
     }
     const fill = this.fresh;
     for (let tries = 0; tries < (fill ? 400 : 6) && this.vehicles.length < this.cap; tries++) this.trySpawn(bus, fill);
@@ -248,6 +251,11 @@ export class Traffic {
     frustum.setFromProjectionMatrix(viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
   }
 
+  private distant(p: { x: number; y: number; z: number }): boolean {
+    const cam = this.view;
+    return !cam || Math.hypot(p.x - cam.position.x, p.y - cam.position.y, p.z - cam.position.z) > FAR_SPAWN_M;
+  }
+
   /** Whether the player can't see a vehicle of this length at `p`: out of view, or lost in the fog. */
   private hidden(p: { x: number; y: number; z: number }, length: number): boolean {
     const cam = this.view;
@@ -276,7 +284,9 @@ export class Traffic {
     this.network.sample(p, s, tmp);
     const d = Math.hypot(tmp.x - bus.x, tmp.z - bus.z);
     if (d < SPAWN_MIN || d > this.style.radius) return;
-    if (!anywhere && !this.hidden(tmp, 11)) return; // 11 m: room for the longest vehicle
+    // Out of sight (11 m: room for the longest vehicle), or far enough off to be a speck; otherwise a
+    // road that stays in view (a straight ahead by day, when the fog is past the radius) never refills.
+    if (!anywhere && !this.hidden(tmp, 11) && !this.distant(tmp)) return;
     const lane = Math.floor(this.rnd() * p.lanes);
     const lateral = this.network.laneOffset(p, lane);
     if (this.vehicles.some(o => o.path === p && Math.abs(o.s - s) < 18 && Math.abs(o.lateral - lateral) < 1.6)) return;
