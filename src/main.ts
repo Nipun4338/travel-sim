@@ -114,6 +114,7 @@ if (region) {
     TRAFFIC_STYLES[regionId] ?? TRAFFIC_STYLES.dhaka,
   );
   if (atmosphere.rainy) traffic.speedScale = RAIN_TRAFFIC_FACTOR;
+  traffic.view = camera;
   // Street lamps light Dhaka's main roads at night; Bandarban stays dark apart from headlights.
   if (atmosphere.night && regionId === 'dhaka') scene.add(...streetLamps(lanes));
   const pts = region.route.points;

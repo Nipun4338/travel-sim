@@ -12,6 +12,7 @@ export type QualityTier = 'low' | 'medium' | 'high';
 export const TRAFFIC_CAP: Record<QualityTier, number> = { low: 25, medium: 45, high: 80 };
 
 const SPAWN_MIN = 140;
+const VIEW_MARGIN = 8;         // m added to a vehicle's bounding sphere, so it can't peek in at a frame edge
 const MIN_GAP = 2.0;
 const RICKSHAW_ZONE_M = 700;   // rickshaws only in the kerb lane around Farmgate (SPEC §7)
 
@@ -46,6 +47,7 @@ interface Vehicle {
 export interface BusObstacle { x: number; z: number; hx: number; hz: number; speed: number; ghost?: boolean; }
 
 const tmp = { x: 0, y: 0, z: 0, hx: 1, hz: 0 }, back = { ...tmp }, front = { ...tmp };
+const frustum = new THREE.Frustum(), viewProj = new THREE.Matrix4(), sphere = new THREE.Sphere();
 const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qp = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3(0, 0, 1), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
 
 /** AI traffic speed in monsoon rain. */
@@ -60,6 +62,8 @@ export class Traffic {
   private truckSigns: THREE.InstancedMesh;
   private byCollider = new Map<number, Vehicle>();
   private time = 0;
+  /** No vehicles yet (start, or after `clear`): the next update fills up in one go, in view or not. */
+  private fresh = true;
   private cap: number;
   private rnd: () => number;
   /** Level crossings with their booms down: traffic stops short of them. */
@@ -68,11 +72,17 @@ export class Traffic {
   /** Rain slows AI traffic (SPEC §7): `speedScale` is set to RAIN_TRAFFIC_FACTOR. */
   speedScale = 1;
 
+  /**
+   * The camera the player sees through. Vehicles only appear or vanish where it can't see them:
+   * out of its view or past the fog. Without one, they come and go at the radius as before.
+   */
+  view: THREE.Camera | null = null;
+
   /** Event hook: a vehicle sounds its horn (audio arrives in M9). */
   onHonk: (type: VehicleType) => void = () => {};
 
   constructor(
-    lanes: LaneData, scene: THREE.Scene, private world: RAPIER.World, private junctions: Junctions,
+    lanes: LaneData, private scene: THREE.Scene, private world: RAPIER.World, private junctions: Junctions,
     cap: number, private rickshawCentre: { x: number; z: number } | null, private style: TrafficStyle = TRAFFIC_STYLES.dhaka, seed = 7,
   ) {
     this.cap = Math.min(cap, style.maxVehicles ?? cap);
@@ -115,22 +125,38 @@ export class Traffic {
   }
 
   /** Removes all vehicles, e.g. when the bus jumps to another Leg. */
-  clear(): void { while (this.vehicles.length) this.remove(0); }
+  clear(): void { while (this.vehicles.length) this.remove(0); this.fresh = true; }
 
+  /**
+   * Simulates traffic within the style's radius of `bus` (the player's vehicle, which AI traffic
+   * also drives around). New vehicles spawn and far ones despawn only out of the `view` camera's
+   * sight, so nothing pops in or out on screen; a vehicle still in view stays until it isn't.
+   */
   update(dt: number, bus: BusObstacle): void {
     this.time += dt;
+    this.updateView();
+    const radius = this.style.radius;
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
       this.network.sample(v.path, v.s, tmp);
-      if (Math.hypot(tmp.x - bus.x, tmp.z - bus.z) > this.style.radius * 1.2) this.remove(i);
+      const d = Math.hypot(tmp.x - bus.x, tmp.z - bus.z);
+      if (d > radius * 2 || (d > radius * 1.2 && this.hidden(tmp, SPECS[v.type].length))) this.remove(i);
     }
-    for (let tries = 0; tries < 6 && this.vehicles.length < this.cap; tries++) this.trySpawn(bus);
+    const fill = this.fresh;
+    for (let tries = 0; tries < (fill ? 400 : 6) && this.vehicles.length < this.cap; tries++) this.trySpawn(bus, fill);
+    this.fresh = false;
     for (const v of this.vehicles) this.drive(v, dt, bus);
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
       if (v.s > v.path.length) {
         const next = this.network.next(v.path, this.rnd());
-        if (!next) { this.remove(i); continue; }
+        if (!next) {
+          // The lane network ends here (the edge of the baked map): wait at the end until out of sight.
+          this.network.sample(v.path, v.path.length, tmp);
+          if (this.hidden(tmp, SPECS[v.type].length)) this.remove(i);
+          else { v.s = v.path.length; v.v = 0; }
+          continue;
+        }
         v.s -= v.path.length;
         v.path = next;
         v.lane = Math.min(v.lane, next.lanes - 1);
@@ -198,6 +224,26 @@ export class Traffic {
     v.lateral += Math.max(-1.2 * dt, Math.min(1.2 * dt, want - v.lateral));
   }
 
+  private updateView(): void {
+    const cam = this.view;
+    if (!cam) return;
+    cam.updateMatrixWorld();
+    frustum.setFromProjectionMatrix(viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  }
+
+  /** Whether the player can't see a vehicle of this length at `p`: out of view, or lost in the fog. */
+  private hidden(p: { x: number; y: number; z: number }, length: number): boolean {
+    const cam = this.view;
+    if (!cam) return true;
+    const fog = this.scene.fog;
+    const far = fog instanceof THREE.Fog ? fog.far : Infinity;
+    const r = length / 2 + VIEW_MARGIN;
+    if (Math.hypot(p.x - cam.position.x, p.y - cam.position.y, p.z - cam.position.z) > far + r) return true;
+    sphere.center.set(p.x, p.y + 1.5, p.z);
+    sphere.radius = r;
+    return !frustum.intersectsSphere(sphere);
+  }
+
   /** Heading change over the next ~30 m of the path, radians. */
   private bendAhead(v: Vehicle): number {
     const a = { x: 0, y: 0, z: 0, hx: 1, hz: 0 }, b = { x: 0, y: 0, z: 0, hx: 1, hz: 0 };
@@ -206,13 +252,14 @@ export class Traffic {
     return Math.abs(Math.atan2(a.hx * b.hz - a.hz * b.hx, a.hx * b.hx + a.hz * b.hz));
   }
 
-  private trySpawn(bus: BusObstacle): void {
+  private trySpawn(bus: BusObstacle, anywhere = false): void {
     const paths = this.network.paths;
     const p = paths[Math.floor(this.rnd() * paths.length)];
     const s = this.rnd() * p.length;
     this.network.sample(p, s, tmp);
     const d = Math.hypot(tmp.x - bus.x, tmp.z - bus.z);
     if (d < SPAWN_MIN || d > this.style.radius) return;
+    if (!anywhere && !this.hidden(tmp, 11)) return; // 11 m: room for the longest vehicle
     const lane = Math.floor(this.rnd() * p.lanes);
     const lateral = this.network.laneOffset(p, lane);
     if (this.vehicles.some(o => o.path === p && Math.abs(o.s - s) < 18 && Math.abs(o.lateral - lateral) < 1.6)) return;
