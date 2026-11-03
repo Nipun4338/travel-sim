@@ -26,13 +26,17 @@ export type RoomMode = 'bus' | 'flight' | 'metro';
 export interface Conditions { time: string; weather: string }
 /** A name is a vehicle index plus a number, so it reads in either language and carries no free text. */
 export interface PlayerName { vehicle: number; n: number }
-export interface Player { seat: number; name: PlayerName; livery: string }
+/** `away`: dropped and inside the 2-minute reconnect grace (§9); their vehicle stays parked. */
+export interface Player { seat: number; name: PlayerName; livery: string; away?: boolean }
+/** How long a dropped player keeps their seat (and a dropped Host the role) while reconnecting (§9). */
+export const RECONNECT_GRACE_MS = 2 * 60_000;
 
 /** Game → server. The first message on a socket must be `hello`. */
 export type ClientMessage =
   | { t: 'hello'; client: string; name: PlayerName; livery: string; mode: RoomMode; region: string; create?: Conditions }
   | { t: 'quick'; id: number }
-  | { t: 'remove'; seat: number };
+  | { t: 'remove'; seat: number }
+  | { t: 'leave' };   // leaving on purpose: the seat frees at once, with no reconnect grace
 
 export type JoinError = 'full' | 'closed' | 'removed' | 'mismatch' | 'exists' | 'quota';
 /** Server → game. */
@@ -40,6 +44,8 @@ export type ServerMessage =
   | { t: 'welcome'; code: string; seat: number; host: number; mode: RoomMode; region: string; conditions: Conditions; players: Player[] }
   | { t: 'joined'; player: Player }
   | { t: 'left'; seat: number }
+  | { t: 'away'; seat: number }     // dropped; may come back within RECONNECT_GRACE_MS
+  | { t: 'back'; seat: number }
   | { t: 'host'; seat: number }
   | { t: 'quick'; seat: number; id: number }
   | { t: 'removed' }
