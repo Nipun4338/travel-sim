@@ -111,7 +111,9 @@ GLO-30 includes the forest canopy. The current filter (min ±30 m, blur ±30 m) 
 - **Jhum patches** (slash-and-burn clearings) on the slopes, as ground colour only.
 - **No undergrowth.** Bandarban's chunks are already the heaviest (287k triangles at LOD 0).
 
-## 6. MRT Line 6 (v1.5)
+## 6. MRT Line 6 (v1.5, built 2026-11-03)
+
+As built: the stations are `scripts/bake/stations.ts` (types A about 4.6k triangles, B 4.9k, C 6.0k, D 5.2k), laid out in a frame that follows the track. Their signs come from a per-line atlas Metro Mode paints from the line's station names (`src/shared/stationAtlas.ts`, `src/render/stationAtlas.ts`; a `station` chunk layer), because the street-sign atlas was full and resizing it would have moved Dhaka's baked UVs. The baked roundels replace the runtime name boards. Uttara North draws 7 runs of the other OSM track as depot track; its layout is still unconfirmed. The Dhaka Farmgate hero (`farmgateMetro`) is restyled as type D. Along the line the street-life kit runs at C within 150 m of the viaduct, with rooftop clutter and about 960 billboards facing it (`rooftop` in `streetlife.ts`). Three grove circles (Dhaka University and Suhrawardy Udyan, Ramna, the Secretariat green) bring the Region to about 10,300 trees. Metro Mode runs the Dhaka traffic mix on the streets under the viaduct, centred below the train. To stay in budget, metro Regions keep only the lanes within 500 m of the line (`lanes.json` 20.6 → 3.6 MB): Line 6 is 47 MB on disk, 43.6 MB of it GLB.
 
 [Research how the Line 6 stations really differ](wayfinder/polish/tickets/003-research-line6-stations.md), [Shape the four station models](wayfinder/polish/tickets/010-shape-line6-station-models.md), [prototype](../prototypes/line6-stations/PROTOTYPE-line6-stations.html), [research](research/line6-stations.md)
 

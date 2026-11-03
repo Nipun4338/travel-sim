@@ -11,6 +11,23 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.5.0',
+    date: '2026-11-03',
+    image: '1.5.0.jpg',
+    bn: [
+      'মেট্রো লাইন ৬-এর ১৬টি স্টেশন এখন আসলের মতো: টেরাকোটা দেয়াল, বাঁকা ছাদ, বাংলা-ইংরেজি নামফলক আর রাস্তার উপর কনকোর্স।',
+      'উত্তরা সেন্টারের সবুজ-লাল খিলান, বিজয় সরণির কাচের পাখা-খিলান, ফার্মগেটের নতুন রূপ আর উত্তরা উত্তরের চওড়া ছাদ।',
+      'ভায়াডাক্টের নিচের রাস্তায় এখন বাস, সিএনজি আর গাড়ি চলে; পাশে দোকানের সাইনবোর্ড, তারের জট, চায়ের দোকান আর মানুষ।',
+      'ছাদে পানির ট্যাংক, ডিশ আর লাইনের দিকে মুখ করা বিলবোর্ড; ঢাকা বিশ্ববিদ্যালয়, সোহরাওয়ার্দী উদ্যান আর রমনায় ঘন গাছ।',
+    ],
+    en: [
+      'All 16 MRT Line 6 stations now look like the real ones: terracotta walls, arched roofs, Bangla and English name signs, and a concourse over the road.',
+      'Uttara Center’s green and red arch, Bijoy Sarani’s glazed fan arch, a rebuilt Farmgate and Uttara North’s wide roof.',
+      'Buses, CNGs and cars drive the road under the viaduct, past shop signs, tangled wires, tea stalls and people.',
+      'Water tanks, dishes and billboards facing the line on the rooftops; dense trees at Dhaka University, Suhrawardy Udyan and Ramna.',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-11-03',
     image: '1.4.0.jpg',

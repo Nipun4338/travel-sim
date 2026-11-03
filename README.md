@@ -42,14 +42,16 @@ Take off from Hazrat Shahjalal International Airport and fly over Dhaka's skylin
 
 ### 🚇 Metro: drive MRT Line 6 *(new in 1.1.0)*
 
-![A six-car Line 6 train curving along the viaduct near Bijoy Sarani](docs/images/metro-hero.jpg)
+![Bijoy Sarani station's glazed fan arch over the road, with trees and street life below the viaduct](docs/images/metro-hero.jpg)
 
 Drive a six-car Dhaka Metro train along the whole of MRT Line 6, Uttara North to Motijheel: 16 stations on the real elevated alignment, with the city below. Work the master controller through power and brake notches while cab signalling and ATP watch your speed: go over the permitted speed and you get a warning, then the brakes. Stop on the mark so the train's doors line up with the platform screen doors, open them on the platform side, let people off and on, close up and wait for the dispatch signal. Keep to the timetable, with the train ahead and trains the other way sharing the line.
 
+**The stations and the city below** *(new in 1.5.0)*. Every station is modelled on the real one: terracotta walls under an arched steel roof, platform roundels and a fascia over the road in Bangla and English, and street entrances with exit letters. Uttara Center has its green and red arch, Bijoy Sarani its glazed fan arch, Farmgate its cream grid and teal roof with skywalks, and Uttara North the widest roof of all. Below the viaduct, buses, CNGs and cars drive past shop signs, tea stalls, tangled wires and rooftop billboards, and Dhaka University, Suhrawardy Udyan and Ramna are thick with trees.
+
 | | |
 |:-:|:-:|
-| ![The cab: the line curving ahead under the overhead wires](docs/images/metro-cab.jpg) | ![Passengers queued at the platform screen doors while the train's doors are open](docs/images/metro-station.jpg) |
-| *From the cab: the driver display shows speed, the permitted speed and the target* | *Platform screen doors, a waiting crowd and Bangla announcements* |
+| ![The cab at Agargaon: the arched roof, the stop marker and the station's roundels](docs/images/metro-cab.jpg) | ![Karwan Bazar station's fascia over the road, with traffic and street life under the viaduct](docs/images/metro-station.jpg) |
+| *From the cab at Agargaon: arched roof, stop marker and bilingual roundels* | *Karwan Bazar from the street: the fascia over the road, traffic and stalls below* |
 
 Seven cameras: the cab, chasing, on the platform, alongside, from the air, a passenger seat, and trackside.
 
@@ -137,7 +139,7 @@ The routes you've driven light up on the map, zoomed-in places name their landma
 |:-:|:-:|
 | ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
 
-**Current version: 1.4.0**: Rooms, so friends can drive the Dhaka bus road together, plus wipers on every bus. 1.3.0 brought Dhaka to its real heights with Bangla shop signs, wires, stalls and people along the road; 1.2.2 kept the Bandarban bus on the Thanchi Road and moved Chimbuk's summit complex to where it really is; 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
+**Current version: 1.5.0**: MRT Line 6 polished, with all 16 stations modelled on the real ones, traffic and street life under the viaduct, and dense trees around Dhaka University. 1.4.0 added Rooms, so friends can drive the Dhaka bus road together, plus wipers on every bus; 1.3.0 brought Dhaka to its real heights with Bangla shop signs, wires, stalls and people along the road; 1.2.2 kept the Bandarban bus on the Thanchi Road and moved Chimbuk's summit complex to where it really is; 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 
