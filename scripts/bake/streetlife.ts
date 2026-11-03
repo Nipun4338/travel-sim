@@ -201,3 +201,52 @@ export function buildStreetLife(
   }
   return { poles, stalls, people, rickshaws };
 }
+
+const R = {
+  tank: [0x1f4fa8, 0x2b2b2b, 0xd9d4c4].map(color), hut: color(0xcfc8b8), rail: color(0x4a4a4a), dish: color(0xe8e8e8),
+};
+const dishGeo = new THREE.ConeGeometry(0.55, 0.25, 7, 1, true).rotateX(Math.PI * 0.62);
+
+/**
+ * Rooftop clutter on a flat roof (polish spec §6.2, the view from the viaduct): a stair hut, a
+ * plastic water tank on a stand, a railing along the parapet and a dish antenna, each on some of
+ * the roofs. With `line` (the nearest point on the viaduct), a billboard facing it on some roofs
+ * of buildings 12 m or taller. LOD 0 only. Returns whether a billboard was added.
+ */
+export function rooftop(
+  geo: ChunkGeometry, ring: THREE.Vector2[], top: number, height: number, id: number, d: StreetDensity,
+  line: { px: number; pz: number; dist: number } | null,
+): boolean {
+  const r = (k: number) => hash01(id * 17 + k * 131);
+  const cx = ring.reduce((s, p) => s + p.x, 0) / ring.length, cz = ring.reduce((s, p) => s + p.y, 0) / ring.length;
+  const area = Math.abs(THREE.ShapeUtils.area(ring));
+  if (area < 60) return false;
+  const inner = (k: number, f: number): [number, number] => { const p = ring[Math.floor(r(k) * ring.length) % ring.length]; return [cx + (p.x - cx) * f, cz + (p.y - cz) * f]; };
+  if (r(1) < 0.5) { const [x, z] = inner(2, 0.45); geo.box(x, z, 1.4, 1.6, top, top + 2.6, R.hut, 'prop', [0]); }
+  if (r(3) < 0.55) {
+    const [x, z] = inner(4, 0.55), c = pick(R.tank, r(5));
+    for (const [dx, dz] of [[-0.5, -0.5], [0.5, 0.5]]) geo.box(x + dx, z + dz, 0.05, 0.05, top, top + 0.8, R.rail, 'prop', [0]);
+    geo.box(x, z, 0.6, 0.6, top + 0.8, top + 2.0, c, 'prop', [0]);
+  }
+  if (r(6) < 0.35) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      const q = (p: THREE.Vector2, y: number): V3 => [p.x, top + y, p.y];
+      geo.quad(q(a, 1.05), q(a, 1.12), q(b, 1.12), q(b, 1.05), R.rail, 'prop', [0]);
+      geo.quad(q(b, 1.05), q(b, 1.12), q(a, 1.12), q(a, 1.05), R.rail, 'prop', [0]);
+    }
+  }
+  if (r(7) < 0.25) { const [x, z] = inner(8, 0.7); geo.box(x, z, 0.04, 0.04, top, top + 1.2, R.rail, 'prop', [0]); geo.mesh(dishGeo.clone().rotateY(r(9) * 6.28), x, top + 1.3, z, R.dish, 'prop', [0]); }
+  // A billboard facing the viaduct, on two posts at the roof's edge nearest the line.
+  if (!line || height < 12 || line.dist < 8 || r(10) >= d.billboard) return false;
+  const nx = (line.px - cx) / line.dist, nz = (line.pz - cz) / line.dist;   // towards the line
+  const reach = Math.max(...ring.map(p => (p.x - cx) * nx + (p.y - cz) * nz));
+  const bx = cx + nx * Math.max(0, reach - 1.5), bz = cz + nz * Math.max(0, reach - 1.5), w = 9, y0 = top + 1.5, y1 = y0 + w * 0.28;
+  const tx = -nz, tz = nx;   // along the board, so it reads left to right seen from the line
+  const p = (s: number, y: number, o = 0): V3 => [bx + tx * s + nx * o, y, bz + tz * s + nz * o];
+  const [u0, v0, u1, v1] = billboardUV(Math.floor(r(11) * 97) % BILLBOARD_CELLS);
+  geo.quad(p(w / 2, y0), p(w / 2, y1), p(-w / 2, y1), p(-w / 2, y0), WHITE, 'sign', [0, 1], [[u0, v0], [u0, v1], [u1, v1], [u1, v0]]);
+  geo.quad(p(-w / 2, y0, -0.05), p(-w / 2, y1, -0.05), p(w / 2, y1, -0.05), p(w / 2, y0, -0.05), C.back, 'prop', [0, 1]);
+  for (const s of [-w / 3, w / 3]) { const [x, , z] = p(s, 0, -0.2); geo.box(x, z, 0.09, 0.09, top, y0, C.post, 'prop', [0]); }
+  return true;
+}

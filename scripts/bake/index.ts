@@ -185,13 +185,22 @@ async function main() {
       const pts = bw.nodes.map(nid => blds.nodes.get(nid)).filter(Boolean);
       if (pts.length) shops.add(pts.reduce((sum, nd) => sum + nd!.x, 0) / pts.length, pts.reduce((sum, nd) => sum + nd!.z, 0) / pts.length);
     }
-    densityAt = (x, z) => (commercialLand.at(x, z) || shops.near(x, z, 40) ? BUSY : MEDIUM);
+    densityAt = region.streetMedium ? () => MEDIUM : (x, z) => (commercialLand.at(x, z) || shops.near(x, z, 40) ? BUSY : MEDIUM);
   }
-  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared, heights, densityAt);
+  // Along Line 6 the street life, rooftop clutter and billboards facing the viaduct stay within
+  // 150 m of it: that is what the view from the train takes in.
+  let lifeNear = nearRoute, roofs: { at: (x: number, z: number) => boolean; line: SegmentIndex } | undefined;
+  if (metro && densityAt) {
+    const lineGrid = new PointGrid(150), lineSegs = new SegmentIndex(150);
+    metro.centre.forEach(([x, , z], i) => { lineGrid.add(x, z); if (i) lineSegs.add(metro!.centre[i - 1][0], metro!.centre[i - 1][2], x, z, 0); });
+    lifeNear = (x, z) => lineGrid.near(x, z, 150);
+    roofs = { at: lifeNear, line: lineSegs };
+  }
+  const nb = buildBuildings(geo, blds, h, nearRoute, onRoad, majorRoads, footprints, cleared, heights, densityAt, roofs);
   lap('buildings');
   console.log(`      ${nb.built} buildings (${nb.droppedOnRoad} dropped for sitting in a major road), ${nb.signs} shop signs, ${nb.billboards} billboards`);
   if (densityAt) {
-    const sl = buildStreetLife(geo, roads, h, junctions, nearRoute, densityAt);
+    const sl = buildStreetLife(geo, roads, h, junctions, lifeNear, densityAt);
     lap('street life');
     console.log(`      street life: ${sl.poles} poles, ${sl.stalls} stalls, ${sl.people} people, ${sl.rickshaws} rickshaws`);
   }
@@ -227,8 +236,13 @@ async function main() {
   const { cumKm, stops } = route;
   console.log(`      Route ${cumKm[cumKm.length - 1].toFixed(2)} km: ${stops.map(st => `${st.name} ${st.km.toFixed(1)}`).join(' · ')}`);
 
+  // Metro mode only needs the streets near the line (the minimap and the traffic under the viaduct):
+  // keep lanes within 500 m of it, which is most of the Line 6 download otherwise (polish spec §7).
+  const laneGrid = new PointGrid(500);
+  if (metro) for (const [x, , z] of metro.centre) laneGrid.add(x, z);
+  const laneNear = (wy: OsmWay) => !metro || wy.nodes.some(nid => { const nd = roads.nodes.get(nid); return !!nd && laneGrid.near(nd.x, nd.z, 500); });
   const lanes: LaneData = {
-    ways: roads.ways.filter(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway)).map(wy => {
+    ways: roads.ways.filter(wy => wy.tags?.highway && DRIVABLE.has(wy.tags.highway) && laneNear(wy)).map(wy => {
       const t = wy.tags!;
       const nodes = wy.nodes.filter(nid => roads.nodes.has(nid));
       // Same height as the road ribbon, or the flyover deck (with its ramps).

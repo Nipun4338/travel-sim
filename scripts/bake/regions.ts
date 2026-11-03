@@ -30,6 +30,8 @@ export interface RegionDef {
   markings?: boolean;
   /** The street-life kit (polish spec §3): painted boards, wires, stalls, rickshaws and people. */
   streetLife?: boolean;
+  /** Street life at medium density (C) everywhere instead of busy (D) on commercial stretches (Line 6). */
+  streetMedium?: boolean;
   /** Route stretches where OSM lacks the roadside buildings: gaps get low-rise retail lots. */
   infill?: Array<{ fromKm: number; toKm: number }>;
   /** Buildings farther than `radiusM` from this point are capped at `maxM` unless OSM tags a height. */
@@ -127,6 +129,8 @@ export const LINE6: RegionDef = {
   footpaths: true,
   metro: true,
   fromExtract: true,
+  streetLife: true,   // at C, within 150 m of the viaduct, with rooftop clutter and billboards facing it (polish spec §6.2)
+  streetMedium: true,
 };
 
 export const REGIONS: Record<string, RegionDef> = { dhaka: DHAKA, bandarban: BANDARBAN, line6: LINE6 };

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from '../../src/shared/region';
 import { ChunkGeometry, color, densify, hash01, type UV, type V3 } from './geometry';
-import { frontage, type DensityAt } from './streetlife';
+import { frontage, rooftop, type DensityAt } from './streetlife';
 import { DRIVABLE, isElevated, isOneway, roadRank, roadWidth, type Indexed } from './osm';
 import { PointGrid, PolygonIndex, SegmentIndex } from './spatial';
 import { crownRadius, pickSpecies, plantTree, type TreeSetting } from './trees';
@@ -414,6 +414,8 @@ export function buildBuildings(
   geo: ChunkGeometry, idx: Indexed, h: HeightSampler, near: (x: number, z: number) => boolean,
   onRoad: (x: number, z: number) => boolean, majorRoads: SegmentIndex, footprints?: PolygonIndex<true>,
   cleared: (x: number, z: number) => boolean = () => false, heights?: HeightSource, street?: DensityAt,
+  /** Rooftop clutter where this returns true, and billboards facing `line` (the viaduct) when it's near. */
+  roofs?: { at: (x: number, z: number) => boolean; line?: SegmentIndex },
 ): { built: number; droppedOnRoad: number; signs: number; billboards: number } {
   let count = 0, dropped = 0, signs = 0, billboards = 0;
   for (const w of idx.ways) {
@@ -490,6 +492,10 @@ export function buildBuildings(
     if (area > 80 && hash01(w.id + 3) < 0.65) {
       const ox = (hash01(w.id + 5) - 0.5) * 3, oz = (hash01(w.id + 9) - 0.5) * 3;
       geo.box(cx + ox, cz + oz, 0.7, 0.7, top, top + 1.5, C.roofTank, 'prop', [0]);
+    }
+    if (roofs?.at(cx, cz) && street) {
+      const near = roofs.line?.nearest(cx, cz) ?? null;
+      if (rooftop(geo, ring, top, height, w.id, street(cx, cz), near && near.dist < 120 ? near : null)) billboards++;
     }
     count++;
   }
