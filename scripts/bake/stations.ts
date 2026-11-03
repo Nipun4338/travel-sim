@@ -323,7 +323,6 @@ function typeD(k: Kit, d: Dims): void {
     for (let y = y0; y <= y1; y += 2.4) k.band(-HALF_M, HALF_M, g1, side, y, y + 0.3, C.cream, MAIN);
   }
   // The underside and the ends: closed below the deck and above the trains, open where the tracks run.
-  k.top(-HALF_M, HALF_M, -w, w, y0, C.cream, 'building', MAIN);
   k.quad([-HALF_M, -w, y0], [HALF_M, -w, y0], [HALF_M, w, y0], [-HALF_M, w, y0], C.terracotta, 'building', MAIN);
   for (const [u, out] of [[-HALF_M, -1], [HALF_M, 1]] as const) {
     const face = (v0: number, v1: number, ya: number, yb: number) => {
