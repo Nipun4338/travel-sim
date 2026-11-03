@@ -8,6 +8,7 @@ import { effectiveQuality, loadSettings } from '../core/settings';
 import { clock, getLang, num, t } from '../i18n/i18n';
 import { Atmosphere, type Tier } from '../render/atmosphere';
 import { setMaterialConditions } from '../render/materials';
+import { setStationNames } from '../render/stationAtlas';
 import { createStage } from '../render/stage';
 import { METRO_EYE, PASSENGER_EYE, TrainView } from '../render/TrainView';
 import type { LineData } from '../shared/region';
@@ -52,6 +53,7 @@ if (!(await region.init()) || !region.manifest.line) {
   throw new Error(`metro region ${regionId} not baked`);
 }
 const line: LineData = await (await fetch(`${import.meta.env.BASE_URL}regions/${regionId}/${region.manifest.line}`)).json();
+setStationNames(line.stations);
 
 // The Leg picks the track (direction) and the stations it runs between.
 const legNo = Math.max(1, Math.min(4, parseInt(params.get('leg') ?? '1', 10) || 1));

@@ -59,28 +59,61 @@ class Kit {
 const C = {
   concrete: 0xb9b3a8, marble: 0xf0eee6, white: 0xf4f2ec, glass: 0x5d86a5, darkGlass: 0x34495e, steel: 0x9aa3ab, roofWhite: 0xd8dde3,
   pink: 0xd58aa0, maroon: 0x7b1e3a, brick: 0xa0523d, sand: 0xd9cbb0, gold: 0xd4a92c, red: 0xc0392b, green: 0x2a8a4b, olive: 0x6b7a3a,
-  wood: 0x7a5230, thatch: 0x9c7a46, rock: 0x6b6a63, water: 0x8fc4e0, foam: 0xf2f8fb, tile: 0xb5452f, dark: 0x2a2a2c, cream: 0xe8dcc0,
+  wood: 0x7a5230, terracotta: 0xa9533a, teal: 0x2f8f86, platform: 0xc4bfb3, thatch: 0x9c7a46, rock: 0x6b6a63, water: 0x8fc4e0, foam: 0xf2f8fb, tile: 0xb5452f, dark: 0x2a2a2c, cream: 0xe8dcc0,
 };
 
 // ---------------- Dhaka Route ----------------
 
 function farmgateMetro(k: Kit): void {
-  const L = 180, deck = 12;
-  for (let z = -L / 2 + 10; z <= L / 2 - 10; z += 30) for (const x of [-6, 6]) k.box(2, deck, 2, C.concrete, x, 0, z);
-  k.box(16, 2, L, C.concrete, 0, deck, 0);                          // track deck
-  k.box(26, 1, L - 20, C.concrete, 0, deck - 4, 0);                 // concourse floor
-  k.box(26, 3, L - 20, C.glass, 0, deck - 3, 0);                    // concourse glazing
-  for (const x of [-11, 11]) k.box(4, 1, L - 30, C.marble, x, deck + 2, 0); // side platforms
-  k.add(new THREE.CylinderGeometry(15, 15, L - 30, 10, 1, true, 0, Math.PI), C.roofWhite, 0, deck + 5, 0, { rx: 90, rz: 90, sy: 1, sx: 0.45 });
-  for (const s of [-1, 1]) k.box(6, 1, 30, C.concrete, s * 16, deck / 2 - 1, s * (L / 2 - 30), 0); // stair landings
-  for (const s of [-1, 1]) k.add(new THREE.BoxGeometry(5, 1, 26), C.concrete, s * 16, deck / 4, s * (L / 2 - 52), { rx: s * 22 });
+  // Type D of the Line 6 stations (polish spec §6.1): a full-height cream grid over terracotta, a
+  // low teal roof, and covered skywalks with green roofs out to both pavements.
+  const L = 180, rail = 14, y0 = 6.2, y1 = rail + 7, w = 11.6, pe = 4.9;
+  for (const z of [-60, 0, 60]) k.box(2.6, y0, 2.6, C.concrete, 0, 0, z);
+  k.box(9.6, 1.2, L + 30, C.concrete, 0, rail - 1.45, 0);                 // track deck
+  for (const s of [-1, 1]) {
+    k.box(w - pe, 2.6, L, C.platform, s * (pe + (w - pe) / 2), rail - 1.45, 0); // side platforms
+    k.box(0.4, 0.02, L, C.gold, s * (pe + 0.2), rail + 1.15, 0);             // edge strip
+    k.box(0.4, y1 - y0, L, C.terracotta, s * w, y0, 0);
+    for (let z = -L / 2; z <= L / 2; z += 3) k.box(0.3, y1 - y0, 0.35, C.cream, s * (w + 0.35), y0, z);
+    for (let y = y0; y <= y1; y += 2.4) k.box(0.3, 0.3, L, C.cream, s * (w + 0.35), y, 0);
+  }
+  k.box(2 * w, 0.4, L, C.cream, 0, y0, 0);                                   // soffit over the street
+  // The ends: closed below the deck and above the trains, open where the tracks run.
+  for (const s of [-1, 1]) {
+    const z = (s * L) / 2;
+    k.box(2 * w, rail - 1.45 - y0, 0.4, C.terracotta, 0, y0, z);
+    k.box(2 * w, y1 - rail - 5.4, 0.4, C.terracotta, 0, rail + 5.4, z);
+    for (const x of [-1, 1]) k.box(w - pe, 6.85, 0.4, C.terracotta, x * (pe + (w - pe) / 2), rail - 1.45, z);
+    // The fascia over the road: white, with the red-and-green mark.
+    k.box(14, 3.4, 0.3, C.white, 0, y0 + 0.6, z + s * 0.3);
+    k.box(14, 0.35, 0.32, C.green, 0, y0 + 0.6, z + s * 0.3);
+    k.cyl(1.1, 1.1, 0.34, 12, C.green, 0, y0 + 2.3, z + s * 0.3, { rx: 90 });
+    k.cyl(0.6, 0.6, 0.36, 12, C.red, 0, y0 + 2.3, z + s * 0.3, { rx: 90 });
+  }
+  // The low teal roof: a flat slab and a shallow arch over it.
+  k.box(2 * w + 2.4, 0.5, L + 4, C.teal, 0, y1, 0);
+  const W = w + 0.6, segs = 8, yr = (x: number) => y1 + 0.5 + 1.4 * (1 - (x / W) ** 2);
+  for (let i = 0; i < segs; i++) {
+    const xa = -W + (2 * W * i) / segs, xb = xa + (2 * W) / segs, ya = yr(xa), yb = yr(xb);
+    k.add(new THREE.BoxGeometry(Math.hypot(xb - xa, yb - ya), 0.3, L + 4), i === 3 || i === 4 ? C.steel : C.teal, (xa + xb) / 2, (ya + yb) / 2, 0, { rz: (Math.atan2(yb - ya, xb - xa) * 180) / Math.PI });
+  }
+  // Skywalks to both pavements: green roofs on terracotta trusses, a stair tower at the far end.
+  for (const s of [-1, 1]) {
+    const z = s * 18, xm = s * (w + 11);
+    k.box(22, 0.4, 4, C.concrete, xm, y0 + 0.5, z);
+    for (let x = 0; x <= 22; x += 2.5) for (const dz of [-2, 2]) k.box(0.2, 2.4, 0.2, C.terracotta, s * (w + x), y0 + 0.9, z + dz);
+    k.box(22, 0.3, 4.8, C.green, xm, y0 + 3.3, z);
+    k.box(5, y0 + 3.6, 6, C.terracotta, s * (w + 24.5), 0, z);
+    k.box(5.8, 0.4, 6.8, C.green, s * (w + 24.5), y0 + 3.6, z);
+    k.box(8, 0.3, 6, C.green, s * (w + 24.5), 3.2, z);
+  }
   // A six-car MRT train at the platform: white, with the red and green Dhaka Metro bands.
   for (let i = 0; i < 6; i++) {
     const z = -60 + i * 22;
-    k.box(3, 3.6, 21.5, C.white, -3.5, deck + 2, z);
-    k.box(3.05, 0.4, 21.6, C.red, -3.5, deck + 3.4, z);
-    k.box(3.05, 0.3, 21.6, C.green, -3.5, deck + 3.0, z);
-    k.box(3.06, 0.9, 19, C.darkGlass, -3.5, deck + 4.2, z);
+    k.box(3, 3.4, 21.5, C.white, -3.3, rail + 0.4, z);
+    k.box(3.05, 0.3, 21.6, C.red, -3.3, rail + 0.8, z);
+    k.box(3.05, 0.25, 21.6, C.green, -3.3, rail + 1.1, z);
+    k.box(3.06, 0.9, 19, C.darkGlass, -3.3, rail + 1.8, z);
   }
 }
 

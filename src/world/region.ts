@@ -10,7 +10,7 @@ import { COLLIDER_LAYERS, type ChunkEntry, type ChunkLayer, type LaneData, type 
 // neighbours always qualify.
 const LOD_DISTANCE = [350, 1100, 2800]; // limits for LOD 0, 1, 2
 const COLLIDER_DISTANCE = 250;
-const SHADOW_CASTERS: ReadonlyArray<ChunkLayer> = ['building', 'wall', 'tree', 'deck', 'pillar', 'prop', 'sign'];
+const SHADOW_CASTERS: ReadonlyArray<ChunkLayer> = ['building', 'wall', 'tree', 'deck', 'pillar', 'prop', 'sign', 'station'];
 
 interface LoadedChunk {
   entry: ChunkEntry;

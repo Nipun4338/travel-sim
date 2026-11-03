@@ -7,10 +7,10 @@ export const LOD_COUNT = 3;
 
 /** Mesh layers inside a chunk GLB. Colliders are built from the COLLIDER_LAYERS of LOD 0. */
 export type ChunkLayer =
-  | 'terrain' | 'road' | 'marking' | 'kerb' | 'building' | 'wall' | 'prop' | 'tree' | 'deck' | 'pillar' | 'water' | 'sign';
+  | 'terrain' | 'road' | 'marking' | 'kerb' | 'building' | 'wall' | 'prop' | 'tree' | 'deck' | 'pillar' | 'water' | 'sign' | 'station';
 export const COLLIDER_LAYERS: ReadonlyArray<ChunkLayer> = ['terrain', 'road', 'building', 'wall', 'pillar', 'deck'];
-/** Layers whose meshes carry TEXCOORD_0: walls (the window texture) and signs (the sign atlas). */
-export const TEXTURED_LAYERS: ReadonlyArray<ChunkLayer> = ['wall', 'sign'];
+/** Layers whose meshes carry TEXCOORD_0: walls (the window texture), signs (the sign atlas) and Line 6 station signs. */
+export const TEXTURED_LAYERS: ReadonlyArray<ChunkLayer> = ['wall', 'sign', 'station'];
 
 export interface ChunkEntry {
   id: string;          // "cx_cz"

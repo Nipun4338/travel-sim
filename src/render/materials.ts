@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import type { ChunkLayer } from '../shared/region';
 import { signAtlasTexture } from './signAtlas';
+import { stationAtlasTexture } from './stationAtlas';
 
 /**
  * One wall tile = one 3 m bay × one 3.2 m floor: a window with a frame on white, multiplied by the
@@ -56,6 +57,7 @@ const flat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: tr
 const decal = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 let walls: THREE.MeshLambertMaterial | null = null;
 let signs: THREE.MeshLambertMaterial | null = null;
+let stationSigns: THREE.MeshLambertMaterial | null = null;
 let road: THREE.Material = flat;
 
 /**
@@ -74,6 +76,7 @@ export function setMaterialConditions(c: { night: boolean; wet: boolean; sheen: 
 export function materialFor(layer: ChunkLayer): THREE.Material {
   if (layer === 'wall') return (walls ??= new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, map: windowTexture() }));
   if (layer === 'sign') return (signs ??= new THREE.MeshLambertMaterial({ map: signAtlasTexture(), side: THREE.DoubleSide }));
+  if (layer === 'station') return (stationSigns ??= new THREE.MeshLambertMaterial({ map: stationAtlasTexture(), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   if (layer === 'marking' || layer === 'water') return decal;
   if (layer === 'road') return road;
   return flat;

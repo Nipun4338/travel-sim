@@ -13,7 +13,8 @@ import { flyoverProfiles } from './flyovers';
 import { REGIONS, projection } from './regions';
 import { PointGrid, PolygonIndex, SegmentIndex } from './spatial';
 import { gradedSampler, groundSampler, type GradedRoad } from './terrain';
-import { bakeLine, buildStations, buildViaduct, type MetroBake } from './metro';
+import { bakeLine, buildViaduct, type MetroBake } from './metro';
+import { buildStations } from './stations';
 import { pbfRegionData } from './pbfQuery';
 import { OpenBuildings, utm46 } from './heights';
 import { BUSY, MEDIUM, buildStreetLife, type DensityAt } from './streetlife';
@@ -99,11 +100,13 @@ async function main() {
     roads.ways = roads.ways.filter(wy => wy.tags?.railway !== 'subway');
     // Nothing may stand in the viaduct: drop every building whose footprint comes too close to the
     // centreline (OSM maps the stations as buildings over the tracks; the bake models them).
-    // Stations are wider (platforms, back walls and concourse): 14 m either side there, 8 m elsewhere.
-    const line = new PointGrid(20), stationGrid = new PointGrid(20);
+    // Stations are wider (platforms, walls, concourse and street entrances): 18 m either side there,
+    // 8 m elsewhere, and 6 m around Uttara North's depot track.
+    const line = new PointGrid(20), stationGrid = new PointGrid(20), depotGrid = new PointGrid(20);
     for (const [x, , z] of metro.centre) line.add(x, z);
     for (const [x, , z] of metro.centre) if (metro.line.stations.some(st => Math.hypot(st.x - x, st.z - z) < 110)) stationGrid.add(x, z);
-    const near = (x: number, z: number) => line.near(x, z, 8) || stationGrid.near(x, z, 14);
+    for (const run of metro.depot) for (const [x, , z] of run) depotGrid.add(x, z);
+    const near = (x: number, z: number) => line.near(x, z, 8) || stationGrid.near(x, z, 18) || depotGrid.near(x, z, 6);
     const before = blds.ways.length;
     blds.ways = blds.ways.filter(wy => {
       if (!wy.tags?.building) return true;
@@ -140,7 +143,8 @@ async function main() {
   if (metro) {
     const v = buildViaduct(geo, metro, onRoad);
     console.log(`      viaduct: ${v.piers} piers (${v.skipped} of them in a mapped road's median)`);
-    console.log(`      ${buildStations(geo, metro)} stations`);
+    const st = buildStations(geo, metro);
+    console.log(`      ${Object.keys(st).length} stations (${metro.depot.length} depot track runs): ${Object.entries(st).map(([k, n]) => `${k} ${(n / 1000).toFixed(1)}k`).join(' · ')}`);
   }
   console.log(`      ${rd.pillars} pillars (${rd.skipped} skipped for standing in a carriageway), ${rd.crossings} crossings, ${rd.footbridges} foot-over-bridges`);
   buildWater(geo, blds, h);

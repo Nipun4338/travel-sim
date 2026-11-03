@@ -4,7 +4,7 @@
 // piers and the overhead line from that one centreline: the train and the viaduct always agree.
 import * as THREE from 'three';
 import type { LineData, LineStop, LineTrack, RouteData } from '../../src/shared/region';
-import { doorOffsets, FLOOR_M, PLATFORM_EDGE_M, TRAIN_M } from '../../src/shared/train';
+import { TRAIN_M } from '../../src/shared/train';
 import { offsetLine } from './build';
 import { ChunkGeometry, color, densify, type V3 } from './geometry';
 import type { Indexed } from './osm';
@@ -162,7 +162,31 @@ function speedLimits(xz: XZ[], cum: number[]): Array<[number, number, number]> {
   return runs.map(([a, b, v]) => [Math.round(a), Math.round(b), v]);
 }
 
-export interface MetroBake { line: LineData; route: RouteData; centre: Array<[number, number, number]>; ground: number[]; gap: number; }
+/** `depot`: OSM tracks at the first station that the line doesn't run on (Uttara North's depot track), at rail level. */
+export interface MetroBake { line: LineData; route: RouteData; centre: Array<[number, number, number]>; ground: number[]; gap: number; depot: V3[][]; }
+
+/**
+ * The OSM track ways within 150 m of the first station that lie clear of the line's two tracks
+ * (more than half the gap plus 3 m from the centreline), as runs at the nearest rail level.
+ */
+function depotTracks(roads: Indexed, centre: Array<[number, number, number]>, at: XZ, gap: number): V3[][] {
+  const near = centre.filter(([x, , z]) => Math.hypot(x - at[0], z - at[1]) < 400);
+  const runs: V3[][] = [];
+  for (const w of roads.ways) {
+    if (w.tags?.railway !== 'subway') continue;
+    const flat = w.nodes.map(id => roads.nodes.get(id)).filter(Boolean).map(n => [n!.x, n!.z] as XZ);
+    if (flat.length < 2) continue;
+    let run: V3[] = [];
+    for (const [x, z] of densify(flat, STEP)) {
+      let bd = Infinity, y = 0;
+      for (const [cx, cy, cz] of near) { const d = Math.hypot(cx - x, cz - z); if (d < bd) { bd = d; y = cy; } }
+      if (Math.hypot(x - at[0], z - at[1]) < 150 && bd > gap / 2 + 3 && bd < 40) run.push([x, y, z]);
+      else { if (run.length > 3) runs.push(run); run = []; }
+    }
+    if (run.length > 3) runs.push(run);
+  }
+  return runs;
+}
 
 /** Works out the line from the OSM track ways and the station list (north to south). */
 export function bakeLine(roads: Indexed, stations: StopDef[], toXZ: (lat: number, lon: number) => XZ, h: (x: number, z: number) => number, name: string, legEnds: string[]): MetroBake {
@@ -221,7 +245,7 @@ export function bakeLine(roads: Indexed, stations: StopDef[], toXZ: (lat: number
     }),
     legs: line.legs,
   };
-  return { line, route, centre, ground, gap };
+  return { line, route, centre, ground, gap, depot: depotTracks(roads, centre, stationXZ[0], gap) };
 }
 
 /** Adds `g` rotated by `yaw` (radians, about +y) at (x, y, z). */
@@ -282,66 +306,4 @@ export function buildViaduct(geo: ChunkGeometry, bake: MetroBake, onRoad: (x: nu
     }
   }
   return { piers, skipped };
-}
-
-const S = {
-  platform: color(0xbab5a9), platformSide: color(0x9f9a8f), edge: color(0xe8c228), psd: color(0x9bbac4),
-  roof: color(0xdcd8cf), roofSide: color(0xa9a59c), column: color(0xc9c5bb), wall: color(0xe6e0d0), concourse: color(0xcfc6b2),
-};
-const PLATFORM_W = 4.4, PLATFORM_HALF_M = 90, PSD_H = 1.55;
-
-/** A point on a track at distance `s`, offset sideways by `off` (+ right of travel). */
-function trackPoint(tr: LineTrack, s: number, off: number): V3 {
-  const c = tr.cum, p = tr.points;
-  let i = 1;
-  while (i < c.length - 1 && c[i] < s) i++;
-  const t = Math.max(0, Math.min(1, (s - c[i - 1]) / ((c[i] - c[i - 1]) || 1)));
-  const x = p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, y = p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t, z = p[i - 1][2] + (p[i][2] - p[i - 1][2]) * t;
-  let dx = p[i][0] - p[i - 1][0], dz = p[i][2] - p[i - 1][2];
-  const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-  return [x - dz * off, y, z + dx * off];
-}
-
-/** Points every 3 m along a track between `a` and `b`, offset sideways, lifted by `dy`. */
-function along(tr: LineTrack, a: number, b: number, off: number, dy: number): V3[] {
-  const n = Math.max(1, Math.ceil((b - a) / 3));
-  return Array.from({ length: n + 1 }, (_, k) => { const p = trackPoint(tr, a + ((b - a) * k) / n, off); return [p[0], p[1] + dy, p[2]] as V3; });
-}
-
-/**
- * The 16 stations (SPEC §20, M13d): side platforms at train-floor height, 180 m long, outside each
- * track; platform screen doors with an opening at every train door when it stops on the mark; a
- * roof over both platforms on columns; back walls; and the concourse block over the street below.
- */
-export function buildStations(geo: ChunkGeometry, bake: MetroBake): number {
-  let n = 0;
-  const half = bake.gap / 2, lods = [0, 1];
-  for (const tr of bake.line.tracks) for (const st of tr.stops) {
-    const a = st.s - PLATFORM_HALF_M, b = st.s + PLATFORM_HALF_M, side = st.side === 'left' ? -1 : 1;
-    const pc = side * (PLATFORM_EDGE_M + PLATFORM_W / 2);
-    geo.ribbon(along(tr, a, b, pc, FLOOR_M - 0.02), PLATFORM_W, S.platform, 'deck', lods, 1.4, S.platformSide);
-    geo.ribbon(along(tr, a, b, side * (PLATFORM_EDGE_M + 0.22), FLOOR_M - 0.01), 0.35, S.edge, 'marking', lods);
-    // Screen doors: fixed panels between the openings where the train's doors stop.
-    const doors = doorOffsets().map(o => st.stopS - o).sort((p, q) => p - q);
-    let from = a;
-    for (const d of [...doors, b + 1]) {
-      const to = Math.min(b, d - 0.8);
-      if (to - from > 0.3) geo.ribbon(along(tr, from, to, side * (PLATFORM_EDGE_M + 0.45), FLOOR_M + PSD_H), 0.08, S.psd, 'prop', [0], PSD_H, S.psd);
-      from = d + 0.8;
-    }
-    // Back wall and roof columns at the platform's outer edge, and the roof out to the line's centre.
-    geo.ribbon(along(tr, a, b, side * (PLATFORM_EDGE_M + PLATFORM_W + 0.1), FLOOR_M + 2.6), 0.2, S.wall, 'deck', lods, 2.6, S.wall);
-    for (let s = a; s <= b; s += 15) {
-      const [x, y, z] = trackPoint(tr, s, side * (PLATFORM_EDGE_M + PLATFORM_W - 0.35));
-      geo.box(x, z, 0.18, 0.18, y + FLOOR_M, y + 7.0, S.column, 'prop', lods);
-    }
-    const outer = side * (PLATFORM_EDGE_M + PLATFORM_W + 0.6), inner = -side * half;
-    geo.ribbon(along(tr, a - 5, b + 5, (outer + inner) / 2, 7.4), Math.abs(outer - inner), S.roof, 'deck', lods, 0.45, S.roofSide);
-    // The concourse below the tracks, once per station (from the southbound side).
-    if (tr.dir === 'south') {
-      geo.ribbon(along(tr, st.s - 65, st.s + 65, half, -1.7), 2 * (PLATFORM_EDGE_M + PLATFORM_W + 0.6) + bake.gap, S.concourse, 'building', lods, 5.2, S.concourse);
-      n++;
-    }
-  }
-  return n;
 }
