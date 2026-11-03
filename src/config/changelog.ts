@@ -11,6 +11,21 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.5.1',
+    date: '2026-11-04',
+    image: '1.5.1.jpg',
+    bn: [
+      'রাতে, বৃষ্টিতে আর কুয়াশায় রাস্তার সব গাড়ির হেডলাইট আর পেছনের লাল বাতি জ্বলে; থামার সময় ব্রেক লাইট।',
+      'গাড়িগুলো আর চোখের সামনে হঠাৎ উদয় হয় বা মিলিয়ে যায় না।',
+      'মেট্রো থেকেও ভায়াডাক্টের নিচের রাস্তায় একই আলো আর একই মসৃণ ট্রাফিক।',
+    ],
+    en: [
+      'Every vehicle on the road now has headlights and red tail lights at night, in rain and in fog, and brake lights when it slows.',
+      'Vehicles no longer appear or vanish in plain sight.',
+      'The same lights and smoother traffic on the road under the viaduct, seen from the metro.',
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-11-03',
     image: '1.5.0.jpg',
