@@ -36,6 +36,8 @@ export interface RegionDef {
   infill?: Array<{ fromKm: number; toKm: number }>;
   /** Buildings farther than `radiusM` from this point are capped at `maxM` unless OSM tags a height. */
   heightCap?: { lat: number; lon: number; radiusM: number; maxM: number };
+  /** Circles of dense campus and park trees (Line 6: Dhaka University, Suhrawardy Udyan, Ramna). */
+  groves?: Array<{ lat: number; lon: number; radiusM: number }>;
   /** A metro Region (SPEC §20): the Route is the line's track and the Stops are its stations. */
   metro?: boolean;
   /** Read OSM from the local Geofabrik extract instead of Overpass (big city areas). */
@@ -131,6 +133,11 @@ export const LINE6: RegionDef = {
   fromExtract: true,
   streetLife: true,   // at C, within 150 m of the viaduct, with rooftop clutter and billboards facing it (polish spec §6.2)
   streetMedium: true,
+  groves: [
+    { lat: 23.7330, lon: 90.3985, radiusM: 520 },   // Dhaka University's campus and Suhrawardy Udyan
+    { lat: 23.7375, lon: 90.4030, radiusM: 330 },   // Ramna Park
+    { lat: 23.7305, lon: 90.4045, radiusM: 300 },   // the green between Doel Chattar and the Secretariat
+  ],
 };
 
 export const REGIONS: Record<string, RegionDef> = { dhaka: DHAKA, bandarban: BANDARBAN, line6: LINE6 };

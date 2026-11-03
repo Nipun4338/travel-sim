@@ -508,6 +508,8 @@ export function buildTrees(
   footprints: PolygonIndex<true>, ground: PolygonIndex<Ground>, junctions: PointGrid,
   forest?: { buildings: PointGrid },
   keepClear?: (x: number, z: number) => boolean,
+  /** Dense campus and park groves: every open, unpaved spot clear of buildings in these circles. */
+  groves?: { circles: Array<{ x: number; z: number; r: number }>; buildings: PointGrid },
 ): number {
   let n = 0;
   // Flyover decks (with their ramps) and railway tracks: no tree grows up through them.
@@ -524,9 +526,9 @@ export function buildTrees(
   }
   // A mix of real species per setting (trees.ts): city streets and greens, hill road and forest.
   // The trunk stays clear of the carriageway by most of its crown, so crowns only just overhang it.
-  const plant = (x: number, z: number, seed: number, setting: TreeSetting) => {
+  const plant = (x: number, z: number, seed: number, setting: TreeSetting, anywhere = false) => {
     const species = pickSpecies(setting, seed), crown = crownRadius(species);
-    if (!near(x, z) || allRoads.onRoad(x, z, Math.max(1.5, crown - 2)) || overhead.onRoad(x, z, crown) || keepClear?.(x, z) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
+    if ((!anywhere && !near(x, z)) || allRoads.onRoad(x, z, Math.max(1.5, crown - 2)) || overhead.onRoad(x, z, crown) || keepClear?.(x, z) || footprints.at(x, z) || junctions.near(x, z, 12)) return;
     plantTree(geo, species, x, h(x, z), z, seed);
     n++;
   };
@@ -550,6 +552,23 @@ export function buildTrees(
     const wooded = forest && !kind && !forest.buildings.near(x, z, 35);
     if ((kind === 'green' || kind === 'leafy' || wooded) && hash01(x * 0.37 + z * 0.11) < (wooded ? 0.6 : 0.45)) {
       plant(x + (hash01(x + z) - 0.5) * 8, z + (hash01(x - z) - 0.5) * 8, Math.floor(x * 31 + z), wooded ? 'hillForest' : forest ? 'hillStreet' : 'cityGreen');
+    }
+  }
+  // Groves: a 9 m jittered grid, skipping where the green-land pass above already planted.
+  for (const c of groves?.circles ?? []) {
+    const G = 9;
+    for (let x = c.x - c.r; x < c.x + c.r; x += G) for (let z = c.z - c.r; z < c.z + c.r; z += G) {
+      const jx = x + (hash01(x * 1.3 + z) - 0.5) * 6, jz = z + (hash01(x - z * 1.7) - 0.5) * 6;
+      if (Math.hypot(jx - c.x, jz - c.z) > c.r || hash01(jx * 0.71 + jz * 0.29) > 0.55) continue;
+      const kind = ground.at(jx, jz);
+      if (kind === 'paved' || kind === 'green' || groves!.buildings.near(jx, jz, 9)) continue;
+      plant(jx, jz, Math.floor(jx * 17 + jz * 3), 'cityGreen', true);
+    }
+    // Inside mapped parks the 15 m pass is too sparse for Suhrawardy Udyan and Ramna: fill in between.
+    for (let x = c.x - c.r; x < c.x + c.r; x += G) for (let z = c.z - c.r; z < c.z + c.r; z += G) {
+      const jx = x + 4.5 + (hash01(x + z * 2.1) - 0.5) * 5, jz = z + 4.5 + (hash01(x * 2.3 - z) - 0.5) * 5;
+      if (Math.hypot(jx - c.x, jz - c.z) > c.r || ground.at(jx, jz) !== 'green' || hash01(jx * 0.53 + jz * 0.47) > 0.45) continue;
+      plant(jx, jz, Math.floor(jx * 23 + jz * 5), 'cityGreen', true);
     }
   }
   return n;

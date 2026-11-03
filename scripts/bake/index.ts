@@ -212,7 +212,13 @@ async function main() {
   }
   const viaductGrid = new PointGrid(20);
   if (metro) for (const [x, , z] of metro.centre) viaductGrid.add(x, z);
-  const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions, forest, (x, z) => viaductGrid.near(x, z, 11));
+  let groves: { circles: Array<{ x: number; z: number; r: number }>; buildings: PointGrid } | undefined;
+  if (region.groves) {
+    const buildings = new PointGrid(20);
+    for (const wy of blds.ways) if (wy.tags?.building) for (const nid of wy.nodes) { const nd = blds.nodes.get(nid); if (nd) buildings.add(nd.x, nd.z); }
+    groves = { circles: region.groves.map(g => { const [x, z] = proj.toXZ(g.lat, g.lon); return { x, z, r: g.radiusM }; }), buildings };
+  }
+  const trees = buildTrees(geo, roads, h, nearRoute, allRoads, footprints, ground, junctions, forest, (x, z) => viaductGrid.near(x, z, 11), groves);
   lap('trees');
   console.log(`      ${trees} trees, ${geo.chunks.size} chunks`);
 
