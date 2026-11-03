@@ -31,6 +31,7 @@ import { ResultsScreen } from '../ui/results';
 import type { LedgerEntry, RunResult } from '../bus/run/Run';
 import { FLOOR_M, PLATFORM_EDGE_M } from '../shared/train';
 import { Track } from './track';
+import { streetLamps } from '../world/streetLamps';
 import { Junctions } from '../traffic/junctions';
 import { RAIN_TRAFFIC_FACTOR, TRAFFIC_CAP, TRAFFIC_STYLES, Traffic, type QualityTier } from '../traffic/Traffic';
 
@@ -110,9 +111,14 @@ const traffic = new Traffic(lanes, scene, world, junctions, TRAFFIC_CAP[tier as 
 if (atmosphere.rainy) traffic.speedScale = RAIN_TRAFFIC_FACTOR;
 traffic.view = camera;
 traffic.lights = atmosphere.night || atmosphere.rainy || atmosphere.foggy;
+// Night (SPEC §9): street lamps on the roads below, as on the Dhaka bus road.
+if (atmosphere.night) scene.add(...streetLamps(lanes));
 const stationView = new StationView(scene, line);
+stationView.setNight(line, atmosphere.night);
 const passengers = new Passengers(scene);
 const ghostViews = [ahead, ...opposite].map(g => { const v = new TrainView(scene, g); v.setCabVisible(false); return v; });
+// Lit windows at night; headlights and tail lights at night and in rain or fog.
+for (const tv of [view, ...ghostViews]) tv.setLights(atmosphere.night, atmosphere.night || atmosphere.rainy || atmosphere.foggy);
 /** Places the ghost trains for leg time `t`; returns the tail of the train ahead (for ATP). */
 function placeGhosts(t: number): number {
   const g = legStart + t;

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { notchLabel, type Train } from '../metro/Train';
+import { glowTexture, lightPoints } from './atmosphere';
 import { CAR_GAP_M, CAR_M, DOOR_W, DOOR_X, FLOOR_M } from '../shared/train';
 
 const CAR = CAR_M, GAP = CAR_GAP_M, WIDTH = 2.95, FLOOR = FLOOR_M, ROOF = 3.95, BOGIE = 6.9;
@@ -162,6 +163,58 @@ export class TrainView {
     this.interior.visible = false;
     this.cars[2].add(this.interior);
   }
+
+  /**
+   * Night running (SPEC §9): every car's windows lit from inside, and on the leading car's nose the
+   * headlights (glowing, with a beam on the track ahead) and on the rear car's the red tail lights.
+   * `headlights` also covers rain and fog by day. No real lights: unlit and additive meshes only.
+   */
+  setLights(night: boolean, headlights: boolean): void {
+    if (!this.lights) {
+      // Lit windows: warm panes between dark pillars every 2.45 m (the interior's window bays),
+      // with the ceiling lamp strip showing along the top, dimmer than the headlights.
+      const pane = document.createElement('canvas');
+      pane.width = 64; pane.height = 32;
+      const pg = pane.getContext('2d')!;
+      pg.fillStyle = '#1b2633'; pg.fillRect(0, 0, 64, 32);
+      const grd = pg.createLinearGradient(0, 0, 0, 32);
+      grd.addColorStop(0, '#fff6dc'); grd.addColorStop(0.25, '#e9d8ae'); grd.addColorStop(1, '#a8916a');
+      pg.fillStyle = grd; pg.fillRect(5, 3, 54, 26);
+      const paneTex = new THREE.CanvasTexture(pane);
+      paneTex.colorSpace = THREE.SRGBColorSpace;
+      paneTex.wrapS = THREE.RepeatWrapping;
+      const lit = new THREE.MeshBasicMaterial({ map: paneTex, color: 0xcfc4a8, toneMapped: false });
+      const white = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+      const red = new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false });
+      const windows: THREE.Mesh[] = [], lamps: THREE.Object3D[] = [];
+      this.cars.forEach((car, i) => {
+        const body = car.children[0], cab = i === 0 || i === 5, L = cab ? CAR - 1.6 : CAR, bx = cab ? -0.8 : 0;
+        const wg = new THREE.BoxGeometry(L - 0.5, 0.9, WIDTH + 0.07);   // just outside the door frames
+        // One pane per window bay along the car's sides (u runs along the car on the ±z faces).
+        const uv = wg.getAttribute('uv'), bays = Math.round((L - 0.5) / 2.45);
+        for (let k = 0; k < uv.count; k++) uv.setX(k, uv.getX(k) * bays);
+        const w = new THREE.Mesh(wg.translate(bx, FLOOR + 1.7, 0), lit);
+        body.add(w); windows.push(w);
+        if (!cab) return;
+        // Car 1's nose leads (white); car 6 is turned round, so its nose is the train's tail (red).
+        const front = i === 0, fx = CAR / 2 + 0.05, y = front ? FLOOR + 0.42 : FLOOR + 0.22;
+        const g = new THREE.Group();
+        for (const side of [-1, 1]) g.add(new THREE.Mesh(new THREE.BoxGeometry(0.04, front ? 0.18 : 0.14, front ? 0.38 : 0.24).translate(fx, y, side * 0.95), front ? white : red));
+        g.add(lightPoints([fx + 0.1, y, -0.95, fx + 0.1, y, 0.95], front ? 0xfff4dc : 0xff2a1a, front ? 1.6 : 0.9));
+        if (front) {
+          // The beam: a long soft pool on the track bed ahead of the train.
+          const beam = new THREE.Mesh(new THREE.PlaneGeometry(38, 4.6).rotateX(-Math.PI / 2).translate(fx + 19, 0.05, 0),
+            new THREE.MeshBasicMaterial({ color: 0xfff0d0, map: glowTexture(), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+          g.add(beam);
+        }
+        body.add(g); lamps.push(g);
+      });
+      this.lights = { windows, lamps };
+    }
+    for (const w of this.lights.windows) w.visible = night;
+    for (const l of this.lights.lamps) l.visible = headlights;
+  }
+  private lights: { windows: THREE.Mesh[]; lamps: THREE.Object3D[] } | null = null;
 
   setInteriorVisible(v: boolean): void { this.interior.visible = v; }
 

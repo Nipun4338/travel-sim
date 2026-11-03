@@ -2,6 +2,8 @@
 // stops, and the platform screen door leaves at the station the train is serving (the fixed panels
 // and the name roundels are baked, polish spec §6.1).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { glowTexture } from '../render/atmosphere';
 import type { LineData, LineStop, LineTrack } from '../shared/region';
 import { doorOffsets, DOOR_W, FLOOR_M, PLATFORM_EDGE_M } from '../shared/train';
 
@@ -29,7 +31,7 @@ export class StationView {
   private q = new THREE.Quaternion();
   private UP = new THREE.Vector3(0, 1, 0);
 
-  constructor(scene: THREE.Scene, line: LineData) {
+  constructor(private scene: THREE.Scene, line: LineData) {
     // A stop marker on the screen doors where the train's front stops.
     const markGeo = new THREE.PlaneGeometry(0.5, 0.5);
     const markMat = new THREE.MeshBasicMaterial({ map: (() => {
@@ -51,6 +53,35 @@ export class StationView {
     this.psd.count = 0;
     scene.add(this.psd);
   }
+
+  /**
+   * Night lighting (SPEC §9): lamp strips under every station roof over both platforms, and pools
+   * of light on the platform floors. Two draw calls, built the first time they're turned on.
+   */
+  setNight(line: LineData, on: boolean): void {
+    if (on && !this.night) {
+      const strips: THREE.BufferGeometry[] = [], pools: THREE.Vector3[] = [];
+      for (const tr of line.tracks) for (const st of tr.stops) {
+        // Under the roof: Uttara North's (type C) is the highest on the line.
+        const side = st.side === 'left' ? -1 : 1, off = side * (PLATFORM_EDGE_M + 3), lampY = line.stations[st.station].name === 'Uttara North' ? 8.4 : 6.3;
+        for (let s = st.s - 84; s < st.s + 84; s += 12) {
+          const { p, yaw } = onTrack(tr, s + 6, off);
+          strips.push(new THREE.BoxGeometry(10, 0.08, 0.22).rotateY(yaw).translate(p.x, p.y + lampY, p.z));
+          for (const d of [-3, 3]) pools.push(onTrack(tr, s + 6 + d, off).p.clone().setY(p.y + FLOOR_M + 0.04));
+        }
+      }
+      const lamp = new THREE.Mesh(mergeGeometries(strips)!, new THREE.MeshBasicMaterial({ color: 0xc9d3dc, toneMapped: false }));
+      const pool = new THREE.InstancedMesh(new THREE.CircleGeometry(3.6, 14).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xe8f0ff, map: glowTexture('235,242,255'), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }), pools.length);
+      const m = new THREE.Matrix4();
+      pools.forEach((q, i) => pool.setMatrixAt(i, m.makeTranslation(q.x, q.y, q.z)));
+      pool.computeBoundingSphere();
+      this.night = new THREE.Group().add(lamp, pool);
+      this.scene.add(this.night);
+    }
+    if (this.night) this.night.visible = on;
+  }
+  private night: THREE.Group | null = null;
 
   /** The screen doors to show: those at `stop` on `track` (null hides them). */
   setActive(track: LineTrack | null, stop: LineStop | null): void {

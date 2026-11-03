@@ -58,6 +58,7 @@ const decal = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: t
 let walls: THREE.MeshLambertMaterial | null = null;
 let signs: THREE.MeshLambertMaterial | null = null;
 let stationSigns: THREE.MeshLambertMaterial | null = null;
+let nightSigns = false;
 let road: THREE.Material = flat;
 
 /**
@@ -68,6 +69,7 @@ export function setMaterialConditions(c: { night: boolean; wet: boolean; sheen: 
   const w = materialFor('wall') as THREE.MeshLambertMaterial;
   if (c.night && !w.emissiveMap) { w.emissiveMap = litWindowTexture(); w.emissive.setHex(0xffffff); w.needsUpdate = true; }
   w.emissiveIntensity = c.night ? 0.9 : 0;
+  nightSigns = c.night;
   road = !c.wet ? flat
     : c.sheen ? new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, color: 0x8a8a8a, specular: 0x555555, shininess: 60 })
     : new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, color: 0x7a7a7a });
@@ -76,7 +78,15 @@ export function setMaterialConditions(c: { night: boolean; wet: boolean; sheen: 
 export function materialFor(layer: ChunkLayer): THREE.Material {
   if (layer === 'wall') return (walls ??= new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, map: windowTexture() }));
   if (layer === 'sign') return (signs ??= new THREE.MeshLambertMaterial({ map: signAtlasTexture(), side: THREE.DoubleSide }));
-  if (layer === 'station') return (stationSigns ??= new THREE.MeshLambertMaterial({ map: stationAtlasTexture(), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  if (layer === 'station') {
+    if (!stationSigns) {
+      // Station signs are backlit: at night they glow with their own picture.
+      const map = stationAtlasTexture();
+      stationSigns = new THREE.MeshLambertMaterial({ map, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      if (nightSigns) { stationSigns.emissiveMap = map; stationSigns.emissive.setHex(0xffffff); stationSigns.emissiveIntensity = 0.85; }
+    }
+    return stationSigns;
+  }
   if (layer === 'marking' || layer === 'water') return decal;
   if (layer === 'road') return road;
   return flat;
