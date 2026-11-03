@@ -12,6 +12,8 @@ This spec covers **Rooms**: a player creates a Room and shares a short code, fri
 
 ## 1. Releases
 
+*As built, v1.4.0 (2026-11-03):* the production Room server is `wss://travel-sim-rooms.nipun4338.workers.dev` (set in `.env.production`), the preview one `wss://travel-sim-rooms-preview.nipun4338.workers.dev` (3,000 free requests a day). On phones the Room pill and a 44 px 💬 sit at the top right under the touch buttons; on a gamepad, Select opens the quick-message wheel and A, B, X, Y, LB, RB pick messages 1–6. The menu itself has no gamepad navigation yet (true of every menu screen, not only Rooms).
+
 [Plan which release ships Rooms and in what order](wayfinder/multiplayer/tickets/011-plan-the-releases.md)
 
 | Release | Rooms in |

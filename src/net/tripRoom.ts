@@ -29,6 +29,8 @@ interface Remote {
   quick?: { text: string; until: number };
 }
 const QUICK_SHOW_MS = 4000, FEED_ROWS = 4;
+/** Gamepad (standard mapping): Select/Back opens the wheel; A, B, X, Y, LB, RB pick messages 1–6. */
+const PAD_WHEEL = 8, PAD_PICK = [0, 1, 2, 3, 4, 5], PAD_LABELS = ['A', 'B', 'X', 'Y', 'LB', 'RB'];
 const quickText = (id: number) => QUICK_MESSAGES[id][getLang() === 'bn' ? 0 : 1];
 
 export interface TripState { bus: Bus; lights: BusLights; paused: boolean; camera: THREE.Camera; minimap: Minimap; rainy: boolean; onHorn: () => void }
@@ -48,6 +50,7 @@ export class TripRoom {
   private feed = document.createElement('div');
   private quickBtn = document.createElement('button');
   private lastQuick = 0;
+  private padWas: boolean[] = [];
 
   constructor(code: string, region: string, private scene: THREE.Scene) {
     this.tags.className = 'room-tags';
@@ -83,7 +86,8 @@ export class TripRoom {
     this.wheel.hidden = !open;
     if (!open) return;
     const wait = Math.max(0, QUICK_MESSAGE_GAP_MS - (Date.now() - this.lastQuick));
-    this.wheel.innerHTML = QUICK_MESSAGES.map((_, i) => `<button data-q="${i}" ${wait ? 'disabled' : ''}><b>${num(i + 1)}</b> ${quickText(i)}</button>`).join('');
+    const pad = !!navigator.getGamepads?.().find(Boolean);
+    this.wheel.innerHTML = QUICK_MESSAGES.map((_, i) => `<button data-q="${i}" ${wait ? 'disabled' : ''}><b>${pad ? PAD_LABELS[i] : num(i + 1)}</b> ${quickText(i)}</button>`).join('');
     this.wheel.querySelectorAll<HTMLButtonElement>('[data-q]').forEach(b => b.addEventListener('click', () => this.sendQuick(+b.dataset.q!)));
     if (wait) setTimeout(() => { if (!this.wheel.hidden) this.toggleWheel(true); }, wait);
   }
@@ -112,6 +116,7 @@ export class TripRoom {
 
   /** Once a frame, after your bus has been drawn. */
   frame(dt: number, s: TripState): void {
+    this.gamepad();
     this.send(dt, s);
     const now = performance.now(), blinkOn = Math.floor((now / 1000) * BLINK_HZ * 2) % 2 === 0;
     const own = s.bus.body.translation(), peers: Minimap['peers'] = [];
@@ -140,6 +145,15 @@ export class TripRoom {
       this.placeTag(r, s.camera, own, away);
     }
     s.minimap.peers = peers;
+  }
+
+  /** Select/Back toggles the wheel; while it's open, the face and shoulder buttons pick a message. */
+  private gamepad(): void {
+    const gp = navigator.getGamepads?.().find(Boolean);
+    if (!gp) return;
+    const edge = (i: number) => { const now = !!gp.buttons[i]?.pressed, e = now && !this.padWas[i]; this.padWas[i] = now; return e; };
+    if (edge(PAD_WHEEL)) this.toggleWheel();
+    PAD_PICK.forEach((b, i) => { if (edge(b) && !this.wheel.hidden) this.sendQuick(i); });
   }
 
   private send(dt: number, s: TripState): void {

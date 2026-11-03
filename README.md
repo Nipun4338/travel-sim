@@ -25,6 +25,12 @@ Take a city bus up the Farmgate → Airport corridor in Dhaka, or wind up the Th
 | ![Driver's cab view at Kakoli: Bangla shop signs, towers, tea stalls and the median railing](docs/images/cab-dhaka.jpg) | ![The bus on the forested hill road to Chimbuk](docs/images/bandarban-hills.jpg) |
 | *The cab is the default view: Bangla dashboard, mirrors, and Kakoli's shops and towers outside* | *Bandarban: hairpins, bamboo and forest on the climb to Chimbuk* |
 
+### 👥 Play with friends *(new in 1.4.0)*
+
+Open a **Room** on the Dhaka bus, share its 4-letter code or link, and up to six friends drive the Farmgate → Airport road with you. Each of you drives your own bus on your own Leg, and you see everyone else's: their own livery, a name tag in their seat colour, a dot on the minimap, and their indicators, lights and horn. The Room shares one time of day and weather, so everyone gets the same golden hour or monsoon. Six preset quick messages (T, 💬, or Select on a gamepad) say "Wait for me" or "See you at the next Stop" without any chat to moderate. No account needed, and playing solo still works offline.
+
+![Two players in a Room at Farmgate at golden hour: the other bus ahead with its name tag and a quick message](docs/images/rooms-dhaka.jpg)
+
 ### ✈️ Plane: fly free or take a Challenge
 
 Take off from Hazrat Shahjalal International Airport and fly over Dhaka's skyline, or cruise over Bandarban's ridges and the Sangu river. Fly freely, or take on landing and ring Challenges.
@@ -131,7 +137,7 @@ The routes you've driven light up on the map, zoomed-in places name their landma
 |:-:|:-:|
 | ![The What's new card shown after an update](docs/images/whats-new.jpg) | ![The classic menu cards: Bus, Plane and Metro](docs/images/menu.jpg) |
 
-**Current version: 1.3.0**: Dhaka at its real heights, with Bangla shop signs, wires, stalls and people along the road, a built-up Kuril and Khilkhet, and weathered streets. 1.2.2 kept the Bandarban bus on the Thanchi Road and moved Chimbuk's summit complex to where it really is; 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
+**Current version: 1.4.0**: Rooms, so friends can drive the Dhaka bus road together, plus wipers on every bus. 1.3.0 brought Dhaka to its real heights with Bangla shop signs, wires, stalls and people along the road; 1.2.2 kept the Bandarban bus on the Thanchi Road and moved Chimbuk's summit complex to where it really is; 1.2.1 added gamepad control for the metro, the passport card and landmark names on the map; 1.2.0 brought the map menu; 1.1.0 added Metro Mode on MRT Line 6.
 
 ## Build it yourself
 
@@ -153,6 +159,14 @@ npm run bake:flight -- bandarban
 ```
 
 To release, bump the version in `package.json` and add an entry to [src/config/changelog.ts](src/config/changelog.ts); players see it once in the What's new card.
+
+Rooms (multiplayer) run on a separate free Cloudflare Worker in [server/rooms](server/rooms) ([docs/rooms-spec.md](docs/rooms-spec.md)):
+
+```bash
+npm run dev:rooms             # the Room server on localhost:8787, used by npm run dev
+npm run deploy:rooms:preview  # travel-sim-rooms-preview, for testing
+npm run deploy:rooms          # the production Room server (its address is in .env.production)
+```
 
 ```bash
 npm run build        # typecheck and production build

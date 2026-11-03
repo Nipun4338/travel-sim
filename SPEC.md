@@ -18,7 +18,7 @@ This spec consolidates the wayfinding map ([docs/wayfinder/map.md](docs/wayfinde
 **Planned after v1 (2026-10-27):** a third mode, a **Dhaka Metro Rail simulator** on MRT Line 6, as realistic as possible. It's the project's final milestone (build plan M13) and gets its own decision round before it's specified.
 
 **Out of scope:**
-- Multiplayer, online accounts, cloud saves, leaderboards.
+- Online accounts, cloud saves, leaderboards. (Multiplayer was out of v1; since v1.4 the see-each-other **Rooms** in [docs/rooms-spec.md](docs/rooms-spec.md) are in, and racing, riding together and shared traffic stay out.)
 - Mobile tilt steering (until it is hosted on HTTPS).
 - Pedestrians in traffic.
 - Photoreal Google 3D Tiles.

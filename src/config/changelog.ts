@@ -11,6 +11,23 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.4.0',
+    date: '2026-11-03',
+    image: '1.4.0.jpg',
+    bn: [
+      'বন্ধুদের সাথে খেলুন: ঢাকার বাসে একটি রুম খুলে কোড বা লিংক পাঠান, ছয়জন পর্যন্ত একসাথে রাস্তায় চালান।',
+      'সবাই একে অপরের বাস দেখবেন: নিজের রঙে, নাম ট্যাগ, মানচিত্রে বিন্দু, সিগন্যাল আর হর্ন সহ।',
+      'রুমে সবার একই সময় আর আবহাওয়া; T বা 💬 দিয়ে ছয়টি ছোট বার্তা পাঠান (গেমপ্যাডে Select)।',
+      'প্রতিটি বাসে এখন ওয়াইপার, বৃষ্টিতে চলে।',
+    ],
+    en: [
+      'Play with friends: open a Room on the Dhaka bus, send the code or link, and drive the road together, up to six of you.',
+      'You see each other’s buses: in their own livery, with name tags, minimap dots, indicators and horns.',
+      'Everyone in a Room shares the time and weather; send one of six quick messages with T or 💬 (Select on a gamepad).',
+      'Every bus now has wipers that sweep in the rain.',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-11-01',
     image: '1.3.0.jpg',
