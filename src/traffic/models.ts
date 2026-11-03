@@ -109,3 +109,84 @@ export function vehicleGeometry(type: VehicleType): THREE.BufferGeometry {
 }
 
 export const vehicleMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
+// Night lamps (SPEC §9): no real lights, just emissive quads and additive glow, instanced like the
+// bodies. Per type: headlamps and tail lamps (x of the front and rear faces, lamp height, ±z), and
+// the halo size around each. Rickshaws carry only rear reflectors.
+interface LampLayout {
+  head?: { x: number; y: number; z: number[]; w: number; h: number; halo: number };
+  tail: { x: number; y: number; z: number[]; w: number; h: number; halo: number };
+}
+const LAMPS: Record<VehicleType, LampLayout> = {
+  car:       { head: { x: 2.2, y: 0.65, z: [-0.6, 0.6], w: 0.4, h: 0.18, halo: 1.3 }, tail: { x: -2.2, y: 0.7, z: [-0.6, 0.6], w: 0.35, h: 0.18, halo: 0.8 } },
+  cng:       { head: { x: 1.31, y: 0.9, z: [0], w: 0.22, h: 0.22, halo: 1.1 }, tail: { x: -1.16, y: 0.6, z: [-0.5, 0.5], w: 0.15, h: 0.12, halo: 0.6 } },
+  rickshaw:  { tail: { x: -0.95, y: 0.8, z: [-0.35, 0.35], w: 0.1, h: 0.1, halo: 0.35 } },
+  motorbike: { head: { x: 0.62, y: 1.0, z: [0], w: 0.2, h: 0.2, halo: 1.0 }, tail: { x: -0.71, y: 0.8, z: [0], w: 0.14, h: 0.1, halo: 0.5 } },
+  truck:     { head: { x: 3.61, y: 0.75, z: [-0.85, 0.85], w: 0.35, h: 0.22, halo: 1.5 }, tail: { x: -3.46, y: 1.0, z: [-0.95, 0.95], w: 0.25, h: 0.2, halo: 0.9 } },
+  jeep:      { head: { x: 1.91, y: 0.95, z: [-0.6, 0.6], w: 0.26, h: 0.26, halo: 1.3 }, tail: { x: -2.01, y: 0.8, z: [-0.7, 0.7], w: 0.2, h: 0.16, halo: 0.7 } },
+  bus:       { head: { x: 5.28, y: 0.75, z: [-0.95, 0.95], w: 0.4, h: 0.25, halo: 1.6 }, tail: { x: -5.28, y: 0.9, z: [-1.0, 1.0], w: 0.25, h: 0.35, halo: 1.0 } },
+};
+
+/** A vertical quad facing +x (`front`) or −x, painted `hex`, keeping its UVs for the glow texture. */
+function facing(w: number, h: number, x: number, y: number, z: number, hex: number, front: boolean): Part {
+  const g = new THREE.PlaneGeometry(w, h).toNonIndexed();
+  g.rotateY(front ? Math.PI / 2 : -Math.PI / 2);
+  g.translate(x, y, z);
+  return tint(g, hex);
+}
+function tint(g: THREE.BufferGeometry, hex: number): Part {
+  const c = new THREE.Color(hex), n = g.getAttribute('position').count, col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
+const HEAD = 0xfff4d6, TAIL = 0x8a1010;
+/** The lamp faces themselves: bright headlamps, dim tail lamps. */
+export function lampGeometry(type: VehicleType): THREE.BufferGeometry {
+  const { head, tail } = LAMPS[type];
+  return mergeGeometries([
+    ...(head?.z.map(z => facing(head.w, head.h, head.x, head.y, z, HEAD, true)) ?? []),
+    ...tail.z.map(z => facing(tail.w, tail.h, tail.x, tail.y, z, type === 'rickshaw' ? 0x5a0c0c : TAIL, false)),
+  ])!;
+}
+
+/** Additive glow: halos round the lamps, and a faint pool of light on the road ahead. */
+export function glowGeometry(type: VehicleType): THREE.BufferGeometry {
+  const { head, tail } = LAMPS[type];
+  const parts = tail.z.map(z => facing(tail.halo, tail.halo, tail.x - 0.05, tail.y, z, 0x4a0808, false));
+  if (head) {
+    parts.push(...head.z.map(z => facing(head.halo, head.halo, head.x + 0.05, head.y, z, 0xb0a890, true)));
+    const len = 4 + head.halo * 4, wide = head.z.length > 1 ? 3.2 : 2;
+    const pool = new THREE.PlaneGeometry(len, wide).toNonIndexed();
+    pool.rotateX(-Math.PI / 2);
+    pool.translate(head.x + len / 2 - 0.5, 0.08, 0);
+    parts.push(tint(pool, 0x2e2a20));
+  }
+  return mergeGeometries(parts)!;
+}
+
+/** Brake lamps: a brighter red halo over each tail lamp, drawn only while braking. */
+export function brakeGeometry(type: VehicleType): THREE.BufferGeometry {
+  const { tail } = LAMPS[type];
+  return mergeGeometries(tail.z.map(z => facing(tail.halo * 0.9, tail.halo * 0.9, tail.x - 0.06, tail.y, z, 0xd01818, false)))!;
+}
+
+function glowTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, '#ffffff');
+  r.addColorStop(0.25, '#9a9a9a');
+  r.addColorStop(1, '#000000');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+export const lampMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+export const glowMaterial = new THREE.MeshBasicMaterial({
+  vertexColors: true, map: glowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+});

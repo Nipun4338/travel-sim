@@ -4,7 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { LaneData } from '../shared/region';
 import type { Junctions } from './junctions';
-import { SPECS, vehicleGeometry, vehicleMaterial, type VehicleType } from './models';
+import { SPECS, brakeGeometry, glowGeometry, glowMaterial, lampGeometry, lampMaterial, vehicleGeometry, vehicleMaterial, type VehicleType } from './models';
 import { LaneNetwork, type Path } from './network';
 import { BUS_LIVERIES, busSignGeometry, busSignMaterial, truckSignGeometry, truckSignMaterial } from './signs';
 
@@ -41,6 +41,7 @@ interface Vehicle {
   color: THREE.Color;
   livery: number;        // buses: index into BUS_LIVERIES
   yaw: number | null;    // drawn heading, eased so turns don't snap at road vertices
+  brakeT: number;        // brake lamps stay lit while > 0
 }
 
 /** The player's vehicle; with `ghost` it only centres the traffic (Metro Mode's train is up on the viaduct). */
@@ -60,6 +61,8 @@ export class Traffic {
   /** Lettering drawn over the bodies: one mesh per bus company, one for trucks. */
   private busSigns: THREE.InstancedMesh[];
   private truckSigns: THREE.InstancedMesh;
+  /** Night lamps per type: lamp faces, glow, and brake lamps (see `lights`). */
+  private lamps = new Map<VehicleType, { lamp: THREE.InstancedMesh; glow: THREE.InstancedMesh; brake: THREE.InstancedMesh }>();
   private byCollider = new Map<number, Vehicle>();
   private time = 0;
   /** No vehicles yet (start, or after `clear`): the next update fills up in one go, in view or not. */
@@ -71,6 +74,9 @@ export class Traffic {
 
   /** Rain slows AI traffic (SPEC §7): `speedScale` is set to RAIN_TRAFFIC_FACTOR. */
   speedScale = 1;
+
+  /** Headlights, tail and brake lamps on: at night and in rain or fog (SPEC §9). */
+  lights = false;
 
   /**
    * The camera the player sees through. Vehicles only appear or vanish where it can't see them:
@@ -97,6 +103,16 @@ export class Traffic {
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       scene.add(mesh);
       this.meshes.set(type, mesh);
+    }
+    const lamp = (geo: THREE.BufferGeometry, mat: THREE.Material) => {
+      const mesh = new THREE.InstancedMesh(geo, mat, cap);
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      return mesh;
+    };
+    for (const type of Object.keys(SPECS) as VehicleType[]) {
+      this.lamps.set(type, { lamp: lamp(lampGeometry(type), lampMaterial), glow: lamp(glowGeometry(type), glowMaterial), brake: lamp(brakeGeometry(type), glowMaterial) });
     }
     const signs = (geo: THREE.BufferGeometry, mat: THREE.Material) => {
       const mesh = new THREE.InstancedMesh(geo, mat, cap);
@@ -196,12 +212,13 @@ export class Traffic {
     }
 
     // Intelligent Driver Model.
-    if (this.time < v.heldUntil) { v.v = 0; return; }
+    if (this.time < v.heldUntil) { v.v = 0; v.brakeT = 0.5; return; }
     const dv = v.v - leaderV;
     const sStar = MIN_GAP + v.v * spec.headwayS + (v.v * dv) / (2 * Math.sqrt(spec.maxAccel * spec.comfortDecel));
     const free = 1 - (v.v / v0) ** 4;
     const a = spec.maxAccel * (free - (Number.isFinite(gap) ? (Math.max(sStar, 0) / Math.max(gap, 0.1)) ** 2 : 0));
     v.v = Math.max(0, Math.min(v0 * 1.05, v.v + Math.max(a, -8) * dt));
+    v.brakeT = a < -1 || (v.v < 0.5 && gap < 25) ? 0.5 : v.brakeT - dt;
     v.s += v.v * dt;
 
     // Lane change to pass something slow, if the target lane is clear.
@@ -276,7 +293,7 @@ export class Traffic {
     const collider = this.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.length / 2, spec.height / 2, spec.width / 2), body);
     const livery = Math.floor(this.rnd() * BUS_LIVERIES.length);
     const color = new THREE.Color(type === 'bus' ? BUS_LIVERIES[livery].body : spec.tints[Math.floor(this.rnd() * spec.tints.length)]);
-    const vehicle: Vehicle = { type, path: p, s, lane, lateral, v: (spec.speedKmh / 3.6) * 0.7, heldUntil: 0, body, collider, color, livery, yaw: null };
+    const vehicle: Vehicle = { type, path: p, s, lane, lateral, v: (spec.speedKmh / 3.6) * 0.7, heldUntil: 0, body, collider, color, livery, yaw: null, brakeT: 0 };
     this.vehicles.push(vehicle);
     this.byCollider.set(collider.handle, vehicle);
   }
@@ -305,7 +322,7 @@ export class Traffic {
    * vertex), and the heading is eased so a turn onto the next road sweeps round instead of snapping.
    */
   draw(ahead: number, frameDt: number): void {
-    const counts = new Map<VehicleType, number>(), signCounts = new Map<THREE.InstancedMesh, number>();
+    const counts = new Map<VehicleType, number>(), signCounts = new Map<THREE.InstancedMesh, number>(), brakes = new Map<VehicleType, number>();
     const ease = 1 - Math.exp(-frameDt * 10);
     for (const v of this.vehicles) {
       const s = Math.min(v.path.length, v.s + v.v * ahead);
@@ -326,6 +343,16 @@ export class Traffic {
       mesh.setMatrixAt(n, m4);
       mesh.setColorAt(n, v.color);
       counts.set(v.type, n + 1);
+      if (this.lights) {
+        const l = this.lamps.get(v.type)!;
+        l.lamp.setMatrixAt(n, m4);
+        l.glow.setMatrixAt(n, m4);
+        if (v.brakeT > 0) {
+          const b = brakes.get(v.type) ?? 0;
+          l.brake.setMatrixAt(b, m4);
+          brakes.set(v.type, b + 1);
+        }
+      }
       const signs = v.type === 'bus' ? this.busSigns[v.livery] : v.type === 'truck' ? this.truckSigns : null;
       if (signs) {
         const k = signCounts.get(signs) ?? 0;
@@ -337,6 +364,10 @@ export class Traffic {
       mesh.count = counts.get(type) ?? 0;
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const l = this.lamps.get(type)!;
+      l.lamp.count = l.glow.count = this.lights ? mesh.count : 0;
+      l.brake.count = this.lights ? brakes.get(type) ?? 0 : 0;
+      for (const m of [l.lamp, l.glow, l.brake]) m.instanceMatrix.needsUpdate = true;
     }
     for (const signs of [...this.busSigns, this.truckSigns]) {
       signs.count = signCounts.get(signs) ?? 0;
