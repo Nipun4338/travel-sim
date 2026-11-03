@@ -11,6 +11,23 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.5.2',
+    date: '2026-11-04',
+    image: '1.5.2.jpg',
+    bn: [
+      'রাতে মেট্রো ট্রেনের জানালায় ভেতরের আলো, সামনে হেডলাইটের আলো ট্র্যাকে আর পেছনে লাল বাতি; বৃষ্টি আর কুয়াশায়ও হেডলাইট জ্বলে।',
+      'রাতে স্টেশনের ছাদের নিচে বাতি, প্ল্যাটফর্মে আলো আর আলোকিত নামফলক; নিচের রাস্তায় সড়কবাতি।',
+      'সংশোধন: মেট্রো থেকে দেখা ফার্মগেট আর বিজয় সরণির ট্রাফিক পুলিশ আর বাতাসে ভাসে না।',
+      'সংশোধন: ট্রেন বা বাস দ্রুত চললেও সামনের রাস্তায় এখন গাড়ি থাকে।',
+    ],
+    en: [
+      'At night the metro trains have lit windows, headlights that light the track ahead and red tail lights; the headlights are on in rain and fog too.',
+      'Stations are lit at night: lamps under the roofs, light on the platforms and glowing name signs, with street lamps on the roads below.',
+      'Fix: the traffic police at Farmgate and Bijoy Sarani no longer float in the air when seen from the metro.',
+      'Fix: the road ahead no longer empties of traffic when the train or bus is moving fast.',
+    ],
+  },
+  {
     version: '1.5.1',
     date: '2026-11-04',
     image: '1.5.1.jpg',
