@@ -24,6 +24,9 @@ export class Minimap {
   private sizePx = 0;
   private visible = true;
 
+  /** Other players in a Room, drawn as seat-coloured dots; set each frame by the Room. */
+  peers: Array<{ x: number; z: number; colour: string; initial: string }> = [];
+
   constructor() {
     this.root.className = 'minimap';
     this.root.appendChild(this.canvas);
@@ -163,6 +166,24 @@ export class Minimap {
       c.lineWidth = 1.5 * dpr;
       c.strokeStyle = '#1b1b1b';
       c.stroke();
+    }
+
+    // Other players in a Room: a dot in their seat colour with their initial (docs/rooms-spec.md §6).
+    for (const pr of this.peers) {
+      const dx = sx(pr.x, pr.z) - size / 2, dy = sy(pr.x, pr.z) - size / 2, d = Math.hypot(dx, dy), rim = size / 2 - 9 * dpr;
+      const k = d > rim ? rim / d : 1, px = size / 2 + dx * k, py = size / 2 + dy * k;
+      c.beginPath();
+      c.arc(px, py, 6 * dpr, 0, Math.PI * 2);
+      c.fillStyle = pr.colour;
+      c.fill();
+      c.lineWidth = 1.5 * dpr;
+      c.strokeStyle = '#1b1b1b';
+      c.stroke();
+      c.fillStyle = '#111';
+      c.font = `700 ${8 * dpr}px "Noto Sans Bengali", system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(pr.initial, px, py + 0.5 * dpr);
     }
 
     c.translate(cx, cy);

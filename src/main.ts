@@ -60,9 +60,9 @@ atmosphere.enableShadows(renderer);
 // World: the baked Region by default, or the test track with ?world=test (or if nothing is baked yet).
 let region: RegionWorld | null = null;
 const regionId = params.get('world') ?? 'dhaka';
-// A Room (v1.4): take back the seat the menu held. Other players' buses arrive in a later step.
+// A Room (v1.4, docs/rooms-spec.md): take back the seat the menu held, send this bus, draw the others.
 const roomCode = params.get('room');
-if (roomCode) void import('./ui/roomBadge').then(m => m.joinTripRoom(roomCode, regionId));
+let tripRoom: import('./net/tripRoom').TripRoom | null = null;
 loader.stage('loadMap', 0, 0.1);
 if (regionId !== 'test') {
   region = new RegionWorld(`${import.meta.env.BASE_URL}regions/${regionId}`, scene, world);
@@ -191,7 +191,7 @@ input.onAction(action => {
     case 'language': setLang(getLang() === 'bn' ? 'en' : 'bn'); hud.toast(t('language')); break;
     case 'details': hud.showDetails = !hud.showDetails; break;
     case 'map': hud.toast(t(minimap.toggle() ? 'mapOn' : 'mapOff')); break;
-    case 'horn': sounds.horn(); break;
+    case 'horn': sounds.horn(); tripRoom?.horn(); break;
   }
 });
 
@@ -307,6 +307,8 @@ function junctionAhead() {
   return { name: a.j.name, stop: st.stop, secondsLeft: st.secondsLeft, distM: Math.max(0, a.dist) };
 }
 
+if (roomCode) tripRoom = new (await import('./net/tripRoom')).TripRoom(roomCode, regionId, scene);
+
 // Compile every shader now, behind the loading screen, so the first seconds of driving don't stutter.
 await renderer.compileAsync(scene, camera).catch(() => undefined);
 
@@ -325,6 +327,7 @@ startLoop(
     const nextDistM = next && progress && km ? Math.max(0, (km[next.index] - km[progress.index]) * 1000) : undefined;
     busView.updateCab(frameDt, { kmh: bus.kmh, steerDeg: bus.steerDeg, doorsOpen: bus.doorsOpen, nextStop: next && place(next.name), nextDistM }, lights);
     cam.update(busView.group, bus.forward, bus.up, frameDt);
+    tripRoom?.frame(frameDt, { bus, lights, paused, camera, minimap, onHorn: () => sounds.horn() });
     busView.updateMirrors(renderer, scene);
     atmosphere.update(frameDt, inCab, bus.kmh);
     railways?.update(frameDt, camera.position, { x: busPos.x, z: busPos.z });

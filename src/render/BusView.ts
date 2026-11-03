@@ -225,6 +225,23 @@ export class BusView {
 
   setCabVisible(v: boolean): void { this.cab.visible = v; }
 
+  /**
+   * Another player's bus in a Room (docs/rooms-spec.md §6): the same model, but no cab and no
+   * headlight SpotLight, which would add a light to every material's shader. The beam cone still shows.
+   */
+  setRemote(): void { this.cab.visible = false; this.beam.visible = false; }
+
+  /** Places another player's bus from a received pose: wheels steered, and spun by `speed` (m/s). */
+  place(position: THREE.Vector3, quaternion: THREE.Quaternion, steerDeg: number, speed: number, dt: number): void {
+    this.group.position.copy(position);
+    this.group.quaternion.copy(quaternion);
+    this.wheels.forEach((w, i) => {
+      w.pivot.position.y = BUS_WHEELS[i][1] - SUSPENSION_REST;
+      w.pivot.rotation.y = i < 2 ? THREE.MathUtils.degToRad(steerDeg) : 0;
+      w.spin.rotation.z -= (speed * dt) / WHEEL_RADIUS;
+    });
+  }
+
   /** Draws the bus `ahead` seconds past its last physics step, so it moves smoothly at any frame rate. */
   sync(bus: Bus, ahead = 0): void {
     const p = bus.body.translation(), r = bus.body.rotation(), v = bus.body.linvel();
