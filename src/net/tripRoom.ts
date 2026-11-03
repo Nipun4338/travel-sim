@@ -9,7 +9,8 @@ import { BusView, type BusLivery } from '../render/BusView';
 import type { Bus } from '../bus/Bus';
 import type { BusLights } from '../bus/lights';
 import { BUS_LIVERIES } from '../config/liveries';
-import { BUS_FLAGS, SEAT_COLOURS, decodeBus, encodeBus, type BusUpdate } from '../shared/rooms';
+import { BUS_FLAGS, QUICK_MESSAGES, QUICK_MESSAGE_GAP_MS, SEAT_COLOURS, decodeBus, encodeBus, type BusUpdate } from '../shared/rooms';
+import { getLang, num, t } from '../i18n/i18n';
 import { nameText } from '../ui/roomSheet';
 import { joinTripRoom } from '../ui/roomBadge';
 import type { RoomClient } from './roomClient';
@@ -25,9 +26,12 @@ interface Remote {
   pos: THREE.Vector3; quat: THREE.Quaternion; placed: boolean;
   seeThrough: boolean; originals?: Map<THREE.Mesh, THREE.Material | THREE.Material[]>;
   hornUntil: number;
+  quick?: { text: string; until: number };
 }
+const QUICK_SHOW_MS = 4000, FEED_ROWS = 4;
+const quickText = (id: number) => QUICK_MESSAGES[id][getLang() === 'bn' ? 0 : 1];
 
-export interface TripState { bus: Bus; lights: BusLights; paused: boolean; camera: THREE.Camera; minimap: Minimap; onHorn: () => void }
+export interface TripState { bus: Bus; lights: BusLights; paused: boolean; camera: THREE.Camera; minimap: Minimap; rainy: boolean; onHorn: () => void }
 
 export class TripRoom {
   private remotes = new Map<number, Remote>();
@@ -40,13 +44,31 @@ export class TripRoom {
   private tmpV = new THREE.Vector3();
   private tmpQ = new THREE.Quaternion();
   private tags = document.createElement('div');
+  private wheel = document.createElement('div');
+  private feed = document.createElement('div');
+  private quickBtn = document.createElement('button');
+  private lastQuick = 0;
 
   constructor(code: string, region: string, private scene: THREE.Scene) {
     this.tags.className = 'room-tags';
-    document.body.appendChild(this.tags);
+    this.feed.className = 'room-feed';
+    this.wheel.className = 'room-wheel';
+    this.wheel.hidden = true;
+    this.quickBtn.className = 'room-quick';
+    this.quickBtn.textContent = '💬';
+    this.quickBtn.title = 'T';
+    this.quickBtn.addEventListener('click', () => this.toggleWheel());
+    document.body.append(this.tags, this.feed, this.wheel, this.quickBtn);
+    addEventListener('keydown', e => {
+      if (this.wheel.hidden) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= QUICK_MESSAGES.length) { e.preventDefault(); this.sendQuick(n - 1); }
+      else if (e.key === 'Escape') this.toggleWheel(false);
+    });
     this.client = joinTripRoom(code, region, {
       change: () => this.syncPlayers(),
       update: buf => this.receive(buf),
+      quick: (seat, id) => this.showQuick(seat, id),
       error: () => { this.client = null; this.syncPlayers(); },
     });
     if (import.meta.env.DEV) Object.assign(window, { __tripRoom: this });
@@ -54,6 +76,39 @@ export class TripRoom {
 
   /** Sounds your horn for the others too (a flag in the next updates). */
   horn(): void { this.hornUntil = performance.now() + 600; this.sendTimer = Infinity; }
+
+  /** Opens or closes the quick-message wheel (T, or the 💬 button). */
+  toggleWheel(open = this.wheel.hidden): void {
+    if (!this.client || this.client.status !== 'in') open = false;
+    this.wheel.hidden = !open;
+    if (!open) return;
+    const wait = Math.max(0, QUICK_MESSAGE_GAP_MS - (Date.now() - this.lastQuick));
+    this.wheel.innerHTML = QUICK_MESSAGES.map((_, i) => `<button data-q="${i}" ${wait ? 'disabled' : ''}><b>${num(i + 1)}</b> ${quickText(i)}</button>`).join('');
+    this.wheel.querySelectorAll<HTMLButtonElement>('[data-q]').forEach(b => b.addEventListener('click', () => this.sendQuick(+b.dataset.q!)));
+    if (wait) setTimeout(() => { if (!this.wheel.hidden) this.toggleWheel(true); }, wait);
+  }
+
+  /** One preset message at most every 5 s (the server enforces it too). */
+  private sendQuick(id: number): void {
+    if (Date.now() - this.lastQuick < QUICK_MESSAGE_GAP_MS) return;
+    this.lastQuick = Date.now();
+    this.client?.send({ t: 'quick', id });
+    this.toggleWheel(false);
+  }
+
+  /** A quick message: beside the sender's name tag for 4 s, and in the Room feed. */
+  private showQuick(seat: number, id: number): void {
+    const p = this.client?.players.get(seat);
+    if (!p || !QUICK_MESSAGES[id]) return;
+    const r = this.remotes.get(seat);
+    if (r) r.quick = { text: quickText(id), until: performance.now() + QUICK_SHOW_MS };
+    const row = document.createElement('div');
+    row.style.setProperty('--seat', SEAT_COLOURS[seat]);
+    row.textContent = `${seat === this.client!.seat ? t('roomYou') : nameText(p.name)}: ${quickText(id)}`;
+    this.feed.prepend(row);
+    while (this.feed.children.length > FEED_ROWS) this.feed.lastElementChild!.remove();
+    setTimeout(() => row.classList.add('old'), 8000);
+  }
 
   /** Once a frame, after your bus has been drawn. */
   frame(dt: number, s: TripState): void {
@@ -75,6 +130,7 @@ export class TripRoom {
         }
         const speed = away ? 0 : Math.hypot(r.last.vx, r.last.vz);
         r.view.place(r.pos, r.quat, r.last.steerDeg, speed, dt);
+        r.view.setWipers(s.rainy, dt);
         r.view.syncLights(remoteLights(r.last.flags, blinkOn));
         if (r.last.flags & BUS_FLAGS.horn && now > r.hornUntil && r.pos.distanceTo(own as THREE.Vector3Like as THREE.Vector3) < 150) { r.hornUntil = now + 800; s.onHorn(); }
         r.view.group.visible = true;
@@ -153,7 +209,8 @@ export class TripRoom {
     }
     r.tag.hidden = false;
     r.tag.classList.toggle('edge', !on);
-    r.tag.textContent = `${on ? '' : '➤ '}${nameText(p.name)}${away ? ' ⟳' : ''}`;
+    const said = r.quick && performance.now() < r.quick.until ? ` · “${r.quick.text}”` : '';
+    r.tag.textContent = `${on ? '' : '➤ '}${nameText(p.name)}${away ? ' ⟳' : ''}${said}`;
     r.tag.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px) translate(-50%, -100%)`;
     r.tag.style.opacity = String(Math.max(0.35, 1 - d / TAG_RANGE_M));
   }

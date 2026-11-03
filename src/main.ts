@@ -192,6 +192,7 @@ input.onAction(action => {
     case 'details': hud.showDetails = !hud.showDetails; break;
     case 'map': hud.toast(t(minimap.toggle() ? 'mapOn' : 'mapOff')); break;
     case 'horn': sounds.horn(); tripRoom?.horn(); break;
+    case 'quick': tripRoom?.toggleWheel(); break;
   }
 });
 
@@ -322,12 +323,13 @@ startLoop(
     busView.syncLights(lights);
     const inCab = cam.mode === 'cockpit';
     busView.setCabVisible(inCab);
+    busView.setWipers(atmosphere.rainy, frameDt);
     const next = run?.nextStop;
     const km = region?.route.cumKm;
     const nextDistM = next && progress && km ? Math.max(0, (km[next.index] - km[progress.index]) * 1000) : undefined;
     busView.updateCab(frameDt, { kmh: bus.kmh, steerDeg: bus.steerDeg, doorsOpen: bus.doorsOpen, nextStop: next && place(next.name), nextDistM }, lights);
     cam.update(busView.group, bus.forward, bus.up, frameDt);
-    tripRoom?.frame(frameDt, { bus, lights, paused, camera, minimap, onHorn: () => sounds.horn() });
+    tripRoom?.frame(frameDt, { bus, lights, paused, camera, minimap, rainy: atmosphere.rainy, onHorn: () => sounds.horn() });
     busView.updateMirrors(renderer, scene);
     atmosphere.update(frameDt, inCab, bus.kmh);
     railways?.update(frameDt, camera.position, { x: busPos.x, z: busPos.z });

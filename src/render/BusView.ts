@@ -58,6 +58,9 @@ export class BusView {
   private mirrors: { cam: THREE.PerspectiveCamera; target: THREE.WebGLRenderTarget }[] = [];
   private mirrorFrame = 0;
   private cabTimer = 0;
+  /** Two exterior wipers on the windscreen (docs/rooms-spec.md §6): they sweep in rain, seen from outside. */
+  private wipers: THREE.Group[] = [];
+  private wipeT = 0;
 
   constructor(scene: THREE.Scene, livery: BusLivery = DEFAULT_LIVERY) {
     const add = (parent: THREE.Object3D, w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
@@ -82,6 +85,16 @@ export class BusView {
     screen.rotation.set(0, Math.PI / 2, 0);
     screen.rotateX(0.12);
     g.add(screen);
+    // Wipers: arms pivoting at the foot of the windscreen, parked flat along its bottom edge.
+    for (const z of [-0.62, 0.42]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(5.58, -0.1, z);
+      add(pivot, 0.03, 0.9, 0.04, chrome, 0, 0.45, 0);             // steel arm: black would vanish on the dark glass
+      add(pivot, 0.05, 0.75, 0.025, dark, 0.02, 0.5, 0.03);
+      pivot.rotation.x = Math.PI / 2;
+      g.add(pivot);
+      this.wipers.push(pivot);
+    }
     add(g, 0.06, 0.28, 1.7, dark, 5.52, 1.12, 0);
     add(g, 0.02, 0.16, 1.4, new THREE.MeshBasicMaterial({ color: 0xffb000 }), 5.56, 1.12, 0);
     add(g, 0.06, 0.5, 1.6, chrome, 5.52, -0.85, 0);
@@ -223,7 +236,17 @@ export class BusView {
     this.cab.add(board);
   }
 
-  setCabVisible(v: boolean): void { this.cab.visible = v; }
+  setCabVisible(v: boolean): void {
+    this.cab.visible = v;
+    this.wipers.forEach(w => { w.visible = !v; }); // from the cab the windscreen overlay draws its own wipers
+  }
+
+  /** Sweeps the exterior wipers in rain (about one stroke a second), and parks them otherwise. */
+  setWipers(on: boolean, dt: number): void {
+    this.wipeT = on ? this.wipeT + dt : 0;
+    const a = on ? Math.PI / 2 - Math.abs(Math.sin(this.wipeT * Math.PI)) * 1.45 : Math.PI / 2;
+    this.wipers.forEach(w => { w.rotation.x = a; });
+  }
 
   /**
    * Another player's bus in a Room (docs/rooms-spec.md §6): the same model, but no cab and no
